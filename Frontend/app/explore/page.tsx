@@ -191,7 +191,9 @@ export default function ExplorePage() {
             index={index}
             totalArticles={articles.length}
             imageSrc={
-              reelImages[index % reelImages.length] || "/placeholder.svg"
+              article.image ||
+              reelImages[index % reelImages.length] ||
+              "/placeholder.svg"
             }
             isLiked={article.liked}
             isSaved={article.bookmarked}

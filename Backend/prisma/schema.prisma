@@ -45,6 +45,7 @@ model Article {
   excerpt     String?
   category    String   @default("Technology")
   readTime    Int      @default(5)
+  image       String?
   likes       Int      @default(0)
   bookmarked  Boolean  @default(false)
   liked       Boolean  @default(false)

@@ -104,6 +104,7 @@ export const ArticleScalarFieldEnum = {
   excerpt: 'excerpt',
   category: 'category',
   readTime: 'readTime',
+  image: 'image',
   likes: 'likes',
   bookmarked: 'bookmarked',
   liked: 'liked',

@@ -43,6 +43,7 @@ export type ArticleMinAggregateOutputType = {
   excerpt: string | null
   category: string | null
   readTime: number | null
+  image: string | null
   likes: number | null
   bookmarked: boolean | null
   liked: boolean | null
@@ -58,6 +59,7 @@ export type ArticleMaxAggregateOutputType = {
   excerpt: string | null
   category: string | null
   readTime: number | null
+  image: string | null
   likes: number | null
   bookmarked: boolean | null
   liked: boolean | null
@@ -73,6 +75,7 @@ export type ArticleCountAggregateOutputType = {
   excerpt: number
   category: number
   readTime: number
+  image: number
   likes: number
   bookmarked: number
   liked: number
@@ -100,6 +103,7 @@ export type ArticleMinAggregateInputType = {
   excerpt?: true
   category?: true
   readTime?: true
+  image?: true
   likes?: true
   bookmarked?: true
   liked?: true
@@ -115,6 +119,7 @@ export type ArticleMaxAggregateInputType = {
   excerpt?: true
   category?: true
   readTime?: true
+  image?: true
   likes?: true
   bookmarked?: true
   liked?: true
@@ -130,6 +135,7 @@ export type ArticleCountAggregateInputType = {
   excerpt?: true
   category?: true
   readTime?: true
+  image?: true
   likes?: true
   bookmarked?: true
   liked?: true
@@ -232,6 +238,7 @@ export type ArticleGroupByOutputType = {
   excerpt: string | null
   category: string
   readTime: number
+  image: string | null
   likes: number
   bookmarked: boolean
   liked: boolean
@@ -270,6 +277,7 @@ export type ArticleWhereInput = {
   excerpt?: Prisma.StringNullableFilter<"Article"> | string | null
   category?: Prisma.StringFilter<"Article"> | string
   readTime?: Prisma.IntFilter<"Article"> | number
+  image?: Prisma.StringNullableFilter<"Article"> | string | null
   likes?: Prisma.IntFilter<"Article"> | number
   bookmarked?: Prisma.BoolFilter<"Article"> | boolean
   liked?: Prisma.BoolFilter<"Article"> | boolean
@@ -286,6 +294,7 @@ export type ArticleOrderByWithRelationInput = {
   excerpt?: Prisma.SortOrderInput | Prisma.SortOrder
   category?: Prisma.SortOrder
   readTime?: Prisma.SortOrder
+  image?: Prisma.SortOrderInput | Prisma.SortOrder
   likes?: Prisma.SortOrder
   bookmarked?: Prisma.SortOrder
   liked?: Prisma.SortOrder
@@ -305,6 +314,7 @@ export type ArticleWhereUniqueInput = Prisma.AtLeast<{
   excerpt?: Prisma.StringNullableFilter<"Article"> | string | null
   category?: Prisma.StringFilter<"Article"> | string
   readTime?: Prisma.IntFilter<"Article"> | number
+  image?: Prisma.StringNullableFilter<"Article"> | string | null
   likes?: Prisma.IntFilter<"Article"> | number
   bookmarked?: Prisma.BoolFilter<"Article"> | boolean
   liked?: Prisma.BoolFilter<"Article"> | boolean
@@ -321,6 +331,7 @@ export type ArticleOrderByWithAggregationInput = {
   excerpt?: Prisma.SortOrderInput | Prisma.SortOrder
   category?: Prisma.SortOrder
   readTime?: Prisma.SortOrder
+  image?: Prisma.SortOrderInput | Prisma.SortOrder
   likes?: Prisma.SortOrder
   bookmarked?: Prisma.SortOrder
   liked?: Prisma.SortOrder
@@ -344,6 +355,7 @@ export type ArticleScalarWhereWithAggregatesInput = {
   excerpt?: Prisma.StringNullableWithAggregatesFilter<"Article"> | string | null
   category?: Prisma.StringWithAggregatesFilter<"Article"> | string
   readTime?: Prisma.IntWithAggregatesFilter<"Article"> | number
+  image?: Prisma.StringNullableWithAggregatesFilter<"Article"> | string | null
   likes?: Prisma.IntWithAggregatesFilter<"Article"> | number
   bookmarked?: Prisma.BoolWithAggregatesFilter<"Article"> | boolean
   liked?: Prisma.BoolWithAggregatesFilter<"Article"> | boolean
@@ -359,6 +371,7 @@ export type ArticleCreateInput = {
   excerpt?: string | null
   category?: string
   readTime?: number
+  image?: string | null
   likes?: number
   bookmarked?: boolean
   liked?: boolean
@@ -374,6 +387,7 @@ export type ArticleUncheckedCreateInput = {
   excerpt?: string | null
   category?: string
   readTime?: number
+  image?: string | null
   likes?: number
   bookmarked?: boolean
   liked?: boolean
@@ -389,6 +403,7 @@ export type ArticleUpdateInput = {
   excerpt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   category?: Prisma.StringFieldUpdateOperationsInput | string
   readTime?: Prisma.IntFieldUpdateOperationsInput | number
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   likes?: Prisma.IntFieldUpdateOperationsInput | number
   bookmarked?: Prisma.BoolFieldUpdateOperationsInput | boolean
   liked?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -404,6 +419,7 @@ export type ArticleUncheckedUpdateInput = {
   excerpt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   category?: Prisma.StringFieldUpdateOperationsInput | string
   readTime?: Prisma.IntFieldUpdateOperationsInput | number
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   likes?: Prisma.IntFieldUpdateOperationsInput | number
   bookmarked?: Prisma.BoolFieldUpdateOperationsInput | boolean
   liked?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -419,6 +435,7 @@ export type ArticleCreateManyInput = {
   excerpt?: string | null
   category?: string
   readTime?: number
+  image?: string | null
   likes?: number
   bookmarked?: boolean
   liked?: boolean
@@ -434,6 +451,7 @@ export type ArticleUpdateManyMutationInput = {
   excerpt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   category?: Prisma.StringFieldUpdateOperationsInput | string
   readTime?: Prisma.IntFieldUpdateOperationsInput | number
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   likes?: Prisma.IntFieldUpdateOperationsInput | number
   bookmarked?: Prisma.BoolFieldUpdateOperationsInput | boolean
   liked?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -448,6 +466,7 @@ export type ArticleUncheckedUpdateManyInput = {
   excerpt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   category?: Prisma.StringFieldUpdateOperationsInput | string
   readTime?: Prisma.IntFieldUpdateOperationsInput | number
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   likes?: Prisma.IntFieldUpdateOperationsInput | number
   bookmarked?: Prisma.BoolFieldUpdateOperationsInput | boolean
   liked?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -473,6 +492,7 @@ export type ArticleCountOrderByAggregateInput = {
   excerpt?: Prisma.SortOrder
   category?: Prisma.SortOrder
   readTime?: Prisma.SortOrder
+  image?: Prisma.SortOrder
   likes?: Prisma.SortOrder
   bookmarked?: Prisma.SortOrder
   liked?: Prisma.SortOrder
@@ -493,6 +513,7 @@ export type ArticleMaxOrderByAggregateInput = {
   excerpt?: Prisma.SortOrder
   category?: Prisma.SortOrder
   readTime?: Prisma.SortOrder
+  image?: Prisma.SortOrder
   likes?: Prisma.SortOrder
   bookmarked?: Prisma.SortOrder
   liked?: Prisma.SortOrder
@@ -508,6 +529,7 @@ export type ArticleMinOrderByAggregateInput = {
   excerpt?: Prisma.SortOrder
   category?: Prisma.SortOrder
   readTime?: Prisma.SortOrder
+  image?: Prisma.SortOrder
   likes?: Prisma.SortOrder
   bookmarked?: Prisma.SortOrder
   liked?: Prisma.SortOrder
@@ -582,6 +604,7 @@ export type ArticleCreateWithoutAuthorInput = {
   excerpt?: string | null
   category?: string
   readTime?: number
+  image?: string | null
   likes?: number
   bookmarked?: boolean
   liked?: boolean
@@ -596,6 +619,7 @@ export type ArticleUncheckedCreateWithoutAuthorInput = {
   excerpt?: string | null
   category?: string
   readTime?: number
+  image?: string | null
   likes?: number
   bookmarked?: boolean
   liked?: boolean
@@ -639,6 +663,7 @@ export type ArticleScalarWhereInput = {
   excerpt?: Prisma.StringNullableFilter<"Article"> | string | null
   category?: Prisma.StringFilter<"Article"> | string
   readTime?: Prisma.IntFilter<"Article"> | number
+  image?: Prisma.StringNullableFilter<"Article"> | string | null
   likes?: Prisma.IntFilter<"Article"> | number
   bookmarked?: Prisma.BoolFilter<"Article"> | boolean
   liked?: Prisma.BoolFilter<"Article"> | boolean
@@ -654,6 +679,7 @@ export type ArticleCreateManyAuthorInput = {
   excerpt?: string | null
   category?: string
   readTime?: number
+  image?: string | null
   likes?: number
   bookmarked?: boolean
   liked?: boolean
@@ -668,6 +694,7 @@ export type ArticleUpdateWithoutAuthorInput = {
   excerpt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   category?: Prisma.StringFieldUpdateOperationsInput | string
   readTime?: Prisma.IntFieldUpdateOperationsInput | number
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   likes?: Prisma.IntFieldUpdateOperationsInput | number
   bookmarked?: Prisma.BoolFieldUpdateOperationsInput | boolean
   liked?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -682,6 +709,7 @@ export type ArticleUncheckedUpdateWithoutAuthorInput = {
   excerpt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   category?: Prisma.StringFieldUpdateOperationsInput | string
   readTime?: Prisma.IntFieldUpdateOperationsInput | number
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   likes?: Prisma.IntFieldUpdateOperationsInput | number
   bookmarked?: Prisma.BoolFieldUpdateOperationsInput | boolean
   liked?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -696,6 +724,7 @@ export type ArticleUncheckedUpdateManyWithoutAuthorInput = {
   excerpt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   category?: Prisma.StringFieldUpdateOperationsInput | string
   readTime?: Prisma.IntFieldUpdateOperationsInput | number
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   likes?: Prisma.IntFieldUpdateOperationsInput | number
   bookmarked?: Prisma.BoolFieldUpdateOperationsInput | boolean
   liked?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -712,6 +741,7 @@ export type ArticleSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   excerpt?: boolean
   category?: boolean
   readTime?: boolean
+  image?: boolean
   likes?: boolean
   bookmarked?: boolean
   liked?: boolean
@@ -728,6 +758,7 @@ export type ArticleSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Exten
   excerpt?: boolean
   category?: boolean
   readTime?: boolean
+  image?: boolean
   likes?: boolean
   bookmarked?: boolean
   liked?: boolean
@@ -744,6 +775,7 @@ export type ArticleSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Exten
   excerpt?: boolean
   category?: boolean
   readTime?: boolean
+  image?: boolean
   likes?: boolean
   bookmarked?: boolean
   liked?: boolean
@@ -760,6 +792,7 @@ export type ArticleSelectScalar = {
   excerpt?: boolean
   category?: boolean
   readTime?: boolean
+  image?: boolean
   likes?: boolean
   bookmarked?: boolean
   liked?: boolean
@@ -768,7 +801,7 @@ export type ArticleSelectScalar = {
   updatedAt?: boolean
 }
 
-export type ArticleOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "title" | "content" | "excerpt" | "category" | "readTime" | "likes" | "bookmarked" | "liked" | "authorId" | "createdAt" | "updatedAt", ExtArgs["result"]["article"]>
+export type ArticleOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "title" | "content" | "excerpt" | "category" | "readTime" | "image" | "likes" | "bookmarked" | "liked" | "authorId" | "createdAt" | "updatedAt", ExtArgs["result"]["article"]>
 export type ArticleInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   author?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }
@@ -791,6 +824,7 @@ export type $ArticlePayload<ExtArgs extends runtime.Types.Extensions.InternalArg
     excerpt: string | null
     category: string
     readTime: number
+    image: string | null
     likes: number
     bookmarked: boolean
     liked: boolean
@@ -1227,6 +1261,7 @@ export interface ArticleFieldRefs {
   readonly excerpt: Prisma.FieldRef<"Article", 'String'>
   readonly category: Prisma.FieldRef<"Article", 'String'>
   readonly readTime: Prisma.FieldRef<"Article", 'Int'>
+  readonly image: Prisma.FieldRef<"Article", 'String'>
   readonly likes: Prisma.FieldRef<"Article", 'Int'>
   readonly bookmarked: Prisma.FieldRef<"Article", 'Boolean'>
   readonly liked: Prisma.FieldRef<"Article", 'Boolean'>
