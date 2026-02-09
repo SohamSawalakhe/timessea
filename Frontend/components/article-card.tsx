@@ -4,12 +4,23 @@ import Link from "next/link"
 import { Heart } from "lucide-react"
 import type { Article } from "@/lib/data"
 import { cn } from "@/lib/utils"
+import { analytics, AnalyticsEventType } from "@/lib/analytics"
+
+// Helper to track article clicks
+const trackArticleClick = (articleId: string) => {
+  analytics.track({
+    event: AnalyticsEventType.POST_VIEW,
+    post_id: articleId,
+    device: 'web' // Will be auto-detected by service but good to have fallback
+  });
+};
 
 export function ArticleCardFeatured({ article }: { article: Article }) {
   return (
     <Link
       href={`/article/${article.id}`}
       className="group block overflow-hidden rounded-3xl border border-transparent bg-card shadow-sm hover:shadow-lg hover:border-border/60 transition-all duration-300"
+      onClick={() => trackArticleClick(article.id)}
     >
       <div className="aspect-video bg-secondary flex items-center justify-center relative overflow-hidden">
         {/* Placeholder gradient/image effect */}
@@ -59,6 +70,7 @@ export function ArticleCardCompact({ article }: { article: Article }) {
     <Link
       href={`/article/${article.id}`}
       className="group flex gap-4 rounded-2xl border border-transparent bg-card p-3 hover:bg-secondary/40 transition-colors"
+      onClick={() => trackArticleClick(article.id)}
     >
       <div className="h-20 w-20 shrink-0 rounded-xl bg-secondary flex items-center justify-center overflow-hidden">
         <div className="text-2xl font-black text-muted-foreground/20 font-serif group-hover:scale-110 transition-transform">
@@ -98,6 +110,7 @@ export function ArticleCardHorizontal({ article }: { article: Article }) {
     <Link
       href={`/article/${article.id}`}
       className="group flex gap-4 py-6 hover:bg-linear-to-r hover:from-transparent hover:via-secondary/10 hover:to-transparent -mx-4 px-4 transition-colors rounded-2xl"
+      onClick={() => trackArticleClick(article.id)}
     >
       <div className="flex flex-1 flex-col justify-between">
         <div>

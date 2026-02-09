@@ -104,3 +104,7 @@ public/uploads/
 *.bak
 *.backup
 *.old
+
+# Docker volumes and data
+clickhouse-data/
+redis-data/

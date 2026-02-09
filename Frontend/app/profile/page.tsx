@@ -19,8 +19,9 @@ import {
   Moon,
   LogIn,
   Sun,
-} from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+  BarChart2,
+} from "lucide-react"
+import { motion, AnimatePresence } from "framer-motion"
 
 const CustomSwitch = ({
   checked,
@@ -176,7 +177,34 @@ export default function ProfilePage() {
       </AnimatePresence>
 
       {/* Pro Banner */}
-      <motion.div
+      
+      {/* Analytics Banner - Only show for logged in users or consistently */}
+      {user && (
+        <motion.div
+           initial={{ opacity: 0, scale: 0.95 }}
+           animate={{ opacity: 1, scale: 1 }}
+           whileHover={{ scale: 1.02 }}
+           onClick={() => router.push("/dashboard")}
+           className="mb-6 flex cursor-pointer items-center gap-4 rounded-3xl bg-card p-5 border border-border/50 shadow-sm hover:shadow-md transition-all group"
+        >
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary group-hover:scale-110 transition-transform">
+             <BarChart2 className="h-6 w-6" />
+          </div>
+          <div className="flex-1">
+             <p className="text-base font-bold text-foreground">Analytics Dashboard</p>
+             <p className="text-xs font-medium text-muted-foreground">
+               View your content performance
+             </p>
+          </div>
+          <div className="rounded-full bg-secondary p-2 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+             <ChevronRight className="h-4 w-4" />
+          </div>
+        </motion.div>
+      )}
+
+
+
+      <motion.div 
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         whileHover={{ scale: 1.02 }}

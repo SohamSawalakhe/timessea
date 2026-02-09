@@ -1,0 +1,49 @@
+# version: '3.9'
+
+services:
+  # Redis - for queues (BullMQ) and live counters
+  redis:
+    image: redis:7-alpine
+    container_name: timessea_redis
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+    networks:
+      - timessea_network
+
+  # ClickHouse - for analytics event storage
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.1
+    container_name: timessea_clickhouse
+    ports:
+      - '8123:8123' # HTTP interface
+      - '9000:9000' # Native client port
+    environment:
+      CLICKHOUSE_DB: analytics
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - clickhouse_logs:/var/log/clickhouse-server
+      - ./clickhouse-init:/docker-entrypoint-initdb.d
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    restart: unless-stopped
+    networks:
+      - timessea_network
+
+volumes:
+  redis_data:
+    driver: local
+  clickhouse_data:
+    driver: local
+  clickhouse_logs:
+    driver: local
+
+networks:
+  timessea_network:
+    driver: bridge
