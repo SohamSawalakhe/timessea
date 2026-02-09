@@ -1,21 +1,22 @@
 export type Article = {
-  id: string
-  title: string
-  excerpt: string
-  content: string
+  id: string;
+  title: string;
+  excerpt: string;
+  content: string;
   author: {
-    name: string
-    avatar: string
-    email: string
-  }
-  category: string
-  readTime: number
-  publishedAt: string
-  image: string
-  liked: boolean
-  bookmarked: boolean
-  likes: number
-}
+    name: string;
+    avatar: string;
+    email: string;
+    picture?: string;
+  };
+  category: string;
+  readTime: number;
+  publishedAt: string;
+  image: string;
+  liked: boolean;
+  bookmarked: boolean;
+  likes: number;
+};
 
 export const categories = [
   "Trending",
@@ -24,7 +25,7 @@ export const categories = [
   "Business",
   "Science",
   "Culture",
-]
+];
 
 export const articles: Article[] = [
   {
@@ -233,4 +234,4 @@ The most exciting possibilities lie not in AI replacing human creativity, but in
     bookmarked: false,
     likes: 334,
   },
-]
+];

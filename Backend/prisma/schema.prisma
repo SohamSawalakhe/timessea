@@ -14,15 +14,28 @@ datasource db {
 }
 
 model User {
+  id            String         @id @default(uuid())
+  email         String         @unique
+  name          String?
+  picture       String?
+  googleId      String?        @unique
+  provider      String?        @default("google")
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  articles      Article[]
+  refreshTokens RefreshToken[]
+}
+
+model RefreshToken {
   id        String   @id @default(uuid())
-  email     String   @unique
-  name      String?
-  picture   String?
-  googleId  String?  @unique
-  provider  String?  @default("google")
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  articles  Article[]
+
+  @@index([userId])
+  @@index([token])
 }
 
 model Article {

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2, ArrowRight, Mail, CheckCircle2 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -12,23 +13,33 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { login, isAuthenticated, isLoading: authLoading } = useAuth();
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      router.push("/profile");
+    }
+  }, [isAuthenticated, authLoading, router]);
 
   useEffect(() => {
     const token = searchParams.get("token");
     if (token) {
-      localStorage.setItem("authToken", token);
       // Fetch user profile
-      fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/profile`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/auth/profile`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      )
         .then((res) => res.json())
         .then((user) => {
-          localStorage.setItem("user", JSON.stringify(user));
-          router.push("/explore");
+          login(token, user);
+          router.push("/profile");
         })
         .catch((err) => console.error(err));
     }
-  }, [searchParams, router]);
+  }, [searchParams, router, login]);
 
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,12 +85,11 @@ export default function LoginPage() {
 
       if (!res.ok) throw new Error(data.message || "Verification failed");
 
-      // Save token (in a real app, use a proper auth context or cookies)
-      localStorage.setItem("authToken", data.token);
-      localStorage.setItem("user", JSON.stringify(data.user));
+      // Use auth context to handle login
+      login(data.token, data.user);
 
-      // Direct to explore page
-      router.push("/explore");
+      // Direct to profile page
+      router.push("/profile");
     } catch (err: any) {
       setError(err.message);
     } finally {
