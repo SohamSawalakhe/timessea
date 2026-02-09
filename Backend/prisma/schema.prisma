@@ -53,6 +53,7 @@ model Article {
   author      User     @relation(fields: [authorId], references: [id])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  views       Int      @default(0)
 
   @@index([authorId])
   @@index([category])

@@ -16,6 +16,7 @@ export type Article = {
   liked: boolean;
   bookmarked: boolean;
   likes: number;
+  views: number;
 };
 
 export const categories = [
@@ -66,6 +67,7 @@ The future of Web 3 likely lies not in replacing existing systems entirely, but 
     liked: false,
     bookmarked: false,
     likes: 142,
+    views: 12450,
   },
   {
     id: "2",
@@ -101,6 +103,7 @@ In today's rapidly evolving landscape, adaptability is perhaps the most crucial 
     liked: true,
     bookmarked: true,
     likes: 89,
+    views: 8900,
   },
   {
     id: "3",
@@ -138,6 +141,7 @@ When you strip away decorative elements, typography becomes the primary vehicle 
     liked: false,
     bookmarked: false,
     likes: 215,
+    views: 32100,
   },
   {
     id: "4",
@@ -171,6 +175,7 @@ While fully fault-tolerant quantum computers may still be years away, hybrid qua
     liked: false,
     bookmarked: true,
     likes: 178,
+    views: 15600,
   },
   {
     id: "5",
@@ -202,6 +207,7 @@ Most organizations are landing on a hybrid model that combines the flexibility o
     liked: true,
     bookmarked: false,
     likes: 96,
+    views: 5400,
   },
   {
     id: "6",
@@ -233,5 +239,6 @@ The most exciting possibilities lie not in AI replacing human creativity, but in
     liked: false,
     bookmarked: false,
     likes: 334,
+    views: 45200,
   },
 ];

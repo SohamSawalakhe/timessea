@@ -29,11 +29,13 @@ export type AggregateArticle = {
 export type ArticleAvgAggregateOutputType = {
   readTime: number | null
   likes: number | null
+  views: number | null
 }
 
 export type ArticleSumAggregateOutputType = {
   readTime: number | null
   likes: number | null
+  views: number | null
 }
 
 export type ArticleMinAggregateOutputType = {
@@ -50,6 +52,7 @@ export type ArticleMinAggregateOutputType = {
   authorId: string | null
   createdAt: Date | null
   updatedAt: Date | null
+  views: number | null
 }
 
 export type ArticleMaxAggregateOutputType = {
@@ -66,6 +69,7 @@ export type ArticleMaxAggregateOutputType = {
   authorId: string | null
   createdAt: Date | null
   updatedAt: Date | null
+  views: number | null
 }
 
 export type ArticleCountAggregateOutputType = {
@@ -82,6 +86,7 @@ export type ArticleCountAggregateOutputType = {
   authorId: number
   createdAt: number
   updatedAt: number
+  views: number
   _all: number
 }
 
@@ -89,11 +94,13 @@ export type ArticleCountAggregateOutputType = {
 export type ArticleAvgAggregateInputType = {
   readTime?: true
   likes?: true
+  views?: true
 }
 
 export type ArticleSumAggregateInputType = {
   readTime?: true
   likes?: true
+  views?: true
 }
 
 export type ArticleMinAggregateInputType = {
@@ -110,6 +117,7 @@ export type ArticleMinAggregateInputType = {
   authorId?: true
   createdAt?: true
   updatedAt?: true
+  views?: true
 }
 
 export type ArticleMaxAggregateInputType = {
@@ -126,6 +134,7 @@ export type ArticleMaxAggregateInputType = {
   authorId?: true
   createdAt?: true
   updatedAt?: true
+  views?: true
 }
 
 export type ArticleCountAggregateInputType = {
@@ -142,6 +151,7 @@ export type ArticleCountAggregateInputType = {
   authorId?: true
   createdAt?: true
   updatedAt?: true
+  views?: true
   _all?: true
 }
 
@@ -245,6 +255,7 @@ export type ArticleGroupByOutputType = {
   authorId: string
   createdAt: Date
   updatedAt: Date
+  views: number
   _count: ArticleCountAggregateOutputType | null
   _avg: ArticleAvgAggregateOutputType | null
   _sum: ArticleSumAggregateOutputType | null
@@ -284,6 +295,7 @@ export type ArticleWhereInput = {
   authorId?: Prisma.StringFilter<"Article"> | string
   createdAt?: Prisma.DateTimeFilter<"Article"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Article"> | Date | string
+  views?: Prisma.IntFilter<"Article"> | number
   author?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
 }
 
@@ -301,6 +313,7 @@ export type ArticleOrderByWithRelationInput = {
   authorId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  views?: Prisma.SortOrder
   author?: Prisma.UserOrderByWithRelationInput
 }
 
@@ -321,6 +334,7 @@ export type ArticleWhereUniqueInput = Prisma.AtLeast<{
   authorId?: Prisma.StringFilter<"Article"> | string
   createdAt?: Prisma.DateTimeFilter<"Article"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Article"> | Date | string
+  views?: Prisma.IntFilter<"Article"> | number
   author?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
 }, "id">
 
@@ -338,6 +352,7 @@ export type ArticleOrderByWithAggregationInput = {
   authorId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  views?: Prisma.SortOrder
   _count?: Prisma.ArticleCountOrderByAggregateInput
   _avg?: Prisma.ArticleAvgOrderByAggregateInput
   _max?: Prisma.ArticleMaxOrderByAggregateInput
@@ -362,6 +377,7 @@ export type ArticleScalarWhereWithAggregatesInput = {
   authorId?: Prisma.StringWithAggregatesFilter<"Article"> | string
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Article"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"Article"> | Date | string
+  views?: Prisma.IntWithAggregatesFilter<"Article"> | number
 }
 
 export type ArticleCreateInput = {
@@ -377,6 +393,7 @@ export type ArticleCreateInput = {
   liked?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
+  views?: number
   author: Prisma.UserCreateNestedOneWithoutArticlesInput
 }
 
@@ -394,6 +411,7 @@ export type ArticleUncheckedCreateInput = {
   authorId: string
   createdAt?: Date | string
   updatedAt?: Date | string
+  views?: number
 }
 
 export type ArticleUpdateInput = {
@@ -409,6 +427,7 @@ export type ArticleUpdateInput = {
   liked?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  views?: Prisma.IntFieldUpdateOperationsInput | number
   author?: Prisma.UserUpdateOneRequiredWithoutArticlesNestedInput
 }
 
@@ -426,6 +445,7 @@ export type ArticleUncheckedUpdateInput = {
   authorId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  views?: Prisma.IntFieldUpdateOperationsInput | number
 }
 
 export type ArticleCreateManyInput = {
@@ -442,6 +462,7 @@ export type ArticleCreateManyInput = {
   authorId: string
   createdAt?: Date | string
   updatedAt?: Date | string
+  views?: number
 }
 
 export type ArticleUpdateManyMutationInput = {
@@ -457,6 +478,7 @@ export type ArticleUpdateManyMutationInput = {
   liked?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  views?: Prisma.IntFieldUpdateOperationsInput | number
 }
 
 export type ArticleUncheckedUpdateManyInput = {
@@ -473,6 +495,7 @@ export type ArticleUncheckedUpdateManyInput = {
   authorId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  views?: Prisma.IntFieldUpdateOperationsInput | number
 }
 
 export type ArticleListRelationFilter = {
@@ -499,11 +522,13 @@ export type ArticleCountOrderByAggregateInput = {
   authorId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  views?: Prisma.SortOrder
 }
 
 export type ArticleAvgOrderByAggregateInput = {
   readTime?: Prisma.SortOrder
   likes?: Prisma.SortOrder
+  views?: Prisma.SortOrder
 }
 
 export type ArticleMaxOrderByAggregateInput = {
@@ -520,6 +545,7 @@ export type ArticleMaxOrderByAggregateInput = {
   authorId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  views?: Prisma.SortOrder
 }
 
 export type ArticleMinOrderByAggregateInput = {
@@ -536,11 +562,13 @@ export type ArticleMinOrderByAggregateInput = {
   authorId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  views?: Prisma.SortOrder
 }
 
 export type ArticleSumOrderByAggregateInput = {
   readTime?: Prisma.SortOrder
   likes?: Prisma.SortOrder
+  views?: Prisma.SortOrder
 }
 
 export type ArticleCreateNestedManyWithoutAuthorInput = {
@@ -610,6 +638,7 @@ export type ArticleCreateWithoutAuthorInput = {
   liked?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
+  views?: number
 }
 
 export type ArticleUncheckedCreateWithoutAuthorInput = {
@@ -625,6 +654,7 @@ export type ArticleUncheckedCreateWithoutAuthorInput = {
   liked?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
+  views?: number
 }
 
 export type ArticleCreateOrConnectWithoutAuthorInput = {
@@ -670,6 +700,7 @@ export type ArticleScalarWhereInput = {
   authorId?: Prisma.StringFilter<"Article"> | string
   createdAt?: Prisma.DateTimeFilter<"Article"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Article"> | Date | string
+  views?: Prisma.IntFilter<"Article"> | number
 }
 
 export type ArticleCreateManyAuthorInput = {
@@ -685,6 +716,7 @@ export type ArticleCreateManyAuthorInput = {
   liked?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
+  views?: number
 }
 
 export type ArticleUpdateWithoutAuthorInput = {
@@ -700,6 +732,7 @@ export type ArticleUpdateWithoutAuthorInput = {
   liked?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  views?: Prisma.IntFieldUpdateOperationsInput | number
 }
 
 export type ArticleUncheckedUpdateWithoutAuthorInput = {
@@ -715,6 +748,7 @@ export type ArticleUncheckedUpdateWithoutAuthorInput = {
   liked?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  views?: Prisma.IntFieldUpdateOperationsInput | number
 }
 
 export type ArticleUncheckedUpdateManyWithoutAuthorInput = {
@@ -730,6 +764,7 @@ export type ArticleUncheckedUpdateManyWithoutAuthorInput = {
   liked?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  views?: Prisma.IntFieldUpdateOperationsInput | number
 }
 
 
@@ -748,6 +783,7 @@ export type ArticleSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   authorId?: boolean
   createdAt?: boolean
   updatedAt?: boolean
+  views?: boolean
   author?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["article"]>
 
@@ -765,6 +801,7 @@ export type ArticleSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Exten
   authorId?: boolean
   createdAt?: boolean
   updatedAt?: boolean
+  views?: boolean
   author?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["article"]>
 
@@ -782,6 +819,7 @@ export type ArticleSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Exten
   authorId?: boolean
   createdAt?: boolean
   updatedAt?: boolean
+  views?: boolean
   author?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["article"]>
 
@@ -799,9 +837,10 @@ export type ArticleSelectScalar = {
   authorId?: boolean
   createdAt?: boolean
   updatedAt?: boolean
+  views?: boolean
 }
 
-export type ArticleOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "title" | "content" | "excerpt" | "category" | "readTime" | "image" | "likes" | "bookmarked" | "liked" | "authorId" | "createdAt" | "updatedAt", ExtArgs["result"]["article"]>
+export type ArticleOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "title" | "content" | "excerpt" | "category" | "readTime" | "image" | "likes" | "bookmarked" | "liked" | "authorId" | "createdAt" | "updatedAt" | "views", ExtArgs["result"]["article"]>
 export type ArticleInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   author?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }
@@ -831,6 +870,7 @@ export type $ArticlePayload<ExtArgs extends runtime.Types.Extensions.InternalArg
     authorId: string
     createdAt: Date
     updatedAt: Date
+    views: number
   }, ExtArgs["result"]["article"]>
   composites: {}
 }
@@ -1268,6 +1308,7 @@ export interface ArticleFieldRefs {
   readonly authorId: Prisma.FieldRef<"Article", 'String'>
   readonly createdAt: Prisma.FieldRef<"Article", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"Article", 'DateTime'>
+  readonly views: Prisma.FieldRef<"Article", 'Int'>
 }
     
 

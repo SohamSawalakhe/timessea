@@ -99,4 +99,16 @@ export class ArticlesService {
       include: { author: true },
     });
   }
+
+  async incrementViews(id: string): Promise<Article> {
+    return this.prisma.article.update({
+      where: { id },
+      data: {
+        views: {
+          increment: 1,
+        },
+      },
+      include: { author: true },
+    });
+  }
 }

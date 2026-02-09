@@ -52,4 +52,9 @@ export class ArticlesController {
   async toggleBookmark(@Param('id') id: string) {
     return await this.articlesService.toggleBookmark(id);
   }
+
+  @Post(':id/view')
+  async incrementViews(@Param('id') id: string) {
+    return await this.articlesService.incrementViews(id);
+  }
 }

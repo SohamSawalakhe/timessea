@@ -151,6 +151,25 @@ export default function ExplorePage() {
     }
   }, []);
 
+  const handleView = useCallback(async (id: string) => {
+    // Optimistic update (increment view count locally)
+    setArticles((prev) =>
+      prev.map((article) =>
+        article.id === id
+          ? { ...article, views: (article.views || 0) + 1 }
+          : article,
+      ),
+    );
+
+    try {
+      await fetch(`http://localhost:5000/api/articles/${id}/view`, {
+        method: "POST",
+      });
+    } catch (error) {
+      console.error("Error logging view:", error);
+    }
+  }, []);
+
   if (isLoading && articles.length === 0) {
     return (
       <div className="flex h-screen items-center justify-center bg-black text-white">
@@ -199,6 +218,7 @@ export default function ExplorePage() {
             isSaved={article.bookmarked}
             onToggleLike={toggleLike}
             onToggleSave={toggleSave}
+            onView={handleView}
           />
         ))}
         {/* Loading trigger / Spinner at bottom */}

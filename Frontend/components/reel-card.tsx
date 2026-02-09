@@ -24,6 +24,7 @@ interface ReelCardProps {
   isSaved: boolean;
   onToggleLike: (id: string) => void;
   onToggleSave: (id: string) => void;
+  onView: (id: string) => void;
 }
 
 function extractKeyPoints(content: string): string[] {
@@ -46,13 +47,41 @@ export function ReelCard({
   isSaved,
   onToggleLike,
   onToggleSave,
+  onView,
 }: ReelCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showReadMore, setShowReadMore] = useState(false);
   const contentRef = useRef<HTMLParagraphElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const hasViewedRef = useRef(false);
   const keyPoints = extractKeyPoints(article.content);
   const commentCount = Math.floor(article.likes * 0.3);
-  const viewCount = article.likes * 12 + Math.floor(Math.random() * 500);
+  const viewCount = article.views;
+
+  // View tracking
+  useEffect(() => {
+    if (hasViewedRef.current || !cardRef.current) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          // Set a timeout to confirm view
+          const timer = setTimeout(() => {
+            if (hasViewedRef.current) return;
+            onView(article.id);
+            hasViewedRef.current = true;
+          }, 1000); // 1 second threshold
+
+          return () => clearTimeout(timer);
+        }
+      },
+      { threshold: 0.6 }, // 60% visibility required
+    );
+
+    observer.observe(cardRef.current);
+
+    return () => observer.disconnect();
+  }, [article.id, onView]);
 
   // Check if content overflows (is clamped)
   useEffect(() => {
@@ -68,7 +97,10 @@ export function ReelCard({
   };
 
   return (
-    <div className="relative h-dvh w-full snap-start snap-always flex flex-col bg-background">
+    <div
+      ref={cardRef}
+      className="relative h-dvh w-full snap-start snap-always flex flex-col bg-background"
+    >
       {/* Top section: Large image - shrinks when content expands */}
       <div
         className={cn(
