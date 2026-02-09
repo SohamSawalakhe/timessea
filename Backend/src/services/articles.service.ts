@@ -39,8 +39,9 @@ export class ArticlesService {
     return this.prisma.article.create({ data });
   }
 
-  findAll(limit = 20, offset = 0): Promise<Article[]> {
-    return this.prisma.article.findMany({
+  async findAll(limit = 20, offset = 0): Promise<Article[]> {
+    const start = Date.now();
+    const articles = await this.prisma.article.findMany({
       take: limit,
       skip: offset,
       include: {
@@ -55,6 +56,8 @@ export class ArticlesService {
       },
       orderBy: { createdAt: 'desc' },
     });
+    console.log(`findAll took ${Date.now() - start}ms for ${limit} items`);
+    return articles;
   }
 
   findOne(id: string): Promise<Article | null> {
