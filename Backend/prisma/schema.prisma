@@ -29,8 +29,18 @@ model Article {
   id          String   @id @default(uuid())
   title       String
   content     String
+  excerpt     String?
+  category    String   @default("Technology")
+  readTime    Int      @default(5)
+  likes       Int      @default(0)
+  bookmarked  Boolean  @default(false)
+  liked       Boolean  @default(false)
   authorId    String
   author      User     @relation(fields: [authorId], references: [id])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([authorId])
+  @@index([category])
+  @@index([createdAt])
 }

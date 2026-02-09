@@ -39,9 +39,21 @@ export class ArticlesService {
     return this.prisma.article.create({ data });
   }
 
-  findAll(): Promise<Article[]> {
+  findAll(limit = 20, offset = 0): Promise<Article[]> {
     return this.prisma.article.findMany({
-      include: { author: true },
+      take: limit,
+      skip: offset,
+      include: {
+        author: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            picture: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
     });
   }
 
@@ -55,5 +67,36 @@ export class ArticlesService {
 
   remove(id: string): Promise<Article> {
     return this.prisma.article.delete({ where: { id } });
+  }
+
+  async toggleLike(id: string): Promise<Article> {
+    const article = await this.prisma.article.findUnique({ where: { id } });
+    if (!article) {
+      throw new Error('Article not found');
+    }
+
+    return this.prisma.article.update({
+      where: { id },
+      data: {
+        liked: !article.liked,
+        likes: article.liked ? article.likes - 1 : article.likes + 1,
+      },
+      include: { author: true },
+    });
+  }
+
+  async toggleBookmark(id: string): Promise<Article> {
+    const article = await this.prisma.article.findUnique({ where: { id } });
+    if (!article) {
+      throw new Error('Article not found');
+    }
+
+    return this.prisma.article.update({
+      where: { id },
+      data: {
+        bookmarked: !article.bookmarked,
+      },
+      include: { author: true },
+    });
   }
 }
