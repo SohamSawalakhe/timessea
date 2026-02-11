@@ -101,17 +101,19 @@ export const ArticleScalarFieldEnum = {
   id: 'id',
   title: 'title',
   content: 'content',
-  excerpt: 'excerpt',
-  category: 'category',
-  readTime: 'readTime',
-  image: 'image',
-  likes: 'likes',
-  bookmarked: 'bookmarked',
-  liked: 'liked',
   authorId: 'authorId',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt',
-  views: 'views'
+  bookmarked: 'bookmarked',
+  category: 'category',
+  excerpt: 'excerpt',
+  liked: 'liked',
+  likes: 'likes',
+  readTime: 'readTime',
+  image: 'image',
+  views: 'views',
+  published: 'published',
+  scheduledAt: 'scheduledAt'
 } as const
 
 export type ArticleScalarFieldEnum = (typeof ArticleScalarFieldEnum)[keyof typeof ArticleScalarFieldEnum]

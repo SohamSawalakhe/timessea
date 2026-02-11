@@ -6,7 +6,7 @@ async function getArticles() {
     const res = await fetch(
       "http://127.0.0.1:5000/api/articles?limit=3&offset=0",
       {
-        next: { revalidate: 60 },
+        next: { revalidate: 0 },
       },
     );
     console.log(`Frontend fetch took ${Date.now() - start}ms`);

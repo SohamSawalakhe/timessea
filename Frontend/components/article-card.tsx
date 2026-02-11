@@ -1,17 +1,18 @@
-"use client"
+"use client";
 
-import Link from "next/link"
-import { Heart } from "lucide-react"
-import type { Article } from "@/lib/data"
-import { cn } from "@/lib/utils"
-import { analytics, AnalyticsEventType } from "@/lib/analytics"
+import Link from "next/link";
+import Image from "next/image";
+import { Heart } from "lucide-react";
+import type { Article } from "@/lib/data";
+import { cn } from "@/lib/utils";
+import { analytics, AnalyticsEventType } from "@/lib/analytics";
 
 // Helper to track article clicks
 const trackArticleClick = (articleId: string) => {
   analytics.track({
     event: AnalyticsEventType.POST_VIEW,
     post_id: articleId,
-    device: 'web' // Will be auto-detected by service but good to have fallback
+    device: "web", // Will be auto-detected by service but good to have fallback
   });
 };
 
@@ -23,13 +24,23 @@ export function ArticleCardFeatured({ article }: { article: Article }) {
       onClick={() => trackArticleClick(article.id)}
     >
       <div className="aspect-video bg-secondary flex items-center justify-center relative overflow-hidden">
-        {/* Placeholder gradient/image effect */}
-        <div className="absolute inset-0 bg-linear-to-tr from-secondary/80 to-muted/20" />
-        <div className="relative text-7xl font-black text-foreground/5 font-serif select-none transform group-hover:scale-110 transition-transform duration-500">
-          {article.title.charAt(0)}
-        </div>
+        {article.image ? (
+          <Image
+            src={article.image}
+            alt={article.title}
+            fill
+            className="object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+        ) : (
+          <>
+            <div className="absolute inset-0 bg-linear-to-tr from-secondary/80 to-muted/20" />
+            <div className="relative text-7xl font-black text-foreground/5 font-serif select-none transform group-hover:scale-110 transition-transform duration-500">
+              {article.title.charAt(0)}
+            </div>
+          </>
+        )}
         <div className="absolute top-4 left-4">
-             <span className="rounded-full bg-background/80 backdrop-blur-md px-3 py-1 text-[10px] font-bold text-foreground shadow-sm">
+          <span className="rounded-full bg-background/80 backdrop-blur-md px-3 py-1 text-[10px] font-bold text-foreground shadow-sm">
             {article.category}
           </span>
         </div>
@@ -37,7 +48,7 @@ export function ArticleCardFeatured({ article }: { article: Article }) {
       <div className="p-5">
         <div className="mb-4 flex items-center gap-3">
           <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary ring-2 ring-background">
-              {article.author.avatar || article.author.name.charAt(0)}
+            {article.author.avatar || article.author.name.charAt(0)}
           </div>
           <div>
             <p className="text-xs font-bold text-foreground">
@@ -55,14 +66,14 @@ export function ArticleCardFeatured({ article }: { article: Article }) {
           <span className="text-[10px] font-semibold text-muted-foreground">
             {article.readTime} min read
           </span>
-           <div className="flex items-center gap-1 text-muted-foreground">
-               <Heart className="h-3 w-3" />
-               <span className="text-[10px] font-bold">{article.likes}</span>
-           </div>
+          <div className="flex items-center gap-1 text-muted-foreground">
+            <Heart className="h-3 w-3" />
+            <span className="text-[10px] font-bold">{article.likes}</span>
+          </div>
         </div>
       </div>
     </Link>
-  )
+  );
 }
 
 export function ArticleCardCompact({ article }: { article: Article }) {
@@ -94,7 +105,7 @@ export function ArticleCardCompact({ article }: { article: Article }) {
             <Heart
               className={cn(
                 "h-2.5 w-2.5",
-                article.liked && "fill-red-500 text-red-500"
+                article.liked && "fill-red-500 text-red-500",
               )}
             />
             <span>{article.likes}</span>
@@ -102,7 +113,7 @@ export function ArticleCardCompact({ article }: { article: Article }) {
         </div>
       </div>
     </Link>
-  )
+  );
 }
 
 export function ArticleCardHorizontal({ article }: { article: Article }) {
@@ -115,9 +126,9 @@ export function ArticleCardHorizontal({ article }: { article: Article }) {
       <div className="flex flex-1 flex-col justify-between">
         <div>
           <div className="mb-2 flex items-center gap-2">
-             <div className="h-5 w-5 rounded-full bg-secondary flex items-center justify-center text-[9px] font-bold text-muted-foreground">
-                {article.author.avatar || article.author.name.charAt(0)}
-             </div>
+            <div className="h-5 w-5 rounded-full bg-secondary flex items-center justify-center text-[9px] font-bold text-muted-foreground">
+              {article.author.avatar || article.author.name.charAt(0)}
+            </div>
             <span className="text-[11px] font-semibold text-muted-foreground">
               {article.author.name} · {article.publishedAt}
             </span>
@@ -136,15 +147,22 @@ export function ArticleCardHorizontal({ article }: { article: Article }) {
           <span className="text-[10px] font-medium text-muted-foreground">
             {article.readTime} min read
           </span>
-          
         </div>
       </div>
-      <div className="h-24 w-24 shrink-0 rounded-2xl bg-secondary flex items-center justify-center overflow-hidden shadow-inset-sm">
-        <div className="text-3xl font-black text-muted-foreground/15 font-serif group-hover:scale-110 transition-transform duration-500">
-          {article.title.charAt(0)}
-        </div>
+      <div className="h-24 w-24 shrink-0 rounded-2xl bg-secondary flex items-center justify-center overflow-hidden shadow-inset-sm relative">
+        {article.image ? (
+          <Image
+            src={article.image}
+            alt={article.title}
+            fill
+            className="object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+        ) : (
+          <div className="text-3xl font-black text-muted-foreground/15 font-serif group-hover:scale-110 transition-transform duration-500">
+            {article.title.charAt(0)}
+          </div>
+        )}
       </div>
     </Link>
-  )
+  );
 }
-

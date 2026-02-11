@@ -173,11 +173,6 @@ export function ReelCard({
         {/* Expandable Content - Instagram Style */}
         <div className="relative">
           {/* Excerpt/Description */}
-          {article.excerpt && (
-            <p className="text-sm sm:text-base leading-relaxed text-foreground/80 mb-2 sm:mb-3 font-medium">
-              {article.excerpt}
-            </p>
-          )}
 
           {/* Content with Read More/Less */}
           <div className="text-xs sm:text-sm leading-relaxed text-muted-foreground">

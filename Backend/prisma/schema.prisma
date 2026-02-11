@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
@@ -30,30 +24,32 @@ model RefreshToken {
   id        String   @id @default(uuid())
   token     String   @unique
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt DateTime
   createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([token])
 }
 
 model Article {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   title       String
   content     String
-  excerpt     String?
-  category    String   @default("Technology")
-  readTime    Int      @default(5)
-  image       String?
-  likes       Int      @default(0)
-  bookmarked  Boolean  @default(false)
-  liked       Boolean  @default(false)
   authorId    String
-  author      User     @relation(fields: [authorId], references: [id])
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  views       Int      @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  bookmarked  Boolean   @default(false)
+  category    String    @default("Technology")
+  excerpt     String?
+  liked       Boolean   @default(false)
+  likes       Int       @default(0)
+  readTime    Int       @default(5)
+  image       String?
+  views       Int       @default(0)
+  published   Boolean   @default(true)
+  scheduledAt DateTime?
+  author      User      @relation(fields: [authorId], references: [id])
 
   @@index([authorId])
   @@index([category])

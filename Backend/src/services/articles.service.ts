@@ -34,6 +34,10 @@ export class ArticlesService {
       data: {
         title: dto.title,
         content: dto.content,
+        excerpt: dto.excerpt,
+        image: dto.image,
+        category: dto.category,
+        readTime: dto.readTime,
         authorId: author.id,
       },
       include: { author: true },

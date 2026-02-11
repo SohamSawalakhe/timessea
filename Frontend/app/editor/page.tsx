@@ -1,8 +1,8 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { AppShell } from "@/components/app-shell"
+import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { AppShell } from "@/components/app-shell";
 import {
   ArrowLeft,
   Bold,
@@ -17,65 +17,138 @@ import {
   Send,
   Loader2,
   Settings2,
-} from "lucide-react"
-import { categories } from "@/lib/data"
-import { cn } from "@/lib/utils"
-import { motion, AnimatePresence } from "framer-motion"
+  X,
+} from "lucide-react";
+import { categories } from "@/lib/data";
+import { cn } from "@/lib/utils";
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function EditorPage() {
-  const router = useRouter()
-  const [title, setTitle] = useState("")
-  const [content, setContent] = useState("")
-  const [selectedCategory, setSelectedCategory] = useState("")
-  const [isPreview, setIsPreview] = useState(false)
-  const [published, setPublished] = useState(false)
-  const [isPublishing, setIsPublishing] = useState(false)
+  const router = useRouter();
+  const [title, setTitle] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
+  // const [excerpt, setExcerpt] = useState(""); // Removed excerpt state
+  // const [content, setContent] = useState(""); // Removed single string state
+  type Block = { id: string; type: "text" | "image"; content: string };
+  const [blocks, setBlocks] = useState<Block[]>([
+    { id: crypto.randomUUID(), type: "text", content: "" },
+  ]);
+  const [activeBlockId, setActiveBlockId] = useState<string>(blocks[0].id);
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [isPreview, setIsPreview] = useState(false);
+  const [published, setPublished] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const coverImageInputRef = useRef<HTMLInputElement>(null);
 
-  const wordCount = content
+  const [user, setUser] = useState<{
+    name: string;
+    email: string;
+    picture?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch (e) {
+        console.error("Failed to parse user from local storage", e);
+      }
+    }
+  }, []);
+
+  const handleCoverImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setImageUrl(event.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const base64String = event.target?.result as string;
+        // Add image block and a new text block below it
+        const newImageBlock: Block = {
+          id: crypto.randomUUID(),
+          type: "image",
+          content: base64String,
+        };
+        const newTextBlock: Block = {
+          id: crypto.randomUUID(),
+          type: "text",
+          content: "",
+        };
+
+        setBlocks((prev) => [...prev, newImageBlock, newTextBlock]);
+        setActiveBlockId(newTextBlock.id);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const fullContent = blocks
+    .map((b) => (b.type === "image" ? `\n![Image](${b.content})\n` : b.content))
+    .join("\n");
+
+  const wordCount = blocks
+    .filter((b) => b.type === "text")
+    .map((b) => b.content)
+    .join(" ")
     .trim()
     .split(/\s+/)
-    .filter((w) => w.length > 0).length
-  const readTime = Math.max(1, Math.ceil(wordCount / 200))
+    .filter((w) => w.length > 0).length;
+  const readTime = Math.max(1, Math.ceil(wordCount / 200));
 
   const handlePublish = async () => {
-    setIsPublishing(true)
-    
+    setIsPublishing(true);
+
     try {
-      const response = await fetch('http://localhost:5000/api/articles', {
-        method: 'POST',
+      const response = await fetch("http://localhost:5000/api/articles", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           title,
-          content,
+          content: fullContent,
+          image:
+            imageUrl || blocks.find((b) => b.type === "image")?.content || "",
+          excerpt: fullContent.substring(0, 150) + "...",
           category: selectedCategory || "General",
           readTime,
           author: {
-            name: "Jason Todd",
-            avatar: "JT",
-            email: "jason@civicnews.com"
-          }
+            name: user?.name || "Anonymous",
+            avatar: user?.picture || user?.name?.charAt(0) || "A",
+            email: user?.email || "anonymous@example.com",
+          },
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to publish article');
+        throw new Error("Failed to publish article");
       }
 
-      setPublished(true)
+      setPublished(true);
       // Show success state briefly then redirect
       setTimeout(() => {
-        setPublished(false)
-        router.push('/explore')
-      }, 1500)
+        setPublished(false);
+        router.push("/explore");
+      }, 1500);
     } catch (error) {
-      console.error('Error publishing:', error);
+      console.error("Error publishing:", error);
       // Optional: Show error toast here
     } finally {
-      setIsPublishing(false)
+      setIsPublishing(false);
     }
-  }
+  };
 
   const toolbarButtons = [
     { icon: Bold, label: "Bold", action: "**" },
@@ -85,8 +158,8 @@ export default function EditorPage() {
     { icon: List, label: "List", action: "- " },
     { icon: ListOrdered, label: "Ordered list", action: "1. " },
     { icon: Link2, label: "Link", action: "[](url)" },
-    { icon: ImagePlus, label: "Image", action: "![](url)" },
-  ]
+    { icon: ImagePlus, label: "Image", action: "IMAGE_UPLOAD" },
+  ];
 
   return (
     <AppShell>
@@ -122,13 +195,15 @@ export default function EditorPage() {
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             type="button"
-            disabled={!title.trim() || !content.trim() || published || isPublishing}
+            disabled={
+              !title.trim() || !fullContent.trim() || published || isPublishing
+            }
             onClick={handlePublish}
             className={cn(
               "flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold text-background shadow-md transition-all",
-              !title.trim() || !content.trim() || published || isPublishing
+              !title.trim() || !fullContent.trim() || published || isPublishing
                 ? "bg-muted text-muted-foreground shadow-none cursor-not-allowed"
-                : "bg-primary text-primary-foreground hover:bg-primary/90"
+                : "bg-primary text-primary-foreground hover:bg-primary/90",
             )}
           >
             {isPublishing ? (
@@ -170,11 +245,23 @@ export default function EditorPage() {
               <h1 className="text-3xl font-black leading-tight tracking-tight text-foreground font-serif text-balance">
                 {title || "Untitled Article"}
               </h1>
-              
+
               <div className="flex items-center gap-3 text-xs font-medium text-muted-foreground">
                 <div className="flex items-center gap-2">
-                  <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">JT</div>
-                  <span className="text-foreground">Jason Todd</span>
+                  <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden text-[10px] font-bold text-primary">
+                    {user?.picture ? (
+                      <img
+                        src={user.picture}
+                        alt={user.name}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      user?.name?.charAt(0) || "A"
+                    )}
+                  </div>
+                  <span className="text-foreground">
+                    {user?.name || "Anonymous"}
+                  </span>
                 </div>
                 <span className="text-border">|</span>
                 <span>Just now</span>
@@ -194,20 +281,39 @@ export default function EditorPage() {
               <div className="h-px w-full bg-border/50" />
 
               <article className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground">
-                {content ? (
-                  content.split("\n\n").map((paragraph, index) => (
-                    <motion.p
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.05 }}
-                      key={index}
-                      className="leading-relaxed text-base"
-                    >
-                      {paragraph}
-                    </motion.p>
-                  ))
+                {blocks.length > 0 ? (
+                  blocks.map((block) => {
+                    if (block.type === "image") {
+                      return (
+                        <motion.div
+                          key={block.id}
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          className="my-6 overflow-hidden rounded-xl"
+                        >
+                          <img
+                            src={block.content}
+                            alt="Article Image"
+                            className="w-full object-cover"
+                          />
+                        </motion.div>
+                      );
+                    }
+                    return block.content
+                      .split("\n\n")
+                      .map((paragraph, index) => (
+                        <p
+                          key={`${block.id}-${index}`}
+                          className="leading-relaxed"
+                        >
+                          {paragraph}
+                        </p>
+                      ));
+                  })
                 ) : (
-                  <p className="italic text-muted-foreground/50">No content to preview...</p>
+                  <p className="italic text-muted-foreground/50">
+                    No content to preview...
+                  </p>
                 )}
               </article>
             </motion.div>
@@ -220,15 +326,46 @@ export default function EditorPage() {
               transition={{ duration: 0.2 }}
               className="space-y-6"
             >
-              {/* Title Input */}
-              <div className="relative group">
-                 <input
+              <div className="relative group space-y-4">
+                <input
                   type="text"
                   placeholder="Article Title"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   className="w-full bg-transparent text-4xl font-black placeholder:text-muted-foreground/20 focus:outline-none font-serif tracking-tight py-2 border-b-2 border-transparent focus:border-primary/20 transition-colors"
                 />
+                <div className="relative">
+                  {imageUrl ? (
+                    <div className="relative h-48 w-full overflow-hidden rounded-xl border border-border">
+                      <img
+                        src={imageUrl}
+                        alt="Cover"
+                        className="h-full w-full object-cover"
+                      />
+                      <button
+                        onClick={() => setImageUrl("")}
+                        className="absolute top-2 right-2 rounded-full bg-black/50 p-1.5 text-white backdrop-blur-sm transition-colors hover:bg-black/70"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => coverImageInputRef.current?.click()}
+                      className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-muted/20 py-8 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
+                    >
+                      <ImagePlus className="h-4 w-4" />
+                      Add Cover Image (Optional)
+                    </button>
+                  )}
+                  <input
+                    type="file"
+                    ref={coverImageInputRef}
+                    className="hidden"
+                    accept="image/*"
+                    onChange={handleCoverImageSelect}
+                  />
+                </div>
               </div>
 
               {/* Category Selector */}
@@ -236,7 +373,7 @@ export default function EditorPage() {
                 <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                   <Settings2 className="w-3 h-3" /> Category
                 </label>
-                <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-2 scrollbar-none snap-x">
+                <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-2 scrollbar-hide snap-x">
                   {categories
                     .filter((c) => c !== "Trending")
                     .map((category) => (
@@ -246,14 +383,14 @@ export default function EditorPage() {
                         type="button"
                         onClick={() =>
                           setSelectedCategory(
-                            selectedCategory === category ? "" : category
+                            selectedCategory === category ? "" : category,
                           )
                         }
                         className={cn(
                           "snap-start shrink-0 rounded-full px-4 py-2 text-xs font-bold transition-all shadow-sm border border-transparent",
                           selectedCategory === category
                             ? "bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20 ring-offset-2 ring-offset-background"
-                            : "bg-secondary/50 text-muted-foreground border-border hover:bg-secondary hover:text-foreground"
+                            : "bg-secondary/50 text-muted-foreground border-border hover:bg-secondary hover:text-foreground",
                         )}
                       >
                         {category}
@@ -265,16 +402,32 @@ export default function EditorPage() {
               {/* Editor Container */}
               <div className="rounded-3xl border border-border bg-card shadow-sm overflow-hidden focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50 transition-all duration-300">
                 {/* Toolbar */}
-                <div className="flex items-center gap-1 overflow-x-auto border-b border-border bg-muted/30 px-4 py-2 scrollbar-none">
+                <div className="flex items-center gap-1 overflow-x-auto border-b border-border bg-muted/30 px-4 py-2 scrollbar-hide">
                   {toolbarButtons.map((btn) => (
                     <motion.button
-                      whileHover={{ scale: 1.1, backgroundColor: "rgba(0,0,0,0.05)" }}
+                      whileHover={{
+                        scale: 1.1,
+                        backgroundColor: "rgba(0,0,0,0.05)",
+                      }}
                       whileTap={{ scale: 0.9 }}
                       key={btn.label}
                       type="button"
                       className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors"
                       title={btn.label}
-                      onClick={() => setContent((prev) => prev + btn.action)}
+                      onClick={() => {
+                        if (btn.label === "Image") {
+                          fileInputRef.current?.click();
+                        } else {
+                          // Insert action into active block
+                          setBlocks((prev) =>
+                            prev.map((b) =>
+                              b.id === activeBlockId
+                                ? { ...b, content: b.content + btn.action }
+                                : b,
+                            ),
+                          );
+                        }
+                      }}
                     >
                       <btn.icon className="h-4 w-4" strokeWidth={2} />
                       <span className="sr-only">{btn.label}</span>
@@ -286,18 +439,81 @@ export default function EditorPage() {
                 </div>
 
                 {/* Content Editor */}
-                <textarea
-                  placeholder="Start writing your story..."
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  className="w-full min-h-[400px] resize-y bg-transparent p-6 text-base leading-relaxed placeholder:text-muted-foreground/30 focus:outline-none font-medium text-foreground"
-                />
+                <div className="min-h-[400px] bg-transparent p-6">
+                  {blocks.map((block, index) => {
+                    if (block.type === "image") {
+                      return (
+                        <div key={block.id} className="relative group my-4">
+                          <img
+                            src={block.content}
+                            alt="Inserted"
+                            className="w-full rounded-lg object-cover max-h-125"
+                          />
+                          <button
+                            onClick={() => {
+                              setBlocks(
+                                blocks.filter((b) => b.id !== block.id),
+                              );
+                            }}
+                            className="absolute top-2 right-2 bg-red-500/80 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              width="16"
+                              height="16"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <path d="M18 6 6 18" />
+                              <path d="m6 6 12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <textarea
+                        key={block.id}
+                        placeholder={
+                          index === 0 ? "Start writing your story..." : ""
+                        }
+                        value={block.content}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setBlocks((prev) =>
+                            prev.map((b) =>
+                              b.id === block.id ? { ...b, content: val } : b,
+                            ),
+                          );
+                          // Auto-resize
+                          e.target.style.height = "auto";
+                          e.target.style.height = e.target.scrollHeight + "px";
+                        }}
+                        onFocus={() => setActiveBlockId(block.id)}
+                        className="w-full resize-none bg-transparent text-base leading-relaxed placeholder:text-muted-foreground/30 focus:outline-none font-medium text-foreground overflow-hidden"
+                        style={{ height: "auto" }}
+                        rows={1}
+                      />
+                    );
+                  })}
+                </div>
               </div>
+              <input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
+                accept="image/*"
+                onChange={handleImageSelect}
+              />
             </motion.div>
           )}
         </AnimatePresence>
       </div>
     </AppShell>
-  )
+  );
 }
-
