@@ -4,11 +4,16 @@ import { UsersService } from './users.service';
 import { Article, Prisma } from '../generated/prisma/client';
 import { CreateArticleDto } from '../modules/articles/dto/create-article.dto';
 
+import { RedisService } from './redis.service';
+import { ArticlesGateway } from '../gateways/articles.gateway';
+
 @Injectable()
 export class ArticlesService {
   constructor(
     private prisma: PrismaService,
     private usersService: UsersService,
+    private articlesGateway: ArticlesGateway,
+    private redisService: RedisService,
   ) {}
 
   async createFromDto(dto: CreateArticleDto): Promise<Article> {
@@ -103,8 +108,16 @@ export class ArticlesService {
     });
   }
 
-  async incrementViews(id: string): Promise<Article> {
-    return this.prisma.article.update({
+  async incrementViews(id: string, userId: string): Promise<Article> {
+    const viewKey = `viewed:${id}:${userId}`;
+    const hasViewed = await this.redisService.incrementCounter(viewKey, 3600); // 1 hour TTL
+
+    // If counter > 1, user has already viewed recently
+    if (hasViewed > 1) {
+      return this.findOne(id) as Promise<Article>;
+    }
+
+    const updatedArticle = await this.prisma.article.update({
       where: { id },
       data: {
         views: {
@@ -113,5 +126,12 @@ export class ArticlesService {
       },
       include: { author: true },
     });
+
+    this.articlesGateway.notifyArticleViewed(
+      updatedArticle.id,
+      updatedArticle.views,
+    );
+
+    return updatedArticle;
   }
 }

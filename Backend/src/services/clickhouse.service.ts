@@ -14,8 +14,8 @@ export class ClickHouseService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleInit() {
     this.client = createClient({
-      host: this.configService.get<string>(
-        'CLICKHOUSE_HOST',
+      url: this.configService.get<string>(
+        'CLICKHOUSE_URL',
         'http://localhost:8123',
       ),
       database: this.configService.get<string>(

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { io } from "socket.io-client";
 
 import { ReelCard } from "@/components/reel-card";
 import type { Article } from "@/lib/data";
@@ -85,6 +86,28 @@ export function ExploreClient({ initialArticles }: ExploreClientProps) {
 
     return () => observer.disconnect();
   }, [hasMore, isFetchingMore, isLoading, offset, fetchArticles]);
+
+  useEffect(() => {
+    const socket = io("http://127.0.0.1:5000");
+
+    socket.on("connect", () => {
+      console.log("Connected to WebSocket");
+    });
+
+    socket.on("articleViewed", (data: { articleId: string; views: number }) => {
+      setArticles((prev) =>
+        prev.map((article) =>
+          article.id === data.articleId
+            ? { ...article, views: data.views }
+            : article,
+        ),
+      );
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, []);
 
   const toggleLike = useCallback(async (id: string) => {
     // Optimistic update

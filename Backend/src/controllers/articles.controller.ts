@@ -7,7 +7,9 @@ import {
   Put,
   Delete,
   Query,
+  Req,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { ArticlesService } from '../services/articles.service';
 import { CreateArticleDto } from '../modules/articles/dto/create-article.dto';
 import { Prisma } from '../generated/prisma/client';
@@ -54,7 +56,8 @@ export class ArticlesController {
   }
 
   @Post(':id/view')
-  async incrementViews(@Param('id') id: string) {
-    return await this.articlesService.incrementViews(id);
+  async incrementViews(@Param('id') id: string, @Req() req: Request) {
+    const viewerId = (req as any).user?.id || req.ip || 'anonymous';
+    return await this.articlesService.incrementViews(id, viewerId);
   }
 }

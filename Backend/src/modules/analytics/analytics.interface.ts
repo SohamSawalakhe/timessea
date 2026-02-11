@@ -65,11 +65,13 @@ export enum DeviceType {
  */
 export interface AnalyticsEvent {
   event: AnalyticsEventType;
-  user_id: string;
+  client_id?: string; // Required if user_id is missing
+  user_id?: string;
   post_id?: string;
-  post_status?: PostStatus;
+  post_status?: string;
   location_id?: number;
-  device?: DeviceType;
+  device?: string;
+  duration?: number; // In seconds
   metadata?: Record<string, any>;
   created_at?: Date;
 }

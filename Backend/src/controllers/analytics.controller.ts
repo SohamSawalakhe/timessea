@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Body, Param, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, Req } from '@nestjs/common';
+import { Request } from 'express';
 import { AnalyticsService } from '../services/analytics.service';
 import { AnalyticsQueryService } from '../services/analytics-query.service';
 import { AnalyticsEvent } from '../modules/analytics/analytics.interface';
@@ -19,7 +20,10 @@ export class AnalyticsController {
    * POST /analytics/track
    */
   @Post('track')
-  async trackEvent(@Body() event: AnalyticsEvent) {
+  async trackEvent(@Body() event: AnalyticsEvent, @Req() req: Request) {
+    const ip = (req as any).ip || (req as any).connection?.remoteAddress;
+    event.metadata = { ...event.metadata, ip };
+
     await this.analyticsService.track(event);
     return { success: true };
   }
@@ -29,8 +33,18 @@ export class AnalyticsController {
    * POST /analytics/track/batch
    */
   @Post('track/batch')
-  async trackBatch(@Body() events: AnalyticsEvent[]) {
-    await this.analyticsService.trackBatch(events);
+  async trackBatch(@Body() body: any, @Req() req: Request) {
+    const ip = (req as any).ip || (req as any).connection?.remoteAddress;
+
+    // Support both { events: [...] } and [...]
+    const events = Array.isArray(body) ? body : body.events || [];
+
+    const enrichedEvents = events.map((event: AnalyticsEvent) => ({
+      ...event,
+      metadata: { ...event.metadata, ip },
+    }));
+
+    await this.analyticsService.trackBatch(enrichedEvents);
     return { success: true };
   }
 
