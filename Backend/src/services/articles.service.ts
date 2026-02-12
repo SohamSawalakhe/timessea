@@ -30,6 +30,7 @@ export class ArticlesService {
     }
 
     // Create article with authorId
+    // Create article with authorId
     return this.prisma.article.create({
       data: {
         title: dto.title,
@@ -37,6 +38,7 @@ export class ArticlesService {
         excerpt: dto.excerpt,
         image: dto.image,
         category: dto.category,
+        location: dto.location,
         readTime: dto.readTime,
         authorId: author.id,
       },

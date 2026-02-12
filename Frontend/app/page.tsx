@@ -19,11 +19,13 @@ export default function HomePage() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  const [visibleCount, setVisibleCount] = useState(4);
+
   useEffect(() => {
     async function fetchArticles() {
       try {
         const res = await fetch(
-          "http://localhost:5000/api/articles?limit=10&offset=0",
+          "http://localhost:5000/api/articles?limit=50&offset=0",
         );
         if (res.ok) {
           const data = await res.json();
@@ -38,6 +40,11 @@ export default function HomePage() {
     fetchArticles();
   }, []);
 
+  // Reset visible count when filters change
+  useEffect(() => {
+    setVisibleCount(4);
+  }, [activeCategory, searchQuery]);
+
   const filteredArticles = articles.filter((a) => {
     const matchesCategory =
       activeCategory === "Trending" || a.category === activeCategory;
@@ -51,6 +58,7 @@ export default function HomePage() {
   // Safe check for empty array
   const featured = filteredArticles.length > 0 ? filteredArticles[0] : null;
   const rest = filteredArticles.length > 1 ? filteredArticles.slice(1) : [];
+  const visibleRest = rest.slice(0, visibleCount);
 
   return (
     <AppShell>
@@ -202,17 +210,31 @@ export default function HomePage() {
               />
             ))}
           </div>
-        ) : rest.length > 0 ? (
-          rest.map((article, index) => (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 * index, duration: 0.3 }}
-              key={article.id}
-            >
-              <ArticleCardHorizontal article={article} />
-            </motion.div>
-          ))
+        ) : visibleRest.length > 0 ? (
+          <>
+            {visibleRest.map((article, index) => (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 * index, duration: 0.3 }}
+                key={article.id}
+              >
+                <ArticleCardHorizontal article={article} />
+              </motion.div>
+            ))}
+
+            {/* Load More Button */}
+            {visibleCount < rest.length && (
+              <div className="pt-4 flex justify-center">
+                <button
+                  onClick={() => setVisibleCount((prev) => prev + 4)}
+                  className="px-6 py-2.5 rounded-full bg-secondary text-sm font-bold text-foreground hover:bg-secondary/80 hover:scale-105 transition-all active:scale-95"
+                >
+                  Load More
+                </button>
+              </div>
+            )}
+          </>
         ) : (
           !featured && (
             <div className="flex flex-col items-center justify-center py-20 text-center">

@@ -42,6 +42,7 @@ model Article {
   bookmarked  Boolean   @default(false)
   category    String    @default("Technology")
   excerpt     String?
+  location    String?
   liked       Boolean   @default(false)
   likes       Int       @default(0)
   readTime    Int       @default(5)

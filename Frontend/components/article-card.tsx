@@ -6,6 +6,7 @@ import { Heart } from "lucide-react";
 import type { Article } from "@/lib/data";
 import { cn } from "@/lib/utils";
 import { analytics, AnalyticsEventType } from "@/lib/analytics";
+import { formatDistanceToNow } from "date-fns";
 
 // Helper to track article clicks
 const trackArticleClick = (articleId: string) => {
@@ -17,6 +18,9 @@ const trackArticleClick = (articleId: string) => {
 };
 
 export function ArticleCardFeatured({ article }: { article: Article }) {
+  const isSpecialType =
+    article.type && ["Breaking", "Live", "Exclusive"].includes(article.type);
+
   return (
     <Link
       href={`/article/${article.id}`}
@@ -39,7 +43,18 @@ export function ArticleCardFeatured({ article }: { article: Article }) {
             </div>
           </>
         )}
-        <div className="absolute top-4 left-4">
+        <div className="absolute top-4 left-4 flex flex-col gap-2">
+          <span className="self-start rounded-full bg-background/90 backdrop-blur-md px-3 py-1 text-[10px] font-bold text-foreground shadow-sm uppercase tracking-wider border border-border/50">
+            FEATURED {isSpecialType ? " • " + article.type : ""}
+          </span>
+          {isSpecialType && (
+            <span className="self-start relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+            </span>
+          )}
+        </div>
+        <div className="absolute bottom-4 left-4">
           <span className="rounded-full bg-background/80 backdrop-blur-md px-3 py-1 text-[10px] font-bold text-foreground shadow-sm">
             {article.category}
           </span>
@@ -47,24 +62,49 @@ export function ArticleCardFeatured({ article }: { article: Article }) {
       </div>
       <div className="p-5">
         <div className="mb-4 flex items-center gap-3">
-          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary ring-2 ring-background">
-            {article.author.avatar || article.author.name.charAt(0)}
+          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary ring-2 ring-background overflow-hidden relative">
+            {/* Author Avatar Logic */}
+            {article.author.picture ? (
+              <Image
+                src={article.author.picture}
+                alt={article.author.name}
+                fill
+                className="object-cover"
+              />
+            ) : (
+              <span>
+                {article.author.avatar || article.author.name.charAt(0)}
+              </span>
+            )}
           </div>
           <div>
-            <p className="text-xs font-bold text-foreground">
+            <p className="text-xs font-bold text-foreground hover:underline cursor-pointer">
               {article.author.name}
             </p>
-            <p className="text-[10px] font-medium text-muted-foreground">
-              {article.publishedAt}
-            </p>
+            <div className="flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground">
+              <span>{article.location || ""}</span>
+              {article.type === "Live" && (
+                <span className="text-red-500 font-bold">• LIVE</span>
+              )}
+            </div>
           </div>
         </div>
         <h3 className="mb-2 text-xl font-black leading-tight text-foreground font-serif text-balance group-hover:text-primary transition-colors">
           {article.title}
         </h3>
+        {article.subheadline && (
+          <p className="mb-4 text-sm font-medium leading-normal text-muted-foreground line-clamp-2 text-balance">
+            {article.subheadline}
+          </p>
+        )}
         <div className="flex items-center justify-between mt-4 border-t border-border/50 pt-3">
           <span className="text-[10px] font-semibold text-muted-foreground">
-            {article.readTime} min read
+            {article.publishedAt ||
+              (article.createdAt &&
+                formatDistanceToNow(new Date(article.createdAt), {
+                  addSuffix: true,
+                })) ||
+              "Just now"}
           </span>
           <div className="flex items-center gap-1 text-muted-foreground">
             <Heart className="h-3 w-3" />
@@ -99,7 +139,12 @@ export function ArticleCardCompact({ article }: { article: Article }) {
         </div>
         <div className="flex items-center gap-2 mt-2">
           <span className="text-[10px] font-medium text-muted-foreground/80">
-            {article.readTime} min read
+            {article.publishedAt ||
+              (article.createdAt &&
+                formatDistanceToNow(new Date(article.createdAt), {
+                  addSuffix: true,
+                })) ||
+              "Just now"}
           </span>
           <div className="flex items-center gap-1 text-[10px] font-bold text-muted-foreground/80 ml-auto bg-secondary px-1.5 py-0.5 rounded-md">
             <Heart
@@ -117,27 +162,52 @@ export function ArticleCardCompact({ article }: { article: Article }) {
 }
 
 export function ArticleCardHorizontal({ article }: { article: Article }) {
+  const isSpecialType =
+    article.type && ["Breaking", "Live", "Exclusive"].includes(article.type);
+
   return (
     <Link
       href={`/article/${article.id}`}
-      className="group flex gap-4 py-6 hover:bg-linear-to-r hover:from-transparent hover:via-secondary/10 hover:to-transparent -mx-4 px-4 transition-colors rounded-2xl"
+      className="group flex gap-4 py-6 hover:bg-linear-to-r hover:from-transparent hover:via-secondary/10 hover:to-transparent -mx-4 px-4 transition-colors rounded-2xl relative"
       onClick={() => trackArticleClick(article.id)}
     >
       <div className="flex flex-1 flex-col justify-between">
         <div>
           <div className="mb-2 flex items-center gap-2">
-            <div className="h-5 w-5 rounded-full bg-secondary flex items-center justify-center text-[9px] font-bold text-muted-foreground">
-              {article.author.avatar || article.author.name.charAt(0)}
+            <div className="h-5 w-5 rounded-full bg-secondary flex items-center justify-center text-[9px] font-bold text-muted-foreground overflow-hidden relative">
+              {article.author.picture ? (
+                <Image
+                  src={article.author.picture}
+                  alt={article.author.name}
+                  fill
+                  className="object-cover"
+                />
+              ) : (
+                <span>
+                  {article.author.avatar || article.author.name.charAt(0)}
+                </span>
+              )}
             </div>
             <span className="text-[11px] font-semibold text-muted-foreground">
-              {article.author.name} · {article.publishedAt}
+              {article.author.name} ·{" "}
+              {article.publishedAt ||
+                (article.createdAt &&
+                  formatDistanceToNow(new Date(article.createdAt), {
+                    addSuffix: true,
+                  })) ||
+                "Just now"}
             </span>
           </div>
+          {isSpecialType && (
+            <span className="inline-block mb-1 text-[9px] font-black uppercase text-red-500 tracking-wider">
+              {article.type}
+            </span>
+          )}
           <h3 className="text-base font-bold leading-snug text-foreground font-serif group-hover:text-primary transition-colors">
             {article.title}
           </h3>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground line-clamp-2 font-medium">
-            {article.excerpt}
+            {article.subheadline || article.excerpt}
           </p>
         </div>
         <div className="mt-3 flex items-center gap-3">
@@ -145,8 +215,18 @@ export function ArticleCardHorizontal({ article }: { article: Article }) {
             {article.category}
           </span>
           <span className="text-[10px] font-medium text-muted-foreground">
-            {article.readTime} min read
+            {article.publishedAt ||
+              (article.createdAt &&
+                formatDistanceToNow(new Date(article.createdAt), {
+                  addSuffix: true,
+                })) ||
+              "Just now"}
           </span>
+          {article.location && (
+            <span className="text-[10px] font-medium text-muted-foreground">
+              • {article.location}
+            </span>
+          )}
         </div>
       </div>
       <div className="h-24 w-24 shrink-0 rounded-2xl bg-secondary flex items-center justify-center overflow-hidden shadow-inset-sm relative">

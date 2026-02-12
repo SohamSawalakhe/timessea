@@ -12,11 +12,25 @@ export type Article = {
   category: string;
   readTime: number;
   publishedAt: string;
+  createdAt?: string;
   image: string;
   liked: boolean;
   bookmarked: boolean;
   likes: number;
   views: number;
+  subheadline?: string;
+  location?: string;
+  type?: "Breaking" | "Live" | "Exclusive" | "Opinion" | "Analysis" | "Standard" | "Feature";
+  status?: "Draft" | "In Review" | "Approved" | "Published" | "Corrected";
+  section?: string;
+  tags?: string[];
+  imageCaption?: string;
+  imageCredit?: string;
+  imageSource?: string;
+  seoTitle?: string;
+  seoDescription?: string;
+  factChecked?: boolean;
+  sources?: string[];
 };
 
 export const categories = [
@@ -72,10 +86,11 @@ The future of Web 3 likely lies not in replacing existing systems entirely, but 
   {
     id: "2",
     title: "Guiding Teams: The Power of Leadership",
+    subheadline: "How empathy and trust transform managers into inspiring leaders.",
     excerpt:
       "Leadership is not about authority, it's about empowering your team to achieve shared goals.",
     content: `Leadership is not about authority, it's about empowering your team to achieve shared goals. Great leaders inspire trust, cultivate collaboration, and lead by example.
-
+    
 Leadership begins with empathy. Understanding your team's strengths, challenges, and aspirations builds trust and creates an environment where everyone thrives. Active listening and clear communication are crucial for aligning your team's vision with organizational objectives.
 
 **Building Trust Through Transparency**
@@ -99,15 +114,20 @@ In today's rapidly evolving landscape, adaptability is perhaps the most crucial 
     category: "Business",
     readTime: 5,
     publishedAt: "2 days ago",
-    image: "/placeholder-leadership.jpg",
+    image: "/images/reel-leadership.jpg",
     liked: true,
     bookmarked: true,
     likes: 89,
     views: 8900,
+    section: "Business",
+    tags: ["Management", "Trust"],
+    type: "Opinion",
+    status: "Published",
   },
   {
     id: "3",
     title: "The Art of Minimalist Design",
+    subheadline: "Why simplicity is the ultimate sophistication in modern UI/UX.",
     excerpt:
       "How stripping away the unnecessary reveals the essential beauty in design.",
     content: `Minimalism in design is more than an aesthetic choice -- it's a philosophy that puts function and clarity at the forefront of every decision.
@@ -137,15 +157,19 @@ When you strip away decorative elements, typography becomes the primary vehicle 
     category: "Design",
     readTime: 4,
     publishedAt: "3 days ago",
-    image: "/placeholder-design.jpg",
+    image: "/images/reel-design.jpg",
     liked: false,
     bookmarked: false,
     likes: 215,
     views: 32100,
+    section: "Design",
+    tags: ["UI", "UX", "Web"],
+    status: "Published",
   },
   {
     id: "4",
     title: "Quantum Computing: A New Era",
+    subheadline: "From theoretical physics to practical applications: What you need to know.",
     excerpt:
       "Understanding the revolutionary potential of quantum computing and its real-world applications.",
     content: `Quantum computing stands at the frontier of computational science, promising to solve problems that classical computers find intractable.
@@ -176,10 +200,13 @@ While fully fault-tolerant quantum computers may still be years away, hybrid qua
     bookmarked: true,
     likes: 178,
     views: 15600,
+    type: "Analysis",
+    status: "Published",
   },
   {
     id: "5",
     title: "Remote Work Revolution",
+    subheadline: "Why the office will never serve the same purpose again.",
     excerpt:
       "How distributed teams are redefining productivity and workplace culture.",
     content: `The shift to remote work has been one of the most significant workplace transformations in modern history. What began as a necessity has evolved into a preferred way of working for millions.
@@ -208,10 +235,12 @@ Most organizations are landing on a hybrid model that combines the flexibility o
     bookmarked: false,
     likes: 96,
     views: 5400,
+    status: "Published",
   },
   {
     id: "6",
     title: "The Rise of AI-Generated Art",
+    subheadline: "Creativity or Computation? The legal and ethical battleground.",
     excerpt:
       "Exploring the intersection of artificial intelligence and creative expression.",
     content: `AI-generated art has sparked one of the most heated debates in the creative world. As models become increasingly sophisticated, the line between human and machine creativity continues to blur.
@@ -240,5 +269,7 @@ The most exciting possibilities lie not in AI replacing human creativity, but in
     bookmarked: false,
     likes: 334,
     views: 45200,
+    status: "Published",
+    type: "Feature",
   },
 ];
