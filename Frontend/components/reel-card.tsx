@@ -82,12 +82,12 @@ export function ReelCard({
   return (
     <div
       ref={elementRef}
-      className="relative h-dvh w-full snap-start snap-always flex flex-col bg-background"
+      className="relative h-dvh w-full snap-start snap-always flex flex-col bg-background overflow-hidden"
     >
       {/* Top section: Large image - shrinks when content expands */}
       <div
         className={cn(
-          "relative shrink-0 overflow-hidden bg-muted transition-all duration-300",
+          "relative shrink-0 overflow-hidden bg-muted transition-all duration-500 ease-in-out",
           isExpanded ? "h-[40vh]" : "h-[60vh] sm:h-[65vh]",
         )}
       >
@@ -95,12 +95,13 @@ export function ReelCard({
           src={imageSrc}
           alt={article.title}
           fill
-          className="object-cover"
+          className="object-cover transition-transform duration-700 hover:scale-105"
           priority={index < 2}
           loading={index < 2 ? "eager" : "lazy"}
+          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
         />
         {/* Gradient overlay for better text readability */}
-        <div className="absolute inset-0 bg-linear-to-b from-black/30 via-transparent to-black/60" />
+        <div className="absolute inset-0 bg-linear-to-b from-black/40 via-transparent to-black/80" />
 
         {/* Category tag on image - positioned below explore bar */}
         <div className="absolute top-14 sm:top-16 left-3 sm:left-4 z-10">
@@ -135,7 +136,7 @@ export function ReelCard({
       {/* Bottom section: Title and Content (30-40% of screen) - Expandable like Instagram */}
       <div
         className={cn(
-          "flex flex-col bg-background px-4 sm:px-5 pt-4 sm:pt-5 pb-20 sm:pb-24 overflow-y-auto scrollbar-hide transition-all duration-300",
+          "flex flex-col bg-background px-4 sm:px-5 pt-4 sm:pt-5 pb-20 sm:pb-24 overflow-y-auto scrollbar-hide transition-all duration-500 ease-in-out",
           isExpanded ? "flex-1" : "h-auto",
         )}
         style={{

@@ -24,10 +24,15 @@ export class ArticlesController {
   }
 
   @Get()
-  findAll(@Query('limit') limit?: string, @Query('offset') offset?: string) {
+  findAll(
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+    @Query('hasMedia') hasMedia?: string,
+  ) {
     const limitNum = limit ? parseInt(limit, 10) : 20;
     const offsetNum = offset ? parseInt(offset, 10) : 0;
-    return this.articlesService.findAll(limitNum, offsetNum);
+    const hasMediaBool = hasMedia === 'true';
+    return this.articlesService.findAll(limitNum, offsetNum, hasMediaBool);
   }
 
   @Get(':id')

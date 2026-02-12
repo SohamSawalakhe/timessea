@@ -4,16 +4,37 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { io } from "socket.io-client";
 
 import { ReelCard } from "@/components/reel-card";
+import { ReelSkeleton } from "@/components/reel-skeleton";
 import type { Article } from "@/lib/data";
 
-const reelImages = [
-  "/images/reel-web3.jpg",
-  "/images/reel-leadership.jpg",
-  "/images/reel-design.jpg",
-  "/images/reel-quantum.jpg",
-  "/images/reel-remote.jpg",
-  "/images/reel-ai-art.jpg",
-];
+// Map specific local paths to Unsplash images
+const imageMap: Record<string, string> = {
+  "/images/reel-web3.jpg":
+    "https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=800&q=80",
+  "/images/reel-leadership.jpg":
+    "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=800&q=80",
+  "/images/reel-design.jpg":
+    "https://images.unsplash.com/photo-1561070791-2526d30994b5?w=800&q=80",
+  "/images/reel-quantum.jpg":
+    "https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=800&q=80",
+  "/images/reel-remote.jpg":
+    "https://images.unsplash.com/photo-1593642532400-2682810df593?w=800&q=80",
+  "/images/reel-ai-art.jpg":
+    "https://images.unsplash.com/photo-1677442136019-21780ecad995?w=800&q=80",
+};
+
+const reelImages = Object.values(imageMap);
+
+function getImageSrc(article: Article, index: number): string {
+  if (article.image && imageMap[article.image]) {
+    return imageMap[article.image];
+  }
+  return (
+    article.image ||
+    reelImages[index % reelImages.length] ||
+    "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&q=80"
+  );
+}
 
 interface ExploreClientProps {
   initialArticles: Article[];
@@ -34,7 +55,7 @@ export function ExploreClient({ initialArticles }: ExploreClientProps) {
     try {
       const limit = 5;
       const response = await fetch(
-        `http://127.0.0.1:5000/api/articles?limit=${limit}&offset=${currentOffset}`,
+        `http://127.0.0.1:5000/api/articles?limit=${limit}&offset=${currentOffset}&hasMedia=true`,
       );
       if (!response.ok) throw new Error("Failed to fetch articles");
       const data = await response.json();
@@ -71,13 +92,11 @@ export function ExploreClient({ initialArticles }: ExploreClientProps) {
           !isLoading
         ) {
           setIsFetchingMore(true);
-          const newOffset = offset;
-          // Increment offset for next time
-          setOffset((prev) => prev + 5);
+          const newOffset = articles.length; // Use current length as safe offset
           fetchArticles(newOffset);
         }
       },
-      { threshold: 0.1 },
+      { threshold: 0.1, rootMargin: "200px" },
     );
 
     if (observerTarget.current) {
@@ -198,20 +217,6 @@ export function ExploreClient({ initialArticles }: ExploreClientProps) {
     }
   }, []);
 
-  // We can keep the loading spinner if initialArticles is empty (which might happen if fetch failed server side)
-  if (articles.length === 0 && isLoading) {
-    return (
-      <div className="h-dvh flex items-center justify-center bg-background text-foreground">
-        <div className="flex flex-col items-center gap-4">
-          <div className="h-10 w-10 animate-spin rounded-full border-4 border-white border-t-transparent" />
-          <p className="text-sm font-medium animate-pulse">
-            Loading experience...
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div
       className="h-dvh snap-y snap-mandatory overflow-y-scroll scrollbar-hide"
@@ -227,11 +232,7 @@ export function ExploreClient({ initialArticles }: ExploreClientProps) {
           article={article}
           index={index}
           totalArticles={articles.length}
-          imageSrc={
-            article.image ||
-            reelImages[index % reelImages.length] ||
-            "/placeholder.svg"
-          }
+          imageSrc={getImageSrc(article, index)}
           isLiked={article.liked}
           isSaved={article.bookmarked}
           onToggleLike={toggleLike}
@@ -239,15 +240,21 @@ export function ExploreClient({ initialArticles }: ExploreClientProps) {
           onView={handleView}
         />
       ))}
-      {/* Loading trigger / Spinner at bottom */}
+
+      {/* Show skeletons while fetching more */}
+      {(isLoading || isFetchingMore) && (
+        <>
+          <ReelSkeleton />
+          <ReelSkeleton />
+        </>
+      )}
+
+      {/* Invisible trigger for infinite scroll - positioned before the end */}
       <div
         ref={observerTarget}
-        className="h-10 w-full flex items-center justify-center snap-end"
-      >
-        {isFetchingMore && (
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-white border-t-transparent" />
-        )}
-      </div>
+        className="h-10 w-full"
+        style={{ scrollSnapAlign: "none" }}
+      />
     </div>
   );
 }

@@ -48,11 +48,18 @@ export class ArticlesService {
     return this.prisma.article.create({ data });
   }
 
-  async findAll(limit = 20, offset = 0): Promise<Article[]> {
+  async findAll(limit = 20, offset = 0, hasMedia = false): Promise<Article[]> {
     const start = Date.now();
+    const where: Prisma.ArticleWhereInput = {};
+
+    if (hasMedia) {
+      where.image = { not: null };
+    }
+
     const articles = await this.prisma.article.findMany({
       take: limit,
       skip: offset,
+      where,
       include: {
         author: {
           select: {
