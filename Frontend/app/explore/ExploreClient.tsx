@@ -53,7 +53,7 @@ export function ExploreClient({ initialArticles }: ExploreClientProps) {
 
   const fetchArticles = useCallback(async (currentOffset: number) => {
     try {
-      const limit = 5;
+      const limit = 10;
       const response = await fetch(
         `http://127.0.0.1:5000/api/articles?limit=${limit}&offset=${currentOffset}&hasMedia=true`,
       );
@@ -82,29 +82,40 @@ export function ExploreClient({ initialArticles }: ExploreClientProps) {
 
   // Removed initial useEffect fetchArticles(0)
 
+  /* eslint-disable react-hooks/exhaustive-deps */
+  const observer = useRef<IntersectionObserver | null>(null);
+
+  const lastCardRef = useCallback(
+    (node: HTMLDivElement) => {
+      if (isLoading || isFetchingMore) return;
+      if (observer.current) observer.current.disconnect();
+
+      observer.current = new IntersectionObserver(
+        (entries) => {
+          if (entries[0].isIntersecting && hasMore) {
+            setIsFetchingMore(true);
+            // We want to fetch the NEXT page
+            // Logic: current articles length is the offset
+            fetchArticles(articles.length);
+          }
+        },
+        // Root margin to trigger slightly before the element fully enters
+        { threshold: 0.1, rootMargin: "100px" },
+      );
+
+      if (node) observer.current.observe(node);
+    },
+    [isLoading, isFetchingMore, hasMore, articles.length, fetchArticles],
+  );
+
+  // Clean up observer on unmount
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (
-          entries[0].isIntersecting &&
-          hasMore &&
-          !isFetchingMore &&
-          !isLoading
-        ) {
-          setIsFetchingMore(true);
-          const newOffset = articles.length; // Use current length as safe offset
-          fetchArticles(newOffset);
-        }
-      },
-      { threshold: 0.1, rootMargin: "200px" },
-    );
-
-    if (observerTarget.current) {
-      observer.observe(observerTarget.current);
-    }
-
-    return () => observer.disconnect();
-  }, [hasMore, isFetchingMore, isLoading, offset, fetchArticles]);
+    return () => {
+      if (observer.current) {
+        observer.current.disconnect();
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const socket = io("http://127.0.0.1:5000");
@@ -217,8 +228,52 @@ export function ExploreClient({ initialArticles }: ExploreClientProps) {
     }
   }, []);
 
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only trigger if no modal/input is active
+      if (
+        document.activeElement?.tagName === "INPUT" ||
+        document.activeElement?.tagName === "TEXTAREA"
+      ) {
+        return;
+      }
+
+      if (!containerRef.current) return;
+
+      const container = containerRef.current;
+      const clientHeight = container.clientHeight;
+      const scrollTop = container.scrollTop;
+
+      // Calculate current item index based on scroll position
+      // Using Math.round handles partial scrolls better
+      const currentIndex = Math.round(scrollTop / clientHeight);
+
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        const nextIndex = Math.min(currentIndex + 1, articles.length - 1);
+        const item = container.children[nextIndex] as HTMLElement;
+        if (item) {
+          item.scrollIntoView({ behavior: "smooth" });
+        }
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        const prevIndex = Math.max(currentIndex - 1, 0);
+        const item = container.children[prevIndex] as HTMLElement;
+        if (item) {
+          item.scrollIntoView({ behavior: "smooth" });
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [articles.length]); // Re-bind when articles length changes to ensure bounds are correct
+
   return (
     <div
+      ref={containerRef}
       className="h-dvh snap-y snap-mandatory overflow-y-scroll scrollbar-hide"
       style={{
         scrollBehavior: "smooth",
@@ -227,18 +282,27 @@ export function ExploreClient({ initialArticles }: ExploreClientProps) {
       }}
     >
       {articles.map((article, index) => (
-        <ReelCard
-          key={`${article.id}-${index}`}
-          article={article}
-          index={index}
-          totalArticles={articles.length}
-          imageSrc={getImageSrc(article, index)}
-          isLiked={article.liked}
-          isSaved={article.bookmarked}
-          onToggleLike={toggleLike}
-          onToggleSave={toggleSave}
-          onView={handleView}
-        />
+        <div key={`${article.id}-${index}`}>
+          <ReelCard
+            article={article}
+            index={index}
+            totalArticles={articles.length}
+            imageSrc={getImageSrc(article, index)}
+            isLiked={article.liked}
+            isSaved={article.bookmarked}
+            onToggleLike={toggleLike}
+            onToggleSave={toggleSave}
+            onView={handleView}
+          />
+          {/* Trigger load when we reach the 3rd to last item (70% point) */}
+          {index === articles.length - 3 && (
+            <div
+              ref={lastCardRef}
+              className="h-1 w-full pointer-events-none"
+              style={{ visibility: "hidden" }}
+            />
+          )}
+        </div>
       ))}
 
       {/* Show skeletons while fetching more */}
@@ -248,13 +312,6 @@ export function ExploreClient({ initialArticles }: ExploreClientProps) {
           <ReelSkeleton />
         </>
       )}
-
-      {/* Invisible trigger for infinite scroll - positioned before the end */}
-      <div
-        ref={observerTarget}
-        className="h-10 w-full"
-        style={{ scrollSnapAlign: "none" }}
-      />
     </div>
   );
 }
