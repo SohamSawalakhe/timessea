@@ -15,30 +15,36 @@ import {
   Filter,
   ArrowUpRight,
   ArrowDownRight,
-  Share2
+  Share2,
+  Activity,
+  Target,
+  ThumbsUp
 } from "lucide-react"
 import Link from "next/link"
 import {
-  AreaChart,
+  ComposedChart,
+  Line,
   Area,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
+  Legend,
   ResponsiveContainer,
-  BarChart,
   Bar,
   Cell
 } from "recharts"
+import { useAuth } from "@/contexts/AuthContext"
+import { useRouter } from "next/navigation"
 
 const mockTrendData = [
-  { name: "Mon", views: 4000, engagement: 2400 },
-  { name: "Tue", views: 3000, engagement: 1398 },
-  { name: "Wed", views: 2000, engagement: 9800 },
-  { name: "Thu", views: 2780, engagement: 3908 },
-  { name: "Fri", views: 1890, engagement: 4800 },
-  { name: "Sat", views: 2390, engagement: 3800 },
-  { name: "Sun", views: 3490, engagement: 4300 },
+  { name: "Mon", views: 0, engagement: 0 },
+  { name: "Tue", views: 0, engagement: 0 },
+  { name: "Wed", views: 0, engagement: 0 },
+  { name: "Thu", views: 0, engagement: 0 },
+  { name: "Fri", views: 0, engagement: 0 },
+  { name: "Sat", views: 0, engagement: 0 },
+  { name: "Sun", views: 0, engagement: 0 },
 ]
 
 const topPosts = [
@@ -49,37 +55,27 @@ const topPosts = [
 
 export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
-  const [stats, setStats] = useState<any>(null)
-  const [trendingPosts, setTrendingPosts] = useState<any[]>(topPosts)
+  const [dashboardData, setDashboardData] = useState<any>(null)
+  const { token, user } = useAuth()
+  const router = useRouter()
 
   useEffect(() => {
-    // Fetch from backend
+    let intervalId: NodeJS.Timeout
+
+    if (!token) return
+
     const fetchData = async () => {
       try {
-        const [statsRes, trendingRes] = await Promise.all([
-          fetch('http://localhost:5000/analytics/platform'),
-          fetch('http://localhost:5000/analytics/trending?limit=5')
-        ])
-
-        if (statsRes.ok) {
-          const data = await statsRes.json()
-          if (data.active_users_today > 0 || data.total_engagement_today > 0) {
-            setStats(data)
+        const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+        const res = await fetch(`${API_URL}/analytics/dashboard`, {
+          headers: {
+            Authorization: `Bearer ${token}`
           }
-        }
+        })
 
-        if (trendingRes.ok) {
-          const data = await trendingRes.json()
-          if (data.length > 0) {
-            // Map backend data to UI format
-            const mapped = data.map((p: any) => ({
-              id: p.post_id,
-              title: `Post ${p.post_id.substring(0, 8)}`, // We'd need actual titles from another API in a real app
-              views: p.views > 1000 ? `${(p.views/1000).toFixed(1)}k` : p.views.toString(),
-              growth: `+${Math.floor(p.engagement_score / 10)}%`
-            }))
-            setTrendingPosts(mapped)
-          }
+        if (res.ok) {
+          const data = await res.json()
+          setDashboardData(data)
         }
       } catch (error) {
         console.error("Failed to fetch analytics", error)
@@ -89,7 +85,31 @@ export default function DashboardPage() {
     }
 
     fetchData()
-  }, [])
+    intervalId = setInterval(fetchData, 5000)
+
+    return () => {
+      if (intervalId) clearInterval(intervalId)
+    }
+  }, [token])
+
+  // Protect route
+  useEffect(() => {
+    if (!loading && !token) {
+      router.push("/login")
+    }
+  }, [loading, token, router])
+
+  const stats = dashboardData?.stats || {
+    total_views: 0,
+    active_users: 0,
+    total_engagement: 0,
+    total_shares: 0,
+    completion_rate: 0,
+    engagement_rate: 0
+  }
+
+  const trendData = dashboardData?.trend || mockTrendData
+  const topPosts = dashboardData?.top_posts || []
 
   return (
     <AppShell>
@@ -115,35 +135,51 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 gap-4 mb-8">
         <StatCard 
           label="Total Views" 
-          value={stats?.active_users_today ? `${(stats.active_users_today * 5.2).toFixed(1)}k` : "24.8k"} 
-          trend="+12.5%" 
+          value={stats.total_views.toLocaleString()} 
+          trend="Lifetime" 
           isUp={true} 
           icon={Eye} 
           color="blue"
         />
         <StatCard 
-          label="Active Users" 
-          value={stats?.active_users_today?.toString() || "1,284"} 
-          trend="+8.2%" 
+          label="Likes" 
+          value={stats.total_likes ? stats.total_likes.toLocaleString() : "0"} 
+          trend="Lifetime" 
           isUp={true} 
-          icon={Users} 
-          color="purple"
-        />
-        <StatCard 
-          label="Engagement" 
-          value={stats?.total_engagement_today?.toString() || "842"} 
-          trend="-3.1%" 
-          isUp={false} 
-          icon={Heart} 
+          icon={ThumbsUp} 
           color="pink"
         />
         <StatCard 
+          label="Engagement" 
+          value={stats.total_engagement.toLocaleString()} 
+          trend="Total" 
+          isUp={true} 
+          icon={Heart} 
+          color="purple"
+        />
+        <StatCard 
           label="Shares" 
-          value="156" 
-          trend="+22.4%" 
+          value={stats.total_shares.toLocaleString()} 
+          trend="Total" 
           isUp={true} 
           icon={Share2} 
           color="orange"
+        />
+        <StatCard 
+          label="Completion Rate" 
+          value={`${stats.completion_rate}%`} 
+          trend="Reads/View" 
+          isUp={stats.completion_rate > 50} 
+          icon={Target} 
+          color="green" 
+        />
+        <StatCard 
+          label="Eng. Rate" 
+          value={`${stats.engagement_rate}%`} 
+          trend="Avg/Post" 
+          isUp={stats.engagement_rate > 2} 
+          icon={Activity} 
+          color="indigo" 
         />
       </div>
 
@@ -155,17 +191,21 @@ export default function DashboardPage() {
       >
         <div className="flex items-center justify-between mb-6">
           <h3 className="font-bold text-foreground">Performance Trend</h3>
-          <div className="flex gap-2">
+          <div className="flex gap-4">
             <span className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               <span className="h-2 w-2 rounded-full bg-primary" />
               Views
             </span>
+            <span className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+              <span className="h-2 w-2 rounded-full bg-pink-500" />
+              Engagement
+            </span>
           </div>
         </div>
 
-        <div className="h-64 w-full">
+        <div className="h-72 w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={mockTrendData}>
+            <ComposedChart data={trendData}>
               <defs>
                 <linearGradient id="colorViews" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
@@ -181,6 +221,14 @@ export default function DashboardPage() {
                 dy={10}
               />
               <YAxis 
+                yAxisId="left"
+                axisLine={false} 
+                tickLine={false} 
+                tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10, fontWeight: 600 }} 
+              />
+              <YAxis 
+                yAxisId="right"
+                orientation="right"
                 axisLine={false} 
                 tickLine={false} 
                 tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10, fontWeight: 600 }} 
@@ -194,9 +242,14 @@ export default function DashboardPage() {
                   padding: '12px'
                 }}
                 itemStyle={{ color: 'hsl(var(--foreground))', fontWeight: 'bold', fontSize: '12px' }}
-                cursor={{ stroke: 'hsl(var(--primary))', strokeWidth: 2, strokeDasharray: '5 5' }}
+                cursor={{ stroke: 'hsl(var(--primary))', strokeWidth: 1, strokeDasharray: '4 4' }}
+              />
+              <Legend 
+                wrapperStyle={{ paddingTop: '20px' }}
+                iconType="circle"
               />
               <Area 
+                yAxisId="left"
                 type="monotone" 
                 dataKey="views" 
                 stroke="hsl(var(--primary))" 
@@ -204,7 +257,17 @@ export default function DashboardPage() {
                 fill="url(#colorViews)" 
                 animationDuration={1500}
               />
-            </AreaChart>
+              <Line 
+                yAxisId="right"
+                type="monotone" 
+                dataKey="engagement" 
+                stroke="#ec4899" 
+                strokeWidth={3}
+                dot={{ r: 4, fill: "#ec4899", strokeWidth: 2, stroke: "#fff" }}
+                activeDot={{ r: 6 }}
+                animationDuration={1500}
+              />
+            </ComposedChart>
           </ResponsiveContainer>
         </div>
       </motion.div>
@@ -213,33 +276,34 @@ export default function DashboardPage() {
       <div className="mb-8">
         <div className="flex items-center justify-between mb-4 px-2">
           <h3 className="text-lg font-bold text-foreground font-serif">Top Performing</h3>
-          <Link href="#" className="text-xs font-bold text-primary hover:underline">See All</Link>
         </div>
         
         <div className="space-y-3">
-          {trendingPosts.map((post, index) => (
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.1 * index }}
-              key={post.id}
-              className="group flex items-center gap-4 rounded-3xl bg-card p-4 border border-border/50 shadow-sm hover:shadow-md transition-all"
-            >
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-secondary font-black text-foreground group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                {index + 1}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold text-foreground truncate">{post.title}</p>
-                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-widest">{post.views} views</p>
-              </div>
-              <div className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-black ${
-                post.growth.startsWith('+') ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'
-              }`}>
-                {post.growth.startsWith('+') ? <TrendingUp className="h-3 w-3" /> : <TrendingUp className="h-3 w-3 rotate-180" />}
-                {post.growth}
-              </div>
-            </motion.div>
-          ))}
+          {topPosts.length === 0 ? (
+            <div className="text-center text-muted-foreground p-4">No posts yet</div>
+          ) : (
+            topPosts.map((post: any, index: number) => (
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.1 * index }}
+                key={post.id}
+                className="group flex items-center gap-4 rounded-3xl bg-card p-4 border border-border/50 shadow-sm hover:shadow-md transition-all"
+              >
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-secondary font-black text-foreground group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                  {index + 1}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-foreground truncate">{post.title}</p>
+                  <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-widest">{post.views} views</p>
+                </div>
+                <div className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-black bg-green-500/10 text-green-500`}>
+                  <TrendingUp className="h-3 w-3" />
+                  View
+                </div>
+              </motion.div>
+            ))
+          )}
         </div>
       </div>
     </AppShell>

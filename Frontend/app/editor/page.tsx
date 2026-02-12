@@ -18,6 +18,9 @@ import {
   Loader2,
   Settings2,
   X,
+  Calendar,
+  Clock,
+  Trash2,
 } from "lucide-react";
 import { categories } from "@/lib/data";
 import { cn } from "@/lib/utils";
@@ -27,8 +30,6 @@ export default function EditorPage() {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [imageUrl, setImageUrl] = useState("");
-  // const [excerpt, setExcerpt] = useState(""); // Removed excerpt state
-  // const [content, setContent] = useState(""); // Removed single string state
   type Block = { id: string; type: "text" | "image"; content: string };
   const [blocks, setBlocks] = useState<Block[]>([
     { id: crypto.randomUUID(), type: "text", content: "" },
@@ -40,12 +41,31 @@ export default function EditorPage() {
   const [isPublishing, setIsPublishing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const coverImageInputRef = useRef<HTMLInputElement>(null);
+  
+  // Schedule state
+  const [scheduledAt, setScheduledAt] = useState<string>("");
+  const [showScheduleInput, setShowScheduleInput] = useState(false);
 
   const [user, setUser] = useState<{
     name: string;
     email: string;
     picture?: string;
   } | null>(null);
+
+  // Tab state for Editor vs Scheduled
+  const [activeTab, setActiveTab] = useState<'editor' | 'scheduled'>('editor');
+  const [scheduledPosts, setScheduledPosts] = useState<any[]>([]);
+
+  const toolbarButtons = [
+    { icon: Bold, label: "Bold", action: "**" },
+    { icon: Italic, label: "Italic", action: "_" },
+    { icon: List, label: "List", action: "\n- " },
+    { icon: ListOrdered, label: "Ordered List", action: "\n1. " },
+    { icon: Quote, label: "Quote", action: "\n> " },
+    { icon: Heading2, label: "Heading", action: "\n## " },
+    { icon: Link2, label: "Link", action: "[](url)" },
+    { icon: ImagePlus, label: "Image", action: "image" },
+  ];
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
@@ -57,6 +77,33 @@ export default function EditorPage() {
       }
     }
   }, []);
+
+  // Fetch scheduled posts
+  // Fetch scheduled posts
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout;
+
+    if (activeTab === 'scheduled') {
+      const fetchScheduled = async () => {
+         try {
+           const res = await fetch("http://localhost:5000/api/articles/scheduled");
+           if (res.ok) {
+             const data = await res.json();
+             setScheduledPosts(data);
+           }
+         } catch (error) {
+           console.error("Failed to fetch scheduled posts", error);
+         }
+      }
+      
+      fetchScheduled();
+      intervalId = setInterval(fetchScheduled, 5000);
+    }
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [activeTab]);
 
   const handleCoverImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -75,7 +122,6 @@ export default function EditorPage() {
       const reader = new FileReader();
       reader.onload = (event) => {
         const base64String = event.target?.result as string;
-        // Add image block and a new text block below it
         const newImageBlock: Block = {
           id: crypto.randomUUID(),
           type: "image",
@@ -86,7 +132,6 @@ export default function EditorPage() {
           type: "text",
           content: "",
         };
-
         setBlocks((prev) => [...prev, newImageBlock, newTextBlock]);
         setActiveBlockId(newTextBlock.id);
       };
@@ -129,6 +174,8 @@ export default function EditorPage() {
             avatar: user?.picture || user?.name?.charAt(0) || "A",
             email: user?.email || "anonymous@example.com",
           },
+          scheduledAt: scheduledAt || undefined,
+          published: !scheduledAt, // If scheduled, it's not "published" yet
         }),
       });
 
@@ -137,103 +184,322 @@ export default function EditorPage() {
       }
 
       setPublished(true);
-      // Show success state briefly then redirect
-      setTimeout(() => {
-        setPublished(false);
-        router.push("/explore");
-      }, 1500);
+      
+      // If scheduled, switch to Scheduled tab
+      if (scheduledAt) {
+         setTimeout(() => {
+          setPublished(false);
+          setActiveTab('scheduled');
+          // Reset editor
+          setTitle("");
+          setBlocks([{ id: crypto.randomUUID(), type: "text", content: "" }]);
+          setImageUrl("");
+          setScheduledAt("");
+          setShowScheduleInput(false);
+        }, 1500);
+      } else {
+        // If published immediately, go to explore
+        setTimeout(() => {
+          setPublished(false);
+          router.push("/explore");
+        }, 1500);
+      }
+
     } catch (error) {
       console.error("Error publishing:", error);
-      // Optional: Show error toast here
     } finally {
       setIsPublishing(false);
     }
   };
 
-  const toolbarButtons = [
-    { icon: Bold, label: "Bold", action: "**" },
-    { icon: Italic, label: "Italic", action: "_" },
-    { icon: Heading2, label: "Heading", action: "## " },
-    { icon: Quote, label: "Quote", action: "> " },
-    { icon: List, label: "List", action: "- " },
-    { icon: ListOrdered, label: "Ordered list", action: "1. " },
-    { icon: Link2, label: "Link", action: "[](url)" },
-    { icon: ImagePlus, label: "Image", action: "IMAGE_UPLOAD" },
-  ];
+  const handleDelete = async (postId: string) => {
+    if (!confirm("Are you sure you want to delete this scheduled post?")) return;
+    try {
+      const res = await fetch(`http://localhost:5000/api/articles/${postId}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setScheduledPosts((prev) => prev.filter((p) => p.id !== postId));
+      } else {
+        console.error("Failed to delete post");
+      }
+    } catch (error) {
+      console.error("Error deleting post:", error);
+    }
+  };
 
   return (
     <AppShell>
       {/* Header */}
-      <header className="mb-6 flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <header className="mb-6 flex items-center justify-between gap-2 overflow-x-auto scrollbar-hide">
+        <div className="flex items-center gap-2 shrink-0">
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             type="button"
             onClick={() => router.back()}
             aria-label="Go back"
-            className="rounded-full bg-secondary/50 p-2 text-foreground transition-colors hover:bg-secondary"
+            className="rounded-full bg-secondary/50 p-2 text-foreground transition-colors hover:bg-secondary shrink-0"
           >
             <ArrowLeft className="h-5 w-5" strokeWidth={2} />
           </motion.button>
-          <span className="text-lg font-bold tracking-tight text-foreground">
-            New Article
-          </span>
+          
+          <div className="flex bg-secondary/30 p-1 rounded-full border border-border/50 shrink-0">
+             <button
+               onClick={() => setActiveTab('editor')}
+               className={cn(
+                 "px-3 py-1.5 rounded-full text-xs font-bold transition-all",
+                 activeTab === 'editor' 
+                   ? "bg-background text-foreground shadow-sm ring-1 ring-black/5" 
+                   : "text-muted-foreground hover:text-foreground"
+               )}
+             >
+               Editor
+             </button>
+             <button
+               onClick={() => setActiveTab('scheduled')}
+               className={cn(
+                 "px-3 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5",
+                 activeTab === 'scheduled' 
+                   ? "bg-background text-foreground shadow-sm ring-1 ring-black/5" 
+                   : "text-muted-foreground hover:text-foreground"
+               )}
+             >
+               Scheduled
+               {scheduledPosts.length > 0 && (
+                 <span className="bg-primary text-primary-foreground text-[9px] px-1.5 py-0.5 rounded-full">
+                    {scheduledPosts.length}
+                 </span>
+               )}
+             </button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            type="button"
-            onClick={() => setIsPreview(!isPreview)}
-            className="flex items-center gap-1.5 rounded-full border border-border bg-background px-4 py-2 text-xs font-semibold text-foreground shadow-sm transition-colors hover:bg-secondary/50"
-          >
-            <Eye className="h-3.5 w-3.5" />
-            {isPreview ? "Edit" : "Preview"}
-          </motion.button>
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            type="button"
-            disabled={
-              !title.trim() || !fullContent.trim() || published || isPublishing
-            }
-            onClick={handlePublish}
-            className={cn(
-              "flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold text-background shadow-md transition-all",
-              !title.trim() || !fullContent.trim() || published || isPublishing
-                ? "bg-muted text-muted-foreground shadow-none cursor-not-allowed"
-                : "bg-primary text-primary-foreground hover:bg-primary/90",
-            )}
-          >
-            {isPublishing ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Send className="h-3.5 w-3.5" />
-            )}
-            {published ? "Published!" : "Publish"}
-          </motion.button>
-        </div>
+
+        {activeTab === 'editor' && (
+          <div className="flex items-center gap-2 shrink-0">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              type="button"
+              onClick={() => setIsPreview(!isPreview)}
+              className="flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-2 text-xs font-semibold text-foreground shadow-sm transition-colors hover:bg-secondary/50"
+            >
+              <Eye className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">{isPreview ? "Edit" : "Preview"}</span>
+            </motion.button>
+            
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              type="button"
+              onClick={() => setShowScheduleInput(!showScheduleInput)}
+              className={cn(
+                "flex items-center gap-1.5 rounded-full border border-border px-3 py-2 text-xs font-semibold shadow-sm transition-colors",
+                scheduledAt 
+                  ? "bg-primary/10 text-primary border-primary/20" 
+                  : "bg-background text-foreground hover:bg-secondary/50"
+              )}
+              title="Schedule"
+            >
+              <Calendar className="h-3.5 w-3.5" />
+              {scheduledAt ? "Scheduled" : ""}
+            </motion.button>
+
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              type="button"
+              disabled={
+                !title.trim() || !fullContent.trim() || published || isPublishing
+              }
+              onClick={handlePublish}
+              className={cn(
+                "flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold text-background shadow-md transition-all",
+                !title.trim() || !fullContent.trim() || published || isPublishing
+                  ? "bg-muted text-muted-foreground shadow-none cursor-not-allowed"
+                  : "bg-primary text-primary-foreground hover:bg-primary/90",
+              )}
+            >
+              {isPublishing ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Send className="h-3.5 w-3.5" />
+              )}
+              <span className={scheduledAt ? "hidden sm:inline" : ""}>
+                {published 
+                  ? (scheduledAt ? "Scheduled!" : "Published!") 
+                  : (scheduledAt ? "Schedule" : "Publish")}
+              </span>
+            </motion.button>
+          </div>
+        )}
       </header>
 
-      <AnimatePresence mode="wait">
-        {published && (
+      {/* Schedule Input Popover */}
+      <AnimatePresence>
+        {showScheduleInput && activeTab === 'editor' && (
           <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="mb-6 rounded-2xl border border-green-500/20 bg-green-500/10 p-4 text-center"
+            initial={{ opacity: 0, scale: 0.95, y: -10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: -10 }}
+            className="fixed top-20 left-4 right-4 z-50 mx-auto max-w-sm rounded-2xl border border-border bg-card p-4 shadow-xl"
           >
-            <p className="text-sm font-semibold text-green-500">
-              Your article has been published successfully! Redirecting...
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-bold text-sm flex items-center gap-2">
+                <Clock className="w-4 h-4 text-primary" />
+                Schedule Publication
+              </h3>
+              <button 
+                onClick={() => {
+                  setScheduledAt("");
+                  setShowScheduleInput(false);
+                }}
+                className="text-muted-foreground hover:text-foreground text-xs"
+              >
+                Clear
+              </button>
+            </div>
+            <input
+              type="datetime-local"
+              value={scheduledAt}
+              onChange={(e) => setScheduledAt(e.target.value)}
+              className="w-full bg-secondary/50 border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+              min={new Date().toISOString().slice(0, 16)}
+            />
+            <p className="text-[10px] text-muted-foreground mt-2">
+              Your article will be published automatically at this time.
             </p>
           </motion.div>
         )}
       </AnimatePresence>
 
+      <AnimatePresence mode="wait">
+        {published && (
+           <motion.div 
+             // ... existing success message code ... 
+            className="mb-6 rounded-2xl border border-green-500/20 bg-green-500/10 p-4 text-center"
+           >
+             <p className="text-sm font-semibold text-green-500">
+              {scheduledAt 
+                ? "Your article has been scheduled successfully!" 
+                : "Your article has been published successfully! Redirecting..."}
+            </p>
+           </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="relative min-h-[calc(100vh-12rem)]">
         <AnimatePresence mode="wait">
-          {isPreview ? (
+          {activeTab === 'scheduled' ? (
+            <motion.div
+              key="scheduled"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="space-y-4"
+            >
+              {scheduledPosts.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-24 text-center">
+                  <div className="bg-secondary/50 p-6 rounded-full mb-6">
+                    <Calendar
+                      className="w-10 h-10 text-muted-foreground/50"
+                      strokeWidth={1.5}
+                    />
+                  </div>
+                  <h3 className="text-xl font-black text-foreground font-serif tracking-tight">
+                    No scheduled posts
+                  </h3>
+                  <p className="text-sm text-muted-foreground max-w-xs mt-3 leading-relaxed">
+                    content you schedule for later will appear here safely until
+                    it&apos;s time to shine.
+                  </p>
+                  <button
+                    onClick={() => setActiveTab("editor")}
+                    className="mt-8 px-8 py-3 rounded-full bg-primary text-primary-foreground text-sm font-bold shadow-lg hover:shadow-xl hover:scale-105 transition-all"
+                  >
+                    Write new story
+                  </button>
+                </div>
+              ) : (
+                <div className="grid gap-4">
+                  {scheduledPosts.map((post) => (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      key={post.id}
+                      className="group relative bg-card/50 backdrop-blur-sm border border-border/50 rounded-3xl p-3 flex gap-4 shadow-sm hover:shadow-md hover:border-primary/20 transition-all duration-300"
+                    >
+                      <div className="h-28 w-28 shrink-0 rounded-2xl bg-secondary overflow-hidden relative">
+                        {post.image ? (
+                          <img
+                            src={post.image}
+                            alt={post.title}
+                            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+                          />
+                        ) : (
+                          <div className="h-full w-full flex items-center justify-center bg-linear-to-br from-secondary to-muted">
+                            <span className="text-4xl font-black text-foreground/5 font-serif">
+                              {post.title.charAt(0)}
+                            </span>
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors" />
+                      </div>
+
+                      <div className="flex flex-col justify-between py-1 pr-2 flex-1 min-w-0">
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="inline-flex items-center rounded-full bg-secondary px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
+                              {post.category || "General"}
+                            </span>
+                            <button className="text-muted-foreground hover:text-foreground transition-colors">
+                              <Settings2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                          <h4 className="font-bold text-foreground text-lg leading-tight line-clamp-2 font-serif group-hover:text-primary transition-colors">
+                            {post.title}
+                          </h4>
+                          <p className="text-xs text-muted-foreground/80 mt-1.5 line-clamp-2 md:line-clamp-1">
+                            {post.excerpt}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center justify-between mt-3">
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex items-center gap-1.5 bg-orange-500/10 text-orange-600 dark:text-orange-400 px-2.5 py-1 rounded-full text-[10px] font-bold ring-1 ring-orange-500/20">
+                              <Clock className="w-3 h-3" />
+                              {new Date(post.scheduledAt).toLocaleDateString(
+                                undefined,
+                                { month: "short", day: "numeric" }
+                              )}{" "}
+                              •{" "}
+                              {new Date(post.scheduledAt).toLocaleTimeString(
+                                [],
+                                { hour: "2-digit", minute: "2-digit" }
+                              )}
+                            </span>
+                          </div>
+
+                            <div className="flex items-center gap-3">
+                             <button 
+                               onClick={() => handleDelete(post.id)}
+                               className="text-muted-foreground hover:text-red-500 transition-colors"
+                               title="Delete"
+                             >
+                               <Trash2 className="w-4 h-4" />
+                             </button>
+                             <button className="text-xs font-bold text-foreground hover:underline decoration-primary decoration-2 underline-offset-4">
+                               Edit
+                             </button>
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </motion.div>
+          ) : isPreview ? (
             <motion.div
               key="preview"
               initial={{ opacity: 0, x: 20 }}
@@ -254,6 +520,7 @@ export default function EditorPage() {
                         src={user.picture}
                         alt={user.name}
                         className="h-full w-full object-cover"
+                        referrerPolicy="no-referrer"
                       />
                     ) : (
                       user?.name?.charAt(0) || "A"
