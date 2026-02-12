@@ -23,6 +23,11 @@ export class ArticlesController {
     return this.articlesService.createFromDto(dto);
   }
 
+  @Get('scheduled')
+  async getScheduled() {
+    return this.articlesService.findScheduled();
+  }
+
   @Get()
   findAll(
     @Query('limit') limit?: string,

@@ -10,4 +10,6 @@ export class CreateArticleDto {
     email: string;
     avatar?: string;
   };
+  scheduledAt?: string | Date;
+  published?: boolean;
 }

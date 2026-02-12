@@ -12,9 +12,11 @@ import {
   MoreHorizontal,
   Loader2,
   Share,
+  ThumbsDown,
 } from "lucide-react"
 import type { Article } from "@/lib/data"
 import { cn } from "@/lib/utils"
+import { AppShell } from "@/components/app-shell"
 
 export default function ArticlePage({
   params,
@@ -35,6 +37,10 @@ export default function ArticlePage({
         if (res.ok) {
           const data = await res.json()
           setArticle(data)
+          
+          // Increment view count
+          fetch(`http://localhost:5000/api/articles/${id}/view`, { method: "POST" })
+            .catch(err => console.error("Failed to increment view", err))
         } else {
           setArticle(null)
         }
@@ -111,10 +117,11 @@ export default function ArticlePage({
 
   const paragraphs = article.content.split("\n\n")
 
+  
   return (
-    <div className="mx-auto min-h-screen max-w-lg bg-background font-sans selection:bg-primary/20">
+    <AppShell>
       {/* Sticky Top Bar */}
-      <header className="sticky top-0 z-50 flex items-center justify-between bg-background/80 backdrop-blur-md px-4 py-3 border-b border-border/50">
+      <header className="sticky top-0 z-40 -mx-5 -mt-4 mb-4 flex items-center justify-between bg-background/95 backdrop-blur-md px-5 py-3 border-b border-border/50">
         <button
           type="button"
           onClick={() => router.back()}
@@ -135,64 +142,116 @@ export default function ArticlePage({
       </header>
 
       {/* Content */}
-      <div className="px-6 pt-6 pb-32">
-        {/* Category Badge */}
-        <div className="mb-4">
-          <span className="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary ring-1 ring-inset ring-primary/20">
-            {article.category}
+      <div className="pb-32">
+        {/* Category - News Style */}
+        <div className="mb-3">
+          <span className="text-xs font-bold tracking-widest text-red-600 dark:text-red-400 uppercase">
+            {article.category || "NEWS"}
           </span>
         </div>
 
         {/* Title */}
-        <h1 className="mb-6 text-3xl font-black leading-tight tracking-tight text-foreground font-serif text-balance">
+        <h1 className="mb-4 text-3xl sm:text-4xl font-black leading-tight tracking-tight text-foreground font-serif text-balance">
           {article.title}
         </h1>
 
-        {/* Author & Meta */}
-        <div className="mb-8 flex items-center gap-4">
-          <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-secondary ring-2 ring-background shadow-sm flex items-center justify-center text-xs font-bold text-muted-foreground">
-             {article.author.avatar ? (
-                <span>{article.author.avatar}</span> 
-             ) : (
-                <span>{article.author.name.charAt(0)}</span>
-             )}
-          </div>
-          <div className="flex flex-col text-xs">
-            <span className="font-bold text-foreground text-sm">
-              {article.author.name}
-            </span>
-            <div className="flex items-center gap-2 text-muted-foreground mt-0.5">
-               <span>{article.publishedAt}</span>
-               <span className="h-0.5 w-0.5 rounded-full bg-muted-foreground" />
-               <span>{article.readTime} min read</span>
-            </div>
-          </div>
-          <button
-              type="button"
-              className="ml-auto rounded-full bg-foreground text-background px-4 py-1.5 text-xs font-bold hover:bg-foreground/90 transition-colors shadow-sm"
-            >
-              Follow
-          </button>
+        {/* Excerpt/Subtitle */}
+        {article.excerpt && (
+          <h2 className="mb-6 text-lg font-medium leading-snug text-muted-foreground font-serif italic border-l-4 border-primary/20 pl-4 py-1">
+            {article.excerpt}
+          </h2>
+        )}
+
+        {/* Author & Actions - Top Section */}
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-4 sm:px-0">
+           <div className="flex items-center gap-3">
+              <div className="h-10 w-10 overflow-hidden rounded-full ring-2 ring-background shrink-0">
+                 {article.author?.picture ? (
+                    <img src={article.author.picture} alt={article.author.name} className="h-full w-full object-cover" />
+                 ) : (
+                    <div className="h-full w-full flex items-center justify-center bg-secondary font-bold text-muted-foreground">{article.author?.name?.charAt(0)}</div>
+                 )}
+              </div>
+              <div className="flex flex-col">
+                 <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">WRITTEN BY</span>
+                 </div>
+                 <h3 className="font-bold text-foreground text-sm leading-tight">{article.author?.name || "The Hindu Bureau"}</h3>
+                 <p className="text-[10px] text-muted-foreground">{article.author?.email || "sohamsawalakhe@gmail.com"}</p>
+              </div>
+           </div>
+
+           <div className="flex items-center gap-3 ml-auto sm:ml-0">
+              <button className="rounded-full px-5 py-1.5 text-xs font-bold text-foreground ring-1 ring-border hover:bg-secondary transition-colors">
+                 Follow
+              </button>
+              <button 
+                 onClick={handleBookmark}
+                 className={cn("p-2 rounded-full hover:bg-secondary transition-colors", article.bookmarked ? "text-foreground" : "text-muted-foreground")}
+              >
+                 <Bookmark className={cn("w-5 h-5", article.bookmarked && "fill-current")} />
+              </button>
+           </div>
         </div>
 
-        {/* Hero Placeholder - if no image, use a gradient or pattern */}
-        <div className="mb-8 aspect-video w-full overflow-hidden rounded-3xl bg-linear-to-br from-secondary to-muted border border-border/50 flex items-center justify-center shadow-sm">
-           {/* If we had an image URL, we'd use next/image here */}
-           <div className="text-8xl font-black text-foreground/5 font-serif select-none">
-            {article.title.charAt(0)}
-          </div>
+        {/* Updated Time */}
+        <div className="mb-4 text-[10px] sm:text-xs text-muted-foreground px-4 sm:px-0">
+           <span>Updated - {article.publishedAt || "1 min read"}</span>
         </div>
+
+        {/* Main Image */}
+        <figure className="mb-8 w-full">
+           <div className="aspect-video w-full overflow-hidden rounded-lg bg-secondary relative mb-2">
+             {article.image ? (
+               <img 
+                 src={article.image} 
+                 alt={article.title} 
+                 className="h-full w-full object-cover" 
+               />
+             ) : (
+               <div className="flex h-full w-full items-center justify-center bg-linear-to-br from-secondary to-muted">
+                  <div className="text-6xl font-black text-foreground/5 font-serif select-none">
+                    {article.title.charAt(0)}
+                  </div>
+               </div>
+             )}
+           </div>
+           <figcaption className="text-[10px] text-muted-foreground font-medium px-1">
+              {article.title} — Photo Credit: Special Arrangement
+           </figcaption>
+        </figure>
 
         {/* Article Body */}
         <article className="space-y-6">
+          {/* Dateline simulation for first paragraph if needed, or just standard text */}
           {paragraphs.map((paragraph, index) => {
+            // Handle Images inside content
+            const imageMatch = paragraph.match(/!\[(.*?)\]\((.*?)\)/);
+            if (imageMatch) {
+              const alt = imageMatch[1];
+              const src = imageMatch[2];
+              if (src === article.image) return null;
+
+              return (
+                <figure key={index} className="my-8">
+                  <img 
+                    src={src} 
+                    alt={alt || "Article Image"} 
+                    className="w-full rounded-lg shadow-md border border-border/50" 
+                  />
+                  {alt && alt !== "Image" && (
+                    <figcaption className="mt-2 text-center text-xs font-medium text-muted-foreground">
+                      {alt}
+                    </figcaption>
+                  )}
+                </figure>
+              );
+            }
+
             if (paragraph.startsWith("**") && paragraph.endsWith("**")) {
               const text = paragraph.replace(/\*\*/g, "")
               return (
-                <h2
-                  key={index}
-                  className="text-xl font-bold text-foreground font-serif pt-4 first:pt-0"
-                >
+                <h2 key={index} className="text-xl font-bold text-foreground font-serif pt-4">
                   {text}
                 </h2>
               )
@@ -200,20 +259,16 @@ export default function ArticlePage({
             if (paragraph.startsWith("##")) {
                const text = paragraph.replace(/^##\s*/, "")
                return (
-                <h2
-                  key={index}
-                  className="text-2xl font-bold text-foreground font-serif pt-6 pb-2"
-                >
+                <h2 key={index} className="text-2xl font-bold text-foreground font-serif pt-6 pb-2">
                   {text}
                 </h2>
                )
             }
-            // Handle blockquotes
             if (paragraph.startsWith(">")) {
                const text = paragraph.replace(/^>\s*/, "")
                return (
-                 <blockquote key={index} className="border-l-4 border-primary pl-4 py-1 my-6 italic text-lg font-medium text-foreground/80 bg-secondary/30 rounded-r-lg">
-                    {text}
+                 <blockquote key={index} className="border-l-4 border-red-500 pl-4 py-2 my-6 italic text-lg font-serif text-foreground/80 bg-secondary/10">
+                    "{text}"
                  </blockquote>
                )
             }
@@ -222,8 +277,9 @@ export default function ArticlePage({
             return (
               <p
                 key={index}
-                className="text-[17px] leading-relaxed text-muted-foreground/90 font-serif tracking-wide"
+                className="text-[18px] leading-8 text-foreground/90 font-serif tracking-normal"
               >
+                {/* Dateline style for first paragraph first word? Optional. */}
                 {parts.map((part, i) => {
                   if (part.startsWith("**") && part.endsWith("**")) {
                     return (
@@ -238,57 +294,45 @@ export default function ArticlePage({
             )
           })}
         </article>
-      </div>
+        
+        {/* Divider */}
+        <div className="h-px w-full bg-border my-8" />
 
-      {/* Floating Bottom Action Bar */}
-      <div className="fixed bottom-6 left-0 right-0 z-50 px-4 pointer-events-none">
-        <div className="mx-auto max-w-70 bg-foreground/90 backdrop-blur-xl text-background rounded-full shadow-2xl px-6 py-3 flex items-center justify-between pointer-events-auto ring-1 ring-white/10">
-            <button
-              type="button"
-              className="flex flex-col items-center gap-0.5 group"
-              onClick={handleLike}
-              aria-label={article.liked ? "Unlike" : "Like"}
-            >
-              <Heart
-                className={cn(
-                  "h-6 w-6 transition-all duration-300",
-                  article.liked
-                    ? "fill-red-500 text-red-500 scale-110"
-                    : "text-background group-hover:scale-110 group-hover:text-red-400"
-                )}
-                strokeWidth={article.liked ? 0 : 2}
-              />
-              <span className="text-[10px] font-bold">{article.likes}</span>
-            </button>
+        
+        {/* Footer Author & Actions */}
+        <div className="mt-10 border-t border-border pt-8">
+           <div className="mb-6">
+              <h3 className="font-black text-foreground text-base uppercase tracking-wider">
+                 {article.author?.name || "THE HINDU BUREAU"}
+              </h3>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1.5 font-medium">
+                 <span>Updated - {article.publishedAt || "February 12, 2026"}</span>
+                 <span className="text-border">|</span>
+                 <span>{article.readTime || "1"} min read</span>
+              </div>
+           </div>
 
-            <div className="w-px h-8 bg-background/20" />
+           {/* Actions Row */}
+           <div className="flex items-center gap-8">
+              <button onClick={handleLike} className="flex items-center gap-2 p-0 text-muted-foreground hover:text-red-500 transition-colors group">
+                 <Heart className={cn("w-5 h-5", article.liked && "fill-current text-red-500")} />
+                 <span className={cn("text-sm font-semibold", article.liked && "text-red-500")}>Like</span>
+              </button>
+              
+              <button className="flex items-center gap-2 p-0 text-muted-foreground hover:text-foreground transition-colors group">
+                 <ThumbsDown className="w-5 h-5 group-hover:text-red-500 transition-colors" />
+                 <span className="text-sm font-semibold group-hover:text-red-500 transition-colors">Dislike</span>
+              </button>
 
-            <button type="button" aria-label="Comment" className="flex flex-col items-center gap-0.5 group">
-              <MessageCircle className="h-6 w-6 text-background transition-transform group-hover:scale-110" strokeWidth={2} />
-              <span className="text-[10px] font-bold">24</span>
-            </button>
-
-             <div className="w-px h-8 bg-background/20" />
-
-            <button
-              type="button"
-              onClick={handleBookmark}
-              aria-label={article.bookmarked ? "Remove bookmark" : "Bookmark"}
-              className="group"
-            >
-              <Bookmark
-                className={cn(
-                  "h-6 w-6 transition-all duration-300 group-hover:scale-110",
-                  article.bookmarked
-                    ? "fill-yellow-400 text-yellow-400"
-                    : "text-background group-hover:text-yellow-400"
-                )}
-                strokeWidth={article.bookmarked ? 0 : 2}
-              />
-            </button>
+              <button className="flex items-center gap-2 p-0 text-muted-foreground hover:text-blue-500 transition-colors group">
+                 <MessageCircle className="w-5 h-5" />
+                 <span className="text-sm font-semibold">Comment</span>
+              </button>
+           </div>
         </div>
       </div>
-    </div>
+
+
+    </AppShell>
   )
 }
-

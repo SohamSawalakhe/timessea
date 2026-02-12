@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import {
@@ -11,9 +11,10 @@ import { Search, Bell, ChevronLeft, ChevronRight } from "lucide-react";
 import { Article, categories } from "@/lib/data";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
-import { useEffect } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function HomePage() {
+  const { user } = useAuth();
   const [activeCategory, setActiveCategory] = useState("Trending");
   const [searchQuery, setSearchQuery] = useState("");
   const [articles, setArticles] = useState<Article[]>([]);
@@ -58,7 +59,7 @@ export default function HomePage() {
       <header className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-black text-foreground font-serif tracking-tight">
-            Hello Jason
+            Hello {user?.name?.split(' ')[0] || "Reader"}
           </h1>
           <p className="text-sm font-medium text-muted-foreground mt-1">
             Discover today's top stories
@@ -73,12 +74,15 @@ export default function HomePage() {
             <Bell className="h-6 w-6 text-foreground" strokeWidth={2} />
             <span className="absolute top-2 right-2 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-background" />
           </button>
-          <Link href="/profile" className="relative group">
+          <Link href={user ? "/profile" : "/login"} className="relative group">
             <div className="h-10 w-10 overflow-hidden rounded-full ring-2 ring-background shadow-md transition-transform group-hover:scale-105">
-              {/* Replaced Avatar with simple div logic */}
-              <div className="h-full w-full bg-foreground text-background flex items-center justify-center text-xs font-bold">
-                JT
-              </div>
+              {user?.picture ? (
+                <img src={user.picture} alt={user.name} className="h-full w-full object-cover" />
+              ) : (
+                <div className="h-full w-full bg-foreground text-background flex items-center justify-center text-xs font-bold">
+                  {user?.name?.charAt(0) || "G"}
+                </div>
+              )}
             </div>
           </Link>
         </div>

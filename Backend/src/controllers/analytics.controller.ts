@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Body, Param, Query, Req } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, Req, UseGuards } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 import { Request } from 'express';
 import { AnalyticsService } from '../services/analytics.service';
 import { AnalyticsQueryService } from '../services/analytics-query.service';
@@ -47,6 +48,29 @@ export class AnalyticsController {
     await this.analyticsService.trackBatch(enrichedEvents);
     return { success: true };
   }
+
+  /**
+   * Get current user's profile analytics overview
+   * GET /analytics/profile/overview
+   */
+  @Get('profile/overview')
+  @UseGuards(AuthGuard('jwt'))
+  async getProfileOverview(@Req() req) {
+    return await this.analyticsQueryService.getAuthorStats(req.user.id);
+  }
+
+  /**
+   * Get detailed dashboard analytics for the current user
+   * GET /analytics/dashboard
+   */
+  @Get('dashboard')
+  @UseGuards(AuthGuard('jwt'))
+  async getDashboardAnalytics(@Req() req) {
+    return await this.analyticsQueryService.getAuthorDashboardStats(req.user.id);
+  }
+
+  /**
+   * Get analytics for a specific post
 
   /**
    * Get analytics for a specific post
