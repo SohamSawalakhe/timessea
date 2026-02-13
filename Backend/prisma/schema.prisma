@@ -48,6 +48,8 @@ model Article {
   readTime    Int       @default(5)
   image       String?
   views       Int       @default(0)
+  media       Json?
+  location    String?
   published   Boolean   @default(true)
   scheduledAt DateTime?
   author      User      @relation(fields: [authorId], references: [id])

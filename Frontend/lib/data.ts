@@ -14,6 +14,7 @@ export type Article = {
   publishedAt: string;
   createdAt?: string;
   image: string;
+  media?: { type: "image" | "video"; url: string; poster?: string }[];
   liked: boolean;
   bookmarked: boolean;
   likes: number;

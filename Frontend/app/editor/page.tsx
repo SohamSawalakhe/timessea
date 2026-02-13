@@ -48,7 +48,7 @@ export default function EditorPage() {
   const [isPublishing, setIsPublishing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const coverImageInputRef = useRef<HTMLInputElement>(null);
-  
+
   // Schedule state
   const [scheduledAt, setScheduledAt] = useState<string>("");
   const [showScheduleInput, setShowScheduleInput] = useState(false);
@@ -60,7 +60,7 @@ export default function EditorPage() {
   } | null>(null);
 
   // Tab state for Editor vs Scheduled
-  const [activeTab, setActiveTab] = useState<'editor' | 'scheduled'>('editor');
+  const [activeTab, setActiveTab] = useState<"editor" | "scheduled">("editor");
   const [scheduledPosts, setScheduledPosts] = useState<any[]>([]);
 
   const toolbarButtons = [
@@ -90,19 +90,21 @@ export default function EditorPage() {
   useEffect(() => {
     let intervalId: NodeJS.Timeout;
 
-    if (activeTab === 'scheduled') {
+    if (activeTab === "scheduled") {
       const fetchScheduled = async () => {
-         try {
-           const res = await fetch("http://localhost:5000/api/articles/scheduled");
-           if (res.ok) {
-             const data = await res.json();
-             setScheduledPosts(data);
-           }
-         } catch (error) {
-           console.error("Failed to fetch scheduled posts", error);
-         }
-      }
-      
+        try {
+          const res = await fetch(
+            "http://localhost:5000/api/articles/scheduled",
+          );
+          if (res.ok) {
+            const data = await res.json();
+            setScheduledPosts(data);
+          }
+        } catch (error) {
+          console.error("Failed to fetch scheduled posts", error);
+        }
+      };
+
       fetchScheduled();
       intervalId = setInterval(fetchScheduled, 5000);
     }
@@ -167,6 +169,29 @@ export default function EditorPage() {
     setIsPublishing(true);
 
     try {
+      // Extract separate text content and media items
+      const textContent = blocks
+        .filter((b) => b.type === "text")
+        .map((b) => b.content)
+        .join("\n\n");
+
+      const mediaItems: { type: "image" | "video"; url: string }[] = [];
+
+      // Add cover image first if it exists
+      if (imageUrl) {
+        mediaItems.push({ type: "image", url: imageUrl });
+      }
+
+      // Add inline images
+      blocks.forEach((b) => {
+        if (b.type === "image") {
+          // Avoid duplicate if cover image is same as block image (unlikely but safe)
+          if (b.content !== imageUrl) {
+            mediaItems.push({ type: "image", url: b.content });
+          }
+        }
+      });
+
       const response = await fetch("http://localhost:5000/api/articles", {
         method: "POST",
         headers: {
@@ -174,10 +199,10 @@ export default function EditorPage() {
         },
         body: JSON.stringify({
           title,
-          content: fullContent,
-          image:
-            imageUrl || blocks.find((b) => b.type === "image")?.content || "",
-          excerpt: fullContent.substring(0, 150) + "...",
+          content: textContent, // Send clean text
+          image: imageUrl || mediaItems[0]?.url || "", // Primary image for fallback
+          media: mediaItems, // Send carousel items
+          excerpt: textContent.substring(0, 150) + "...",
           category: selectedCategory || "General",
           readTime,
           author: {
@@ -204,12 +229,12 @@ export default function EditorPage() {
       }
 
       setPublished(true);
-      
+
       // If scheduled, switch to Scheduled tab
       if (scheduledAt) {
-         setTimeout(() => {
+        setTimeout(() => {
           setPublished(false);
-          setActiveTab('scheduled');
+          setActiveTab("scheduled");
           // Reset editor
           setTitle("");
           setBlocks([{ id: crypto.randomUUID(), type: "text", content: "" }]);
@@ -224,7 +249,6 @@ export default function EditorPage() {
           router.push("/explore");
         }, 1500);
       }
-
     } catch (error) {
       console.error("Error publishing:", error);
     } finally {
@@ -233,7 +257,8 @@ export default function EditorPage() {
   };
 
   const handleDelete = async (postId: string) => {
-    if (!confirm("Are you sure you want to delete this scheduled post?")) return;
+    if (!confirm("Are you sure you want to delete this scheduled post?"))
+      return;
     try {
       const res = await fetch(`http://localhost:5000/api/articles/${postId}`, {
         method: "DELETE",
@@ -296,39 +321,39 @@ export default function EditorPage() {
           >
             <ArrowLeft className="h-5 w-5" strokeWidth={2} />
           </motion.button>
-          
+
           <div className="flex bg-secondary/30 p-1 rounded-full border border-border/50 shrink-0">
-             <button
-               onClick={() => setActiveTab('editor')}
-               className={cn(
-                 "px-3 py-1.5 rounded-full text-xs font-bold transition-all",
-                 activeTab === 'editor' 
-                   ? "bg-background text-foreground shadow-sm ring-1 ring-black/5" 
-                   : "text-muted-foreground hover:text-foreground"
-               )}
-             >
-               Editor
-             </button>
-             <button
-               onClick={() => setActiveTab('scheduled')}
-               className={cn(
-                 "px-3 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5",
-                 activeTab === 'scheduled' 
-                   ? "bg-background text-foreground shadow-sm ring-1 ring-black/5" 
-                   : "text-muted-foreground hover:text-foreground"
-               )}
-             >
-               Scheduled
-               {scheduledPosts.length > 0 && (
-                 <span className="bg-primary text-primary-foreground text-[9px] px-1.5 py-0.5 rounded-full">
-                    {scheduledPosts.length}
-                 </span>
-               )}
-             </button>
+            <button
+              onClick={() => setActiveTab("editor")}
+              className={cn(
+                "px-3 py-1.5 rounded-full text-xs font-bold transition-all",
+                activeTab === "editor"
+                  ? "bg-background text-foreground shadow-sm ring-1 ring-black/5"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              Editor
+            </button>
+            <button
+              onClick={() => setActiveTab("scheduled")}
+              className={cn(
+                "px-3 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5",
+                activeTab === "scheduled"
+                  ? "bg-background text-foreground shadow-sm ring-1 ring-black/5"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              Scheduled
+              {scheduledPosts.length > 0 && (
+                <span className="bg-primary text-primary-foreground text-[9px] px-1.5 py-0.5 rounded-full">
+                  {scheduledPosts.length}
+                </span>
+              )}
+            </button>
           </div>
         </div>
 
-        {activeTab === 'editor' && (
+        {activeTab === "editor" && (
           <div className="flex items-center gap-2 shrink-0">
             <motion.button
               whileHover={{ scale: 1.05 }}
@@ -338,9 +363,11 @@ export default function EditorPage() {
               className="flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-2 text-xs font-semibold text-foreground shadow-sm transition-colors hover:bg-secondary/50"
             >
               <Eye className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">{isPreview ? "Edit" : "Preview"}</span>
+              <span className="hidden sm:inline">
+                {isPreview ? "Edit" : "Preview"}
+              </span>
             </motion.button>
-            
+
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -348,9 +375,9 @@ export default function EditorPage() {
               onClick={() => setShowScheduleInput(!showScheduleInput)}
               className={cn(
                 "flex items-center gap-1.5 rounded-full border border-border px-3 py-2 text-xs font-semibold shadow-sm transition-colors",
-                scheduledAt 
-                  ? "bg-primary/10 text-primary border-primary/20" 
-                  : "bg-background text-foreground hover:bg-secondary/50"
+                scheduledAt
+                  ? "bg-primary/10 text-primary border-primary/20"
+                  : "bg-background text-foreground hover:bg-secondary/50",
               )}
               title="Schedule"
             >
@@ -363,12 +390,18 @@ export default function EditorPage() {
               whileTap={{ scale: 0.95 }}
               type="button"
               disabled={
-                !title.trim() || !fullContent.trim() || published || isPublishing
+                !title.trim() ||
+                !fullContent.trim() ||
+                published ||
+                isPublishing
               }
               onClick={handlePublish}
               className={cn(
                 "flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold text-background shadow-md transition-all",
-                !title.trim() || !fullContent.trim() || published || isPublishing
+                !title.trim() ||
+                  !fullContent.trim() ||
+                  published ||
+                  isPublishing
                   ? "bg-muted text-muted-foreground shadow-none cursor-not-allowed"
                   : "bg-primary text-primary-foreground hover:bg-primary/90",
               )}
@@ -379,9 +412,13 @@ export default function EditorPage() {
                 <Send className="h-3.5 w-3.5" />
               )}
               <span className={scheduledAt ? "hidden sm:inline" : ""}>
-                {published 
-                  ? (scheduledAt ? "Scheduled!" : "Published!") 
-                  : (scheduledAt ? "Schedule" : "Publish")}
+                {published
+                  ? scheduledAt
+                    ? "Scheduled!"
+                    : "Published!"
+                  : scheduledAt
+                    ? "Schedule"
+                    : "Publish"}
               </span>
             </motion.button>
           </div>
@@ -390,7 +427,7 @@ export default function EditorPage() {
 
       {/* Schedule Input Popover */}
       <AnimatePresence>
-        {showScheduleInput && activeTab === 'editor' && (
+        {showScheduleInput && activeTab === "editor" && (
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: -10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -402,7 +439,7 @@ export default function EditorPage() {
                 <Clock className="w-4 h-4 text-primary" />
                 Schedule Publication
               </h3>
-              <button 
+              <button
                 onClick={() => {
                   setScheduledAt("");
                   setShowScheduleInput(false);
@@ -426,24 +463,24 @@ export default function EditorPage() {
         )}
       </AnimatePresence>
 
-        <AnimatePresence mode="wait">
-          {published && (
-            <motion.div
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="mb-6 rounded-2xl border border-green-500/20 bg-green-500/10 p-4 text-center"
-            >
-              <p className="text-sm font-semibold text-green-500">
-                Your article has been published successfully! Redirecting...
-              </p>
-            </motion.div>
-          )}
-        </AnimatePresence>
+      <AnimatePresence mode="wait">
+        {published && (
+          <motion.div
+            // ... existing success message code ...
+            className="mb-6 rounded-2xl border border-green-500/20 bg-green-500/10 p-4 text-center"
+          >
+            <p className="text-sm font-semibold text-green-500">
+              {scheduledAt
+                ? "Your article has been scheduled successfully!"
+                : "Your article has been published successfully! Redirecting..."}
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="relative min-h-[calc(100vh-12rem)]">
         <AnimatePresence mode="wait">
-          {activeTab === 'scheduled' ? (
+          {activeTab === "scheduled" ? (
             <motion.div
               key="scheduled"
               initial={{ opacity: 0, x: 20 }}
@@ -523,27 +560,27 @@ export default function EditorPage() {
                               <Clock className="w-3 h-3" />
                               {new Date(post.scheduledAt).toLocaleDateString(
                                 undefined,
-                                { month: "short", day: "numeric" }
+                                { month: "short", day: "numeric" },
                               )}{" "}
                               •{" "}
                               {new Date(post.scheduledAt).toLocaleTimeString(
                                 [],
-                                { hour: "2-digit", minute: "2-digit" }
+                                { hour: "2-digit", minute: "2-digit" },
                               )}
                             </span>
                           </div>
 
-                            <div className="flex items-center gap-3">
-                             <button 
-                               onClick={() => handleDelete(post.id)}
-                               className="text-muted-foreground hover:text-red-500 transition-colors"
-                               title="Delete"
-                             >
-                               <Trash2 className="w-4 h-4" />
-                             </button>
-                             <button className="text-xs font-bold text-foreground hover:underline decoration-primary decoration-2 underline-offset-4">
-                               Edit
-                             </button>
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => handleDelete(post.id)}
+                              className="text-muted-foreground hover:text-red-500 transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                            <button className="text-xs font-bold text-foreground hover:underline decoration-primary decoration-2 underline-offset-4">
+                              Edit
+                            </button>
                           </div>
                         </div>
                       </div>

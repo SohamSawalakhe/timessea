@@ -49,5 +49,6 @@ export class CreateArticleDto {
 
   @IsOptional()
   @IsBoolean()
+  media?: { type: 'image' | 'video'; url: string; poster?: string }[];
   published?: boolean;
 }
