@@ -24,6 +24,7 @@ export default function DraftsPage() {
   const router = useRouter();
   const { user, token, isAuthenticated, isLoading } = useAuth();
   const [drafts, setDrafts] = useState<Article[]>([]);
+  const [scheduledPosts, setScheduledPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -35,8 +36,23 @@ export default function DraftsPage() {
 
     if (user && token) {
       fetchDrafts();
+      fetchScheduled();
     }
   }, [user, token, isAuthenticated, isLoading]);
+
+  const fetchScheduled = async () => {
+    try {
+      const API_URL =
+        process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+      const response = await fetch(`${API_URL}/api/articles/scheduled`);
+      if (response.ok) {
+        const data = await response.json();
+        setScheduledPosts(data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch scheduled posts", error);
+    }
+  };
 
   const fetchDrafts = async () => {
     try {
@@ -64,6 +80,28 @@ export default function DraftsPage() {
       setDrafts([]); // Set to empty array on error
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleScheduledDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this scheduled post?"))
+      return;
+    try {
+      const API_URL =
+        process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+      const res = await fetch(`${API_URL}/api/articles/${id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (res.ok) {
+        setScheduledPosts((prev) => prev.filter((p) => p.id !== id));
+      } else {
+        console.error("Failed to delete post");
+      }
+    } catch (error) {
+      console.error("Error deleting post:", error);
     }
   };
 
@@ -140,7 +178,30 @@ export default function DraftsPage() {
 
       {/* Content */}
       <AnimatePresence mode="wait">
-        {drafts.length === 0 ? (
+        {scheduledPosts.length > 0 && (
+          <motion.div
+            key="scheduled"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8"
+          >
+            <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-primary" />
+              Scheduled for Later
+            </h2>
+            <div className="grid gap-4">
+              {scheduledPosts.map((post) => (
+                <ScheduledPostCard
+                  key={post.id}
+                  post={post}
+                  onDelete={handleScheduledDelete}
+                />
+              ))}
+            </div>
+          </motion.div>
+        )}
+
+        {drafts.length === 0 && scheduledPosts.length === 0 ? (
           <motion.div
             key="empty"
             initial={{ opacity: 0, y: 20 }}
@@ -267,23 +328,88 @@ export default function DraftsPage() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Floating Action Button - Create New Draft */}
-      {drafts.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="fixed bottom-6 right-6 z-50"
-        >
-          <Link
-            href="/editor"
-            className="flex items-center gap-2 bg-primary text-primary-foreground px-6 py-4 rounded-full shadow-2xl shadow-primary/25 hover:scale-105 active:scale-95 transition-all font-bold text-sm"
-          >
-            <Edit className="w-5 h-5" />
-            <span className="hidden sm:inline">New Draft</span>
-          </Link>
-        </motion.div>
-      )}
     </AppShell>
+  );
+}
+
+function ScheduledPostCard({
+  post,
+  onDelete,
+}: {
+  post: any;
+  onDelete: (id: string) => void;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="group relative bg-card/50 backdrop-blur-sm border border-border/50 rounded-3xl p-3 flex gap-4 shadow-sm hover:shadow-md hover:border-primary/20 transition-all duration-300"
+    >
+      <div className="h-28 w-28 shrink-0 rounded-2xl bg-secondary overflow-hidden relative">
+        {post.image ? (
+          <img
+            src={post.image}
+            alt={post.title}
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+          />
+        ) : (
+          <div className="h-full w-full flex items-center justify-center bg-linear-to-br from-secondary to-muted">
+            <span className="text-4xl font-black text-foreground/5 font-serif">
+              {post.title.charAt(0)}
+            </span>
+          </div>
+        )}
+        <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors" />
+      </div>
+
+      <div className="flex flex-col justify-between py-1 pr-2 flex-1 min-w-0">
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <span className="inline-flex items-center rounded-full bg-secondary px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
+              {post.category || "General"}
+            </span>
+          </div>
+          <h4 className="font-bold text-foreground text-lg leading-tight line-clamp-2 font-serif group-hover:text-primary transition-colors">
+            {post.title}
+          </h4>
+          <p className="text-xs text-muted-foreground/80 mt-1.5 line-clamp-2 md:line-clamp-1">
+            {post.excerpt}
+          </p>
+        </div>
+
+        <div className="flex items-center justify-between mt-3">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 bg-orange-500/10 text-orange-600 dark:text-orange-400 px-2.5 py-1 rounded-full text-[10px] font-bold ring-1 ring-orange-500/20">
+              <Calendar className="w-3 h-3" />
+              {new Date(post.scheduledAt).toLocaleDateString(undefined, {
+                month: "short",
+                day: "numeric",
+              })}{" "}
+              •{" "}
+              {new Date(post.scheduledAt).toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => onDelete(post.id)}
+              className="text-muted-foreground hover:text-red-500 transition-colors"
+              title="Delete"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+            <Link
+              href={`/editor?draft=${post.id}`}
+              className="text-xs font-bold text-foreground hover:underline decoration-primary decoration-2 underline-offset-4"
+            >
+              Edit
+            </Link>
+          </div>
+        </div>
+      </div>
+    </motion.div>
   );
 }

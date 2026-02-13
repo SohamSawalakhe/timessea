@@ -257,9 +257,11 @@ export default function ArticlePage({
               </div>
             )}
           </div>
-          <figcaption className="text-[10px] text-muted-foreground font-medium px-1">
-            {article.title} — Photo Credit: Special Arrangement
-          </figcaption>
+          {(article.imageDescription || article.imageCaption) && (
+            <figcaption className="text-[10px] text-muted-foreground font-medium px-1">
+              {article.imageDescription || article.imageCaption}
+            </figcaption>
+          )}
         </figure>
 
         {/* Article Body */}

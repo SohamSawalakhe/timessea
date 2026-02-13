@@ -126,7 +126,7 @@ export default function ProfilePage() {
     {
       icon: FileText,
       label: "Draft Articles",
-      count: stats.draftCount.toString(),
+      count: (stats.draftCount + stats.scheduledCount).toString(),
     },
     {
       icon: Heart,

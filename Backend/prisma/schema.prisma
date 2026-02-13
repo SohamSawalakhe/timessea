@@ -50,6 +50,17 @@ model Article {
   views       Int       @default(0)
   media       Json?
 
+  // Article metadata fields
+  subheadline    String?
+  type           String?   @default("News Article")
+  status         String?   @default("Draft")
+  imageCaption   String?
+  imageDescription String?
+  imageCredit    String?
+  seoTitle       String?
+  seoDescription String?
+  factChecked    Boolean   @default(false)
+
   published   Boolean   @default(true)
   scheduledAt DateTime?
   author      User      @relation(fields: [authorId], references: [id])

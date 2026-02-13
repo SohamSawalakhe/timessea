@@ -32,7 +32,7 @@ export class ArticlesController {
 
   @Get('drafts')
   @UseGuards(AuthGuard('jwt'))
-  async getDrafts(@Req() req) {
+  async getDrafts(@Req() req: Request & { user: { id: string } }) {
     return this.articlesService.findDrafts(req.user.id);
   }
 
@@ -74,8 +74,11 @@ export class ArticlesController {
   }
 
   @Post(':id/view')
-  async incrementViews(@Param('id') id: string, @Req() req: Request) {
-    const viewerId = (req as any).user?.id || req.ip || 'anonymous';
+  async incrementViews(
+    @Param('id') id: string,
+    @Req() req: Request & { user?: { id: string } },
+  ) {
+    const viewerId = req.user?.id || req.ip || 'anonymous';
     return await this.articlesService.incrementViews(id, viewerId);
   }
 }

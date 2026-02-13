@@ -25,6 +25,7 @@ import {
   Calendar,
   Clock,
   Trash2,
+  Edit,
 } from "lucide-react";
 import { categories, Article } from "@/lib/data";
 import { cn } from "@/lib/utils";
@@ -76,7 +77,7 @@ export default function EditorPage() {
   const [location, setLocation] = useState("");
   const [articleType, setArticleType] = useState("News Article");
   const [status, setStatus] = useState("Draft");
-  const [imageCaption, setImageCaption] = useState("");
+  const [imageDescription, setImageDescription] = useState("");
   const [imageCredit, setImageCredit] = useState("");
   const [seoTitle, setSeoTitle] = useState("");
   const [seoDescription, setSeoDescription] = useState("");
@@ -149,7 +150,9 @@ export default function EditorPage() {
       setLocation(article.location || "");
       setArticleType(article.type || "News Article");
       setSelectedCategory(article.category || "");
-      setImageCaption(article.imageCaption || "");
+      setImageDescription(
+        article.imageDescription || article.imageCaption || "",
+      );
       setImageCredit(article.imageCredit || "");
       setSeoTitle(article.seoTitle || "");
       setSeoDescription(article.seoDescription || "");
@@ -219,32 +222,31 @@ export default function EditorPage() {
 
   // Fetch scheduled posts
   // Fetch scheduled posts
+  // Fetch scheduled posts
   useEffect(() => {
     let intervalId: NodeJS.Timeout;
 
-    if (activeTab === "scheduled") {
-      const fetchScheduled = async () => {
-        try {
-          const res = await fetch(
-            "http://localhost:5000/api/articles/scheduled",
-          );
-          if (res.ok) {
-            const data = await res.json();
-            setScheduledPosts(data);
-          }
-        } catch (error) {
-          console.error("Failed to fetch scheduled posts", error);
+    const fetchScheduled = async () => {
+      try {
+        const API_URL =
+          process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+        const res = await fetch(`${API_URL}/api/articles/scheduled`);
+        if (res.ok) {
+          const data = await res.json();
+          setScheduledPosts(data);
         }
-      };
+      } catch (error) {
+        console.error("Failed to fetch scheduled posts", error);
+      }
+    };
 
-      fetchScheduled();
-      intervalId = setInterval(fetchScheduled, 5000);
-    }
+    fetchScheduled();
+    intervalId = setInterval(fetchScheduled, 5000);
 
     return () => {
       if (intervalId) clearInterval(intervalId);
     };
-  }, [activeTab]);
+  }, []);
 
   const handleCoverImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -301,40 +303,62 @@ export default function EditorPage() {
     setIsPublishing(true);
 
     try {
-      const response = await fetch("http://localhost:5000/api/articles", {
-        method: "POST",
+      const API_URL =
+        process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+
+      // If editing a draft, update it; otherwise create new article
+      const url = editingDraftId
+        ? `${API_URL}/api/articles/${editingDraftId}`
+        : `${API_URL}/api/articles`;
+
+      const method = editingDraftId ? "PUT" : "POST";
+
+      // Build the payload - exclude author when updating
+      const payload: any = {
+        title,
+        content: fullContent,
+        image:
+          imageUrl || blocks.find((b) => b.type === "image")?.content || "",
+        excerpt: fullContent.substring(0, 150) + "...",
+        category: selectedCategory || "General",
+        readTime,
+        location,
+        scheduledAt: scheduledAt
+          ? new Date(scheduledAt).toISOString()
+          : undefined,
+        published: !scheduledAt, // If scheduled, it's not "published" yet
+        imageDescription,
+        imageCredit,
+        subheadline,
+        type: articleType,
+        seoTitle,
+        seoDescription,
+        factChecked,
+      };
+
+      // Only include author when creating a new article (POST)
+      if (!editingDraftId) {
+        payload.author = {
+          name: user?.name || "Anonymous",
+          picture: user?.picture,
+          email: user?.email || "anonymous@example.com",
+        };
+      }
+
+      const response = await fetch(url, {
+        method,
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          title,
-          content: fullContent,
-          image:
-            imageUrl || blocks.find((b) => b.type === "image")?.content || "",
-          excerpt: fullContent.substring(0, 150) + "...",
-          category: selectedCategory || "General",
-          readTime,
-          author: {
-            name: user?.name || "Anonymous",
-            picture: user?.picture,
-            email: user?.email || "anonymous@example.com",
-          },
-          subheadline,
-          location,
-          type: articleType,
-          status,
-          imageCaption,
-          imageCredit,
-          seoTitle,
-          seoDescription,
-          factChecked,
-          scheduledAt: scheduledAt || undefined,
-          published: !scheduledAt, // If scheduled, it's not "published" yet
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
-        throw new Error("Failed to publish article");
+        const errorData = await response.text();
+        console.error("Publish failed:", response.status, errorData);
+        throw new Error(
+          `Failed to publish article: ${errorData || response.statusText}`,
+        );
       }
 
       setPublished(true);
@@ -343,18 +367,13 @@ export default function EditorPage() {
       if (scheduledAt) {
         setTimeout(() => {
           setPublished(false);
-          setActiveTab("scheduled");
-          // Reset editor
-          setTitle("");
-          setBlocks([{ id: crypto.randomUUID(), type: "text", content: "" }]);
-          setImageUrl("");
-          setScheduledAt("");
-          setShowScheduleInput(false);
+          router.push("/drafts");
         }, 1500);
       } else {
         // If published immediately, go to explore
         setTimeout(() => {
           setPublished(false);
+          setEditingDraftId(null);
           router.push("/explore");
         }, 1500);
       }
@@ -381,36 +400,42 @@ export default function EditorPage() {
 
       const method = editingDraftId ? "PUT" : "POST";
 
+      // Build the payload - exclude author when updating
+      const draftPayload: any = {
+        title: title || "Untitled Draft",
+        content: fullContent || "No content",
+        image:
+          imageUrl || blocks.find((b) => b.type === "image")?.content || "",
+        excerpt: fullContent.substring(0, 150) + "...",
+        category: selectedCategory || "General",
+        readTime,
+        location,
+        published: false, // Draft = not published
+        scheduledAt: null, // Draft = not scheduled
+        imageDescription,
+        imageCredit,
+        subheadline,
+        type: articleType,
+        seoTitle,
+        seoDescription,
+        factChecked,
+      };
+
+      // Only include author when creating a new draft (POST)
+      if (!editingDraftId) {
+        draftPayload.author = {
+          name: user?.name || "Anonymous",
+          picture: user?.picture,
+          email: user?.email || "anonymous@example.com",
+        };
+      }
+
       const response = await fetch(url, {
         method,
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          title: title || "Untitled Draft",
-          content: fullContent || "No content",
-          image:
-            imageUrl || blocks.find((b) => b.type === "image")?.content || "",
-          excerpt: fullContent.substring(0, 150) + "...",
-          category: selectedCategory || "General",
-          readTime,
-          author: {
-            name: user?.name || "Anonymous",
-            picture: user?.picture,
-            email: user?.email || "anonymous@example.com",
-          },
-          subheadline,
-          location,
-          type: articleType,
-          status,
-          imageCaption,
-          imageCredit,
-          seoTitle,
-          seoDescription,
-          factChecked,
-          published: false, // Draft = not published
-          scheduledAt: null, // Draft = not scheduled
-        }),
+        body: JSON.stringify(draftPayload),
       });
 
       if (!response.ok) {
@@ -459,7 +484,6 @@ export default function EditorPage() {
       name: user?.name || "Anonymous",
       email: user?.email || "anonymous@example.com",
       picture: user?.picture,
-      avatar: "",
     },
     category: selectedCategory || "General",
     readTime,
@@ -473,7 +497,8 @@ export default function EditorPage() {
     location,
     type: articleType as any,
     status: status as any,
-    imageCaption,
+    imageDescription,
+    imageCaption: imageDescription,
     imageCredit,
     seoTitle,
     seoDescription,
@@ -513,69 +538,45 @@ export default function EditorPage() {
             <ArrowLeft className="h-5 w-5" strokeWidth={2} />
           </motion.button>
 
-          <div className="flex bg-secondary/30 p-1 rounded-full border border-border/50 shrink-0">
-            <button
-              onClick={() => setActiveTab("editor")}
-              className={cn(
-                "px-3 py-1.5 rounded-full text-xs font-bold transition-all",
-                activeTab === "editor"
-                  ? "bg-background text-foreground shadow-sm ring-1 ring-black/5"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              Editor
-            </button>
-            <button
-              onClick={() => setActiveTab("scheduled")}
-              className={cn(
-                "px-3 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5",
-                activeTab === "scheduled"
-                  ? "bg-background text-foreground shadow-sm ring-1 ring-black/5"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              Scheduled
-              {scheduledPosts.length > 0 && (
-                <span className="bg-primary text-primary-foreground text-[9px] px-1.5 py-0.5 rounded-full">
-                  {scheduledPosts.length}
-                </span>
-              )}
-            </button>
-          </div>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            type="button"
+            onClick={() => {
+              if (activeTab === "editor") {
+                setShowScheduleInput(!showScheduleInput);
+              } else {
+                setActiveTab("editor");
+              }
+            }}
+            className={cn(
+              "flex items-center gap-2 rounded-full border border-border px-4 py-2 text-xs font-bold shadow-sm transition-all",
+              activeTab === "scheduled" || showScheduleInput
+                ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                : "bg-background text-foreground hover:bg-secondary/50",
+            )}
+          >
+            {activeTab === "editor" ? (
+              <>
+                <Calendar className="h-4 w-4" />
+                <span>Schedule</span>
+                {scheduledPosts.length > 0 && (
+                  <span className="ml-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[9px] text-primary">
+                    {scheduledPosts.length}
+                  </span>
+                )}
+              </>
+            ) : (
+              <>
+                <Edit className="h-4 w-4" />
+                <span>Editor</span>
+              </>
+            )}
+          </motion.button>
         </div>
 
         {activeTab === "editor" && (
           <div className="flex items-center gap-2 shrink-0 ml-auto">
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              type="button"
-              onClick={() => setIsPreview(!isPreview)}
-              className="flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-2 text-xs font-semibold text-foreground shadow-sm transition-colors hover:bg-secondary/50"
-            >
-              <Eye className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">
-                {isPreview ? "Edit" : "Preview"}
-              </span>
-            </motion.button>
-
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              type="button"
-              onClick={() => setShowScheduleInput(!showScheduleInput)}
-              className={cn(
-                "flex items-center gap-1.5 rounded-full border border-border px-3 py-2 text-xs font-semibold shadow-sm transition-colors",
-                scheduledAt
-                  ? "bg-primary/10 text-primary border-primary/20"
-                  : "bg-background text-foreground hover:bg-secondary/50",
-              )}
-              title="Schedule"
-            >
-              <Calendar className="h-3.5 w-3.5" />
-              {scheduledAt ? "Scheduled" : ""}
-            </motion.button>
-
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -603,36 +604,18 @@ export default function EditorPage() {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               type="button"
-              disabled={
-                !title.trim() ||
-                !fullContent.trim() ||
-                published ||
-                isPublishing
-              }
-              onClick={handlePublish}
+              disabled={!title.trim() || !fullContent.trim()}
+              onClick={() => setIsPreview(true)}
               className={cn(
                 "flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold text-background shadow-md transition-all",
-                !title.trim() ||
-                  !fullContent.trim() ||
-                  published ||
-                  isPublishing
+                !title.trim() || !fullContent.trim()
                   ? "bg-muted text-muted-foreground shadow-none cursor-not-allowed"
                   : "bg-primary text-primary-foreground hover:bg-primary/90",
               )}
             >
-              {isPublishing ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Send className="h-3.5 w-3.5" />
-              )}
+              <Eye className="h-3.5 w-3.5" />
               <span className={scheduledAt ? "hidden sm:inline" : ""}>
-                {published
-                  ? scheduledAt
-                    ? "Scheduled!"
-                    : "Published!"
-                  : scheduledAt
-                    ? "Schedule"
-                    : "Publish"}
+                Preview & Publish
               </span>
             </motion.button>
           </div>
@@ -640,40 +623,61 @@ export default function EditorPage() {
       </header>
 
       {/* Schedule Input Popover */}
+      {/* Schedule Input Popover */}
       <AnimatePresence>
         {showScheduleInput && activeTab === "editor" && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: -10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: -10 }}
-            className="fixed top-20 left-4 right-4 z-50 mx-auto max-w-sm rounded-2xl border border-border bg-card p-4 shadow-xl"
-          >
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-bold text-sm flex items-center gap-2">
-                <Clock className="w-4 h-4 text-primary" />
-                Schedule Publication
-              </h3>
-              <button
-                onClick={() => {
-                  setScheduledAt("");
-                  setShowScheduleInput(false);
-                }}
-                className="text-muted-foreground hover:text-foreground text-xs"
-              >
-                Clear
-              </button>
-            </div>
-            <input
-              type="datetime-local"
-              value={scheduledAt}
-              onChange={(e) => setScheduledAt(e.target.value)}
-              className="w-full bg-secondary/50 border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-              min={new Date().toISOString().slice(0, 16)}
+          <>
+            <div
+              className="fixed inset-0 z-40"
+              onClick={() => setShowScheduleInput(false)}
             />
-            <p className="text-[10px] text-muted-foreground mt-2">
-              Your article will be published automatically at this time.
-            </p>
-          </motion.div>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: -10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: -10 }}
+              className="fixed top-20 left-4 right-4 z-50 mx-auto max-w-sm rounded-2xl border border-border bg-card p-4 shadow-xl"
+            >
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-bold text-sm flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-primary" />
+                  Schedule Publication
+                </h3>
+                <button
+                  onClick={() => {
+                    setScheduledAt("");
+                    setShowScheduleInput(false);
+                  }}
+                  className="text-muted-foreground hover:text-foreground text-xs"
+                >
+                  Clear
+                </button>
+              </div>
+              <input
+                type="datetime-local"
+                value={scheduledAt}
+                onChange={(e) => {
+                  setScheduledAt(e.target.value);
+                  e.target.blur(); // Close the native picker on selection
+                }}
+                className="w-full bg-secondary/50 border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                min={new Date().toISOString().slice(0, 16)}
+              />
+              <div className="flex items-center justify-between mt-4 gap-4">
+                <button
+                  onClick={() => {
+                    if (scheduledAt) {
+                      handlePublish();
+                      setShowScheduleInput(false);
+                    }
+                  }}
+                  disabled={!scheduledAt}
+                  className="flex-1 rounded-full bg-primary px-4 py-2 text-xs font-bold text-primary-foreground shadow-md transition-all hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Schedule
+                </button>
+              </div>
+            </motion.div>
+          </>
         )}
       </AnimatePresence>
 
@@ -911,6 +915,32 @@ export default function EditorPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Publish Actions */}
+              <div className="flex items-center justify-between border-t border-border pt-6 mt-8">
+                <button
+                  onClick={() => setIsPreview(false)}
+                  className="px-6 py-2.5 rounded-full border border-border text-sm font-bold hover:bg-secondary/50 transition-colors"
+                >
+                  Back to Editor
+                </button>
+                <button
+                  onClick={handlePublish}
+                  disabled={isPublishing || published}
+                  className="flex items-center gap-2 px-8 py-2.5 rounded-full bg-primary text-primary-foreground text-sm font-bold shadow-lg hover:shadow-xl hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isPublishing ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4" />
+                  )}
+                  {published
+                    ? "Published!"
+                    : scheduledAt
+                      ? "Schedule Publication"
+                      : "Publish Now"}
+                </button>
+              </div>
             </motion.div>
           ) : (
             <motion.div
@@ -972,36 +1002,32 @@ export default function EditorPage() {
 
                 <div className="relative">
                   {imageUrl ? (
-                    <div className="relative h-64 w-full overflow-hidden rounded-xl border border-border group/image">
-                      <img
-                        src={imageUrl}
-                        alt="Cover"
-                        className="h-full w-full object-cover"
-                      />
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/image:opacity-100 transition-opacity flex flex-col justify-end p-4">
-                        <div className="space-y-2">
-                          <input
-                            type="text"
-                            placeholder="Image Caption"
-                            value={imageCaption}
-                            onChange={(e) => setImageCaption(e.target.value)}
-                            className="w-full bg-transparent text-white placeholder:text-white/50 text-xs border-b border-white/20 pb-1 focus:outline-none focus:border-white"
-                          />
-                          <input
-                            type="text"
-                            placeholder="Image Credit / Source"
-                            value={imageCredit}
-                            onChange={(e) => setImageCredit(e.target.value)}
-                            className="w-full bg-transparent text-white placeholder:text-white/50 text-xs border-b border-white/20 pb-1 focus:outline-none focus:border-white"
-                          />
-                        </div>
+                    <div className="space-y-4">
+                      <div className="relative h-64 w-full overflow-hidden rounded-xl border border-border group/image">
+                        <img
+                          src={imageUrl}
+                          alt="Cover"
+                          className="h-full w-full object-cover"
+                        />
+                        <button
+                          onClick={() => setImageUrl("")}
+                          className="absolute top-2 right-2 rounded-full bg-black/50 p-1.5 text-white backdrop-blur-sm transition-colors hover:bg-black/70"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
                       </div>
-                      <button
-                        onClick={() => setImageUrl("")}
-                        className="absolute top-2 right-2 rounded-full bg-black/50 p-1.5 text-white backdrop-blur-sm transition-colors hover:bg-black/70"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                          Image Description
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Describe this image for the home page..."
+                          value={imageDescription}
+                          onChange={(e) => setImageDescription(e.target.value)}
+                          className="w-full bg-secondary/30 rounded-lg px-3 py-2 text-sm font-medium focus:outline-none focus:ring-1 focus:ring-primary/20 placeholder:text-muted-foreground/50 text-foreground"
+                        />
+                      </div>
                     </div>
                   ) : (
                     <button

@@ -20,11 +20,19 @@ export type Article = {
   views: number;
   subheadline?: string;
   location?: string;
-  type?: "Breaking" | "Live" | "Exclusive" | "Opinion" | "Analysis" | "Standard" | "Feature";
+  type?:
+    | "Breaking"
+    | "Live"
+    | "Exclusive"
+    | "Opinion"
+    | "Analysis"
+    | "Standard"
+    | "Feature";
   status?: "Draft" | "In Review" | "Approved" | "Published" | "Corrected";
   section?: string;
   tags?: string[];
   imageCaption?: string;
+  imageDescription?: string;
   imageCredit?: string;
   imageSource?: string;
   seoTitle?: string;
@@ -85,7 +93,8 @@ The future of Web 3 likely lies not in replacing existing systems entirely, but 
   {
     id: "2",
     title: "Guiding Teams: The Power of Leadership",
-    subheadline: "How empathy and trust transform managers into inspiring leaders.",
+    subheadline:
+      "How empathy and trust transform managers into inspiring leaders.",
     excerpt:
       "Leadership is not about authority, it's about empowering your team to achieve shared goals.",
     content: `Leadership is not about authority, it's about empowering your team to achieve shared goals. Great leaders inspire trust, cultivate collaboration, and lead by example.
@@ -125,7 +134,8 @@ In today's rapidly evolving landscape, adaptability is perhaps the most crucial 
   {
     id: "3",
     title: "The Art of Minimalist Design",
-    subheadline: "Why simplicity is the ultimate sophistication in modern UI/UX.",
+    subheadline:
+      "Why simplicity is the ultimate sophistication in modern UI/UX.",
     excerpt:
       "How stripping away the unnecessary reveals the essential beauty in design.",
     content: `Minimalism in design is more than an aesthetic choice -- it's a philosophy that puts function and clarity at the forefront of every decision.
@@ -166,7 +176,8 @@ When you strip away decorative elements, typography becomes the primary vehicle 
   {
     id: "4",
     title: "Quantum Computing: A New Era",
-    subheadline: "From theoretical physics to practical applications: What you need to know.",
+    subheadline:
+      "From theoretical physics to practical applications: What you need to know.",
     excerpt:
       "Understanding the revolutionary potential of quantum computing and its real-world applications.",
     content: `Quantum computing stands at the frontier of computational science, promising to solve problems that classical computers find intractable.
@@ -235,7 +246,8 @@ Most organizations are landing on a hybrid model that combines the flexibility o
   {
     id: "6",
     title: "The Rise of AI-Generated Art",
-    subheadline: "Creativity or Computation? The legal and ethical battleground.",
+    subheadline:
+      "Creativity or Computation? The legal and ethical battleground.",
     excerpt:
       "Exploring the intersection of artificial intelligence and creative expression.",
     content: `AI-generated art has sparked one of the most heated debates in the creative world. As models become increasingly sophisticated, the line between human and machine creativity continues to blur.
