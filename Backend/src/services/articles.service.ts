@@ -176,11 +176,16 @@ export class ArticlesService {
       throw new Error('Article not found');
     }
 
+    const willLike = !article.liked;
+    const wasDisliked = article.disliked;
+
     return this.prisma.article.update({
       where: { id },
       data: {
-        liked: !article.liked,
-        likes: article.liked ? article.likes - 1 : article.likes + 1,
+        liked: willLike,
+        likes: willLike ? article.likes + 1 : Math.max(0, article.likes - 1),
+        disliked: willLike ? false : wasDisliked,
+        dislikes: (willLike && wasDisliked) ? Math.max(0, article.dislikes - 1) : article.dislikes,
       },
       include: { author: true },
     });
@@ -196,6 +201,27 @@ export class ArticlesService {
       where: { id },
       data: {
         bookmarked: !article.bookmarked,
+      },
+      include: { author: true },
+    });
+  }
+
+  async toggleDislike(id: string): Promise<Article> {
+    const article = await this.prisma.article.findUnique({ where: { id } });
+    if (!article) {
+      throw new Error('Article not found');
+    }
+
+    const willDislike = !article.disliked;
+    const wasLiked = article.liked;
+
+    return this.prisma.article.update({
+      where: { id },
+      data: {
+        disliked: willDislike,
+        dislikes: willDislike ? article.dislikes + 1 : Math.max(0, article.dislikes - 1),
+        liked: willDislike ? false : wasLiked,
+        likes: (willDislike && wasLiked) ? Math.max(0, article.likes - 1) : article.likes,
       },
       include: { author: true },
     });
@@ -236,6 +262,27 @@ export class ArticlesService {
         },
       })
       .catch((err) => console.error('Failed to track view:', err));
+
+    return updatedArticle;
+  }
+
+  async incrementReads(id: string, userId: string): Promise<Article> {
+    const readKey = `read:${id}:${userId}`;
+    const hasRead = await this.redisService.incrementCounter(readKey, 3600); // 1 hour TTL
+
+    if (hasRead > 1) {
+      return this.findOne(id) as Promise<Article>;
+    }
+
+    const updatedArticle = await this.prisma.article.update({
+      where: { id },
+      data: {
+        reads: {
+          increment: 1,
+        },
+      },
+      include: { author: true },
+    });
 
     return updatedArticle;
   }

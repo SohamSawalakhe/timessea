@@ -4,6 +4,7 @@ export type Article = {
   excerpt: string;
   content: string;
   author: {
+    id?: string;
     name: string;
     avatar: string;
     email: string;
@@ -18,7 +19,11 @@ export type Article = {
   liked: boolean;
   bookmarked: boolean;
   likes: number;
+  dislikes: number;
+  disliked: boolean;
   views: number;
+  reads: number;
+
   subheadline?: string;
   location?: string;
   type?: "Breaking" | "Live" | "Exclusive" | "Opinion" | "Analysis" | "Standard" | "Feature";
@@ -82,7 +87,10 @@ The future of Web 3 likely lies not in replacing existing systems entirely, but 
     liked: false,
     bookmarked: false,
     likes: 142,
+    dislikes: 12,
+    disliked: false,
     views: 12450,
+    reads: 10200,
   },
   {
     id: "2",
@@ -119,7 +127,10 @@ In today's rapidly evolving landscape, adaptability is perhaps the most crucial 
     liked: true,
     bookmarked: true,
     likes: 89,
+    dislikes: 5,
+    disliked: false,
     views: 8900,
+    reads: 6500,
     section: "Business",
     tags: ["Management", "Trust"],
     type: "Opinion",
@@ -162,7 +173,10 @@ When you strip away decorative elements, typography becomes the primary vehicle 
     liked: false,
     bookmarked: false,
     likes: 215,
+    dislikes: 8,
+    disliked: false,
     views: 32100,
+    reads: 28000,
     section: "Design",
     tags: ["UI", "UX", "Web"],
     status: "Published",
@@ -200,7 +214,10 @@ While fully fault-tolerant quantum computers may still be years away, hybrid qua
     liked: false,
     bookmarked: true,
     likes: 178,
+    dislikes: 24,
+    disliked: false,
     views: 15600,
+    reads: 12000,
     type: "Analysis",
     status: "Published",
   },
@@ -235,7 +252,10 @@ Most organizations are landing on a hybrid model that combines the flexibility o
     liked: true,
     bookmarked: false,
     likes: 96,
+    dislikes: 3,
+    disliked: false,
     views: 5400,
+    reads: 3200,
     status: "Published",
   },
   {
@@ -269,7 +289,10 @@ The most exciting possibilities lie not in AI replacing human creativity, but in
     liked: false,
     bookmarked: false,
     likes: 334,
+    dislikes: 15,
+    disliked: false,
     views: 45200,
+    reads: 40100,
     status: "Published",
     type: "Feature",
   },

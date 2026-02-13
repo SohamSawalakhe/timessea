@@ -28,14 +28,18 @@ export type AggregateArticle = {
 
 export type ArticleAvgAggregateOutputType = {
   likes: number | null
+  dislikes: number | null
   readTime: number | null
   views: number | null
+  reads: number | null
 }
 
 export type ArticleSumAggregateOutputType = {
   likes: number | null
+  dislikes: number | null
   readTime: number | null
   views: number | null
+  reads: number | null
 }
 
 export type ArticleMinAggregateOutputType = {
@@ -51,9 +55,12 @@ export type ArticleMinAggregateOutputType = {
   location: string | null
   liked: boolean | null
   likes: number | null
+  dislikes: number | null
+  disliked: boolean | null
   readTime: number | null
   image: string | null
   views: number | null
+  reads: number | null
   published: boolean | null
   scheduledAt: Date | null
 }
@@ -71,9 +78,12 @@ export type ArticleMaxAggregateOutputType = {
   location: string | null
   liked: boolean | null
   likes: number | null
+  dislikes: number | null
+  disliked: boolean | null
   readTime: number | null
   image: string | null
   views: number | null
+  reads: number | null
   published: boolean | null
   scheduledAt: Date | null
 }
@@ -91,9 +101,12 @@ export type ArticleCountAggregateOutputType = {
   location: number
   liked: number
   likes: number
+  dislikes: number
+  disliked: number
   readTime: number
   image: number
   views: number
+  reads: number
   media: number
   published: number
   scheduledAt: number
@@ -103,14 +116,18 @@ export type ArticleCountAggregateOutputType = {
 
 export type ArticleAvgAggregateInputType = {
   likes?: true
+  dislikes?: true
   readTime?: true
   views?: true
+  reads?: true
 }
 
 export type ArticleSumAggregateInputType = {
   likes?: true
+  dislikes?: true
   readTime?: true
   views?: true
+  reads?: true
 }
 
 export type ArticleMinAggregateInputType = {
@@ -126,9 +143,12 @@ export type ArticleMinAggregateInputType = {
   location?: true
   liked?: true
   likes?: true
+  dislikes?: true
+  disliked?: true
   readTime?: true
   image?: true
   views?: true
+  reads?: true
   published?: true
   scheduledAt?: true
 }
@@ -146,9 +166,12 @@ export type ArticleMaxAggregateInputType = {
   location?: true
   liked?: true
   likes?: true
+  dislikes?: true
+  disliked?: true
   readTime?: true
   image?: true
   views?: true
+  reads?: true
   published?: true
   scheduledAt?: true
 }
@@ -166,9 +189,12 @@ export type ArticleCountAggregateInputType = {
   location?: true
   liked?: true
   likes?: true
+  dislikes?: true
+  disliked?: true
   readTime?: true
   image?: true
   views?: true
+  reads?: true
   media?: true
   published?: true
   scheduledAt?: true
@@ -274,9 +300,12 @@ export type ArticleGroupByOutputType = {
   location: string | null
   liked: boolean
   likes: number
+  dislikes: number
+  disliked: boolean
   readTime: number
   image: string | null
   views: number
+  reads: number
   media: runtime.JsonValue | null
   published: boolean
   scheduledAt: Date | null
@@ -318,13 +347,17 @@ export type ArticleWhereInput = {
   location?: Prisma.StringNullableFilter<"Article"> | string | null
   liked?: Prisma.BoolFilter<"Article"> | boolean
   likes?: Prisma.IntFilter<"Article"> | number
+  dislikes?: Prisma.IntFilter<"Article"> | number
+  disliked?: Prisma.BoolFilter<"Article"> | boolean
   readTime?: Prisma.IntFilter<"Article"> | number
   image?: Prisma.StringNullableFilter<"Article"> | string | null
   views?: Prisma.IntFilter<"Article"> | number
+  reads?: Prisma.IntFilter<"Article"> | number
   media?: Prisma.JsonNullableFilter<"Article">
   published?: Prisma.BoolFilter<"Article"> | boolean
   scheduledAt?: Prisma.DateTimeNullableFilter<"Article"> | Date | string | null
   author?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
+  comments?: Prisma.CommentListRelationFilter
 }
 
 export type ArticleOrderByWithRelationInput = {
@@ -340,13 +373,17 @@ export type ArticleOrderByWithRelationInput = {
   location?: Prisma.SortOrderInput | Prisma.SortOrder
   liked?: Prisma.SortOrder
   likes?: Prisma.SortOrder
+  dislikes?: Prisma.SortOrder
+  disliked?: Prisma.SortOrder
   readTime?: Prisma.SortOrder
   image?: Prisma.SortOrderInput | Prisma.SortOrder
   views?: Prisma.SortOrder
+  reads?: Prisma.SortOrder
   media?: Prisma.SortOrderInput | Prisma.SortOrder
   published?: Prisma.SortOrder
   scheduledAt?: Prisma.SortOrderInput | Prisma.SortOrder
   author?: Prisma.UserOrderByWithRelationInput
+  comments?: Prisma.CommentOrderByRelationAggregateInput
 }
 
 export type ArticleWhereUniqueInput = Prisma.AtLeast<{
@@ -365,13 +402,17 @@ export type ArticleWhereUniqueInput = Prisma.AtLeast<{
   location?: Prisma.StringNullableFilter<"Article"> | string | null
   liked?: Prisma.BoolFilter<"Article"> | boolean
   likes?: Prisma.IntFilter<"Article"> | number
+  dislikes?: Prisma.IntFilter<"Article"> | number
+  disliked?: Prisma.BoolFilter<"Article"> | boolean
   readTime?: Prisma.IntFilter<"Article"> | number
   image?: Prisma.StringNullableFilter<"Article"> | string | null
   views?: Prisma.IntFilter<"Article"> | number
+  reads?: Prisma.IntFilter<"Article"> | number
   media?: Prisma.JsonNullableFilter<"Article">
   published?: Prisma.BoolFilter<"Article"> | boolean
   scheduledAt?: Prisma.DateTimeNullableFilter<"Article"> | Date | string | null
   author?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
+  comments?: Prisma.CommentListRelationFilter
 }, "id">
 
 export type ArticleOrderByWithAggregationInput = {
@@ -387,9 +428,12 @@ export type ArticleOrderByWithAggregationInput = {
   location?: Prisma.SortOrderInput | Prisma.SortOrder
   liked?: Prisma.SortOrder
   likes?: Prisma.SortOrder
+  dislikes?: Prisma.SortOrder
+  disliked?: Prisma.SortOrder
   readTime?: Prisma.SortOrder
   image?: Prisma.SortOrderInput | Prisma.SortOrder
   views?: Prisma.SortOrder
+  reads?: Prisma.SortOrder
   media?: Prisma.SortOrderInput | Prisma.SortOrder
   published?: Prisma.SortOrder
   scheduledAt?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -416,9 +460,12 @@ export type ArticleScalarWhereWithAggregatesInput = {
   location?: Prisma.StringNullableWithAggregatesFilter<"Article"> | string | null
   liked?: Prisma.BoolWithAggregatesFilter<"Article"> | boolean
   likes?: Prisma.IntWithAggregatesFilter<"Article"> | number
+  dislikes?: Prisma.IntWithAggregatesFilter<"Article"> | number
+  disliked?: Prisma.BoolWithAggregatesFilter<"Article"> | boolean
   readTime?: Prisma.IntWithAggregatesFilter<"Article"> | number
   image?: Prisma.StringNullableWithAggregatesFilter<"Article"> | string | null
   views?: Prisma.IntWithAggregatesFilter<"Article"> | number
+  reads?: Prisma.IntWithAggregatesFilter<"Article"> | number
   media?: Prisma.JsonNullableWithAggregatesFilter<"Article">
   published?: Prisma.BoolWithAggregatesFilter<"Article"> | boolean
   scheduledAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Article"> | Date | string | null
@@ -436,13 +483,17 @@ export type ArticleCreateInput = {
   location?: string | null
   liked?: boolean
   likes?: number
+  dislikes?: number
+  disliked?: boolean
   readTime?: number
   image?: string | null
   views?: number
+  reads?: number
   media?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   published?: boolean
   scheduledAt?: Date | string | null
   author: Prisma.UserCreateNestedOneWithoutArticlesInput
+  comments?: Prisma.CommentCreateNestedManyWithoutArticleInput
 }
 
 export type ArticleUncheckedCreateInput = {
@@ -458,12 +509,16 @@ export type ArticleUncheckedCreateInput = {
   location?: string | null
   liked?: boolean
   likes?: number
+  dislikes?: number
+  disliked?: boolean
   readTime?: number
   image?: string | null
   views?: number
+  reads?: number
   media?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   published?: boolean
   scheduledAt?: Date | string | null
+  comments?: Prisma.CommentUncheckedCreateNestedManyWithoutArticleInput
 }
 
 export type ArticleUpdateInput = {
@@ -478,13 +533,17 @@ export type ArticleUpdateInput = {
   location?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   liked?: Prisma.BoolFieldUpdateOperationsInput | boolean
   likes?: Prisma.IntFieldUpdateOperationsInput | number
+  dislikes?: Prisma.IntFieldUpdateOperationsInput | number
+  disliked?: Prisma.BoolFieldUpdateOperationsInput | boolean
   readTime?: Prisma.IntFieldUpdateOperationsInput | number
   image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   views?: Prisma.IntFieldUpdateOperationsInput | number
+  reads?: Prisma.IntFieldUpdateOperationsInput | number
   media?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   published?: Prisma.BoolFieldUpdateOperationsInput | boolean
   scheduledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   author?: Prisma.UserUpdateOneRequiredWithoutArticlesNestedInput
+  comments?: Prisma.CommentUpdateManyWithoutArticleNestedInput
 }
 
 export type ArticleUncheckedUpdateInput = {
@@ -500,12 +559,16 @@ export type ArticleUncheckedUpdateInput = {
   location?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   liked?: Prisma.BoolFieldUpdateOperationsInput | boolean
   likes?: Prisma.IntFieldUpdateOperationsInput | number
+  dislikes?: Prisma.IntFieldUpdateOperationsInput | number
+  disliked?: Prisma.BoolFieldUpdateOperationsInput | boolean
   readTime?: Prisma.IntFieldUpdateOperationsInput | number
   image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   views?: Prisma.IntFieldUpdateOperationsInput | number
+  reads?: Prisma.IntFieldUpdateOperationsInput | number
   media?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   published?: Prisma.BoolFieldUpdateOperationsInput | boolean
   scheduledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  comments?: Prisma.CommentUncheckedUpdateManyWithoutArticleNestedInput
 }
 
 export type ArticleCreateManyInput = {
@@ -521,9 +584,12 @@ export type ArticleCreateManyInput = {
   location?: string | null
   liked?: boolean
   likes?: number
+  dislikes?: number
+  disliked?: boolean
   readTime?: number
   image?: string | null
   views?: number
+  reads?: number
   media?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   published?: boolean
   scheduledAt?: Date | string | null
@@ -541,9 +607,12 @@ export type ArticleUpdateManyMutationInput = {
   location?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   liked?: Prisma.BoolFieldUpdateOperationsInput | boolean
   likes?: Prisma.IntFieldUpdateOperationsInput | number
+  dislikes?: Prisma.IntFieldUpdateOperationsInput | number
+  disliked?: Prisma.BoolFieldUpdateOperationsInput | boolean
   readTime?: Prisma.IntFieldUpdateOperationsInput | number
   image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   views?: Prisma.IntFieldUpdateOperationsInput | number
+  reads?: Prisma.IntFieldUpdateOperationsInput | number
   media?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   published?: Prisma.BoolFieldUpdateOperationsInput | boolean
   scheduledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -562,9 +631,12 @@ export type ArticleUncheckedUpdateManyInput = {
   location?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   liked?: Prisma.BoolFieldUpdateOperationsInput | boolean
   likes?: Prisma.IntFieldUpdateOperationsInput | number
+  dislikes?: Prisma.IntFieldUpdateOperationsInput | number
+  disliked?: Prisma.BoolFieldUpdateOperationsInput | boolean
   readTime?: Prisma.IntFieldUpdateOperationsInput | number
   image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   views?: Prisma.IntFieldUpdateOperationsInput | number
+  reads?: Prisma.IntFieldUpdateOperationsInput | number
   media?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   published?: Prisma.BoolFieldUpdateOperationsInput | boolean
   scheduledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -593,9 +665,12 @@ export type ArticleCountOrderByAggregateInput = {
   location?: Prisma.SortOrder
   liked?: Prisma.SortOrder
   likes?: Prisma.SortOrder
+  dislikes?: Prisma.SortOrder
+  disliked?: Prisma.SortOrder
   readTime?: Prisma.SortOrder
   image?: Prisma.SortOrder
   views?: Prisma.SortOrder
+  reads?: Prisma.SortOrder
   media?: Prisma.SortOrder
   published?: Prisma.SortOrder
   scheduledAt?: Prisma.SortOrder
@@ -603,8 +678,10 @@ export type ArticleCountOrderByAggregateInput = {
 
 export type ArticleAvgOrderByAggregateInput = {
   likes?: Prisma.SortOrder
+  dislikes?: Prisma.SortOrder
   readTime?: Prisma.SortOrder
   views?: Prisma.SortOrder
+  reads?: Prisma.SortOrder
 }
 
 export type ArticleMaxOrderByAggregateInput = {
@@ -620,9 +697,12 @@ export type ArticleMaxOrderByAggregateInput = {
   location?: Prisma.SortOrder
   liked?: Prisma.SortOrder
   likes?: Prisma.SortOrder
+  dislikes?: Prisma.SortOrder
+  disliked?: Prisma.SortOrder
   readTime?: Prisma.SortOrder
   image?: Prisma.SortOrder
   views?: Prisma.SortOrder
+  reads?: Prisma.SortOrder
   published?: Prisma.SortOrder
   scheduledAt?: Prisma.SortOrder
 }
@@ -640,17 +720,27 @@ export type ArticleMinOrderByAggregateInput = {
   location?: Prisma.SortOrder
   liked?: Prisma.SortOrder
   likes?: Prisma.SortOrder
+  dislikes?: Prisma.SortOrder
+  disliked?: Prisma.SortOrder
   readTime?: Prisma.SortOrder
   image?: Prisma.SortOrder
   views?: Prisma.SortOrder
+  reads?: Prisma.SortOrder
   published?: Prisma.SortOrder
   scheduledAt?: Prisma.SortOrder
 }
 
 export type ArticleSumOrderByAggregateInput = {
   likes?: Prisma.SortOrder
+  dislikes?: Prisma.SortOrder
   readTime?: Prisma.SortOrder
   views?: Prisma.SortOrder
+  reads?: Prisma.SortOrder
+}
+
+export type ArticleScalarRelationFilter = {
+  is?: Prisma.ArticleWhereInput
+  isNot?: Prisma.ArticleWhereInput
 }
 
 export type ArticleCreateNestedManyWithoutAuthorInput = {
@@ -711,6 +801,20 @@ export type NullableDateTimeFieldUpdateOperationsInput = {
   set?: Date | string | null
 }
 
+export type ArticleCreateNestedOneWithoutCommentsInput = {
+  create?: Prisma.XOR<Prisma.ArticleCreateWithoutCommentsInput, Prisma.ArticleUncheckedCreateWithoutCommentsInput>
+  connectOrCreate?: Prisma.ArticleCreateOrConnectWithoutCommentsInput
+  connect?: Prisma.ArticleWhereUniqueInput
+}
+
+export type ArticleUpdateOneRequiredWithoutCommentsNestedInput = {
+  create?: Prisma.XOR<Prisma.ArticleCreateWithoutCommentsInput, Prisma.ArticleUncheckedCreateWithoutCommentsInput>
+  connectOrCreate?: Prisma.ArticleCreateOrConnectWithoutCommentsInput
+  upsert?: Prisma.ArticleUpsertWithoutCommentsInput
+  connect?: Prisma.ArticleWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.ArticleUpdateToOneWithWhereWithoutCommentsInput, Prisma.ArticleUpdateWithoutCommentsInput>, Prisma.ArticleUncheckedUpdateWithoutCommentsInput>
+}
+
 export type ArticleCreateWithoutAuthorInput = {
   id?: string
   title: string
@@ -723,12 +827,16 @@ export type ArticleCreateWithoutAuthorInput = {
   location?: string | null
   liked?: boolean
   likes?: number
+  dislikes?: number
+  disliked?: boolean
   readTime?: number
   image?: string | null
   views?: number
+  reads?: number
   media?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   published?: boolean
   scheduledAt?: Date | string | null
+  comments?: Prisma.CommentCreateNestedManyWithoutArticleInput
 }
 
 export type ArticleUncheckedCreateWithoutAuthorInput = {
@@ -743,12 +851,16 @@ export type ArticleUncheckedCreateWithoutAuthorInput = {
   location?: string | null
   liked?: boolean
   likes?: number
+  dislikes?: number
+  disliked?: boolean
   readTime?: number
   image?: string | null
   views?: number
+  reads?: number
   media?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   published?: boolean
   scheduledAt?: Date | string | null
+  comments?: Prisma.CommentUncheckedCreateNestedManyWithoutArticleInput
 }
 
 export type ArticleCreateOrConnectWithoutAuthorInput = {
@@ -793,12 +905,127 @@ export type ArticleScalarWhereInput = {
   location?: Prisma.StringNullableFilter<"Article"> | string | null
   liked?: Prisma.BoolFilter<"Article"> | boolean
   likes?: Prisma.IntFilter<"Article"> | number
+  dislikes?: Prisma.IntFilter<"Article"> | number
+  disliked?: Prisma.BoolFilter<"Article"> | boolean
   readTime?: Prisma.IntFilter<"Article"> | number
   image?: Prisma.StringNullableFilter<"Article"> | string | null
   views?: Prisma.IntFilter<"Article"> | number
+  reads?: Prisma.IntFilter<"Article"> | number
   media?: Prisma.JsonNullableFilter<"Article">
   published?: Prisma.BoolFilter<"Article"> | boolean
   scheduledAt?: Prisma.DateTimeNullableFilter<"Article"> | Date | string | null
+}
+
+export type ArticleCreateWithoutCommentsInput = {
+  id?: string
+  title: string
+  content: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  bookmarked?: boolean
+  category?: string
+  excerpt?: string | null
+  location?: string | null
+  liked?: boolean
+  likes?: number
+  dislikes?: number
+  disliked?: boolean
+  readTime?: number
+  image?: string | null
+  views?: number
+  reads?: number
+  media?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  published?: boolean
+  scheduledAt?: Date | string | null
+  author: Prisma.UserCreateNestedOneWithoutArticlesInput
+}
+
+export type ArticleUncheckedCreateWithoutCommentsInput = {
+  id?: string
+  title: string
+  content: string
+  authorId: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  bookmarked?: boolean
+  category?: string
+  excerpt?: string | null
+  location?: string | null
+  liked?: boolean
+  likes?: number
+  dislikes?: number
+  disliked?: boolean
+  readTime?: number
+  image?: string | null
+  views?: number
+  reads?: number
+  media?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  published?: boolean
+  scheduledAt?: Date | string | null
+}
+
+export type ArticleCreateOrConnectWithoutCommentsInput = {
+  where: Prisma.ArticleWhereUniqueInput
+  create: Prisma.XOR<Prisma.ArticleCreateWithoutCommentsInput, Prisma.ArticleUncheckedCreateWithoutCommentsInput>
+}
+
+export type ArticleUpsertWithoutCommentsInput = {
+  update: Prisma.XOR<Prisma.ArticleUpdateWithoutCommentsInput, Prisma.ArticleUncheckedUpdateWithoutCommentsInput>
+  create: Prisma.XOR<Prisma.ArticleCreateWithoutCommentsInput, Prisma.ArticleUncheckedCreateWithoutCommentsInput>
+  where?: Prisma.ArticleWhereInput
+}
+
+export type ArticleUpdateToOneWithWhereWithoutCommentsInput = {
+  where?: Prisma.ArticleWhereInput
+  data: Prisma.XOR<Prisma.ArticleUpdateWithoutCommentsInput, Prisma.ArticleUncheckedUpdateWithoutCommentsInput>
+}
+
+export type ArticleUpdateWithoutCommentsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  content?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  bookmarked?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  category?: Prisma.StringFieldUpdateOperationsInput | string
+  excerpt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  location?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  liked?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  likes?: Prisma.IntFieldUpdateOperationsInput | number
+  dislikes?: Prisma.IntFieldUpdateOperationsInput | number
+  disliked?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  readTime?: Prisma.IntFieldUpdateOperationsInput | number
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  views?: Prisma.IntFieldUpdateOperationsInput | number
+  reads?: Prisma.IntFieldUpdateOperationsInput | number
+  media?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  published?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  scheduledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  author?: Prisma.UserUpdateOneRequiredWithoutArticlesNestedInput
+}
+
+export type ArticleUncheckedUpdateWithoutCommentsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  content?: Prisma.StringFieldUpdateOperationsInput | string
+  authorId?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  bookmarked?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  category?: Prisma.StringFieldUpdateOperationsInput | string
+  excerpt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  location?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  liked?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  likes?: Prisma.IntFieldUpdateOperationsInput | number
+  dislikes?: Prisma.IntFieldUpdateOperationsInput | number
+  disliked?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  readTime?: Prisma.IntFieldUpdateOperationsInput | number
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  views?: Prisma.IntFieldUpdateOperationsInput | number
+  reads?: Prisma.IntFieldUpdateOperationsInput | number
+  media?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  published?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  scheduledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
 
 export type ArticleCreateManyAuthorInput = {
@@ -813,9 +1040,12 @@ export type ArticleCreateManyAuthorInput = {
   location?: string | null
   liked?: boolean
   likes?: number
+  dislikes?: number
+  disliked?: boolean
   readTime?: number
   image?: string | null
   views?: number
+  reads?: number
   media?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   published?: boolean
   scheduledAt?: Date | string | null
@@ -833,12 +1063,16 @@ export type ArticleUpdateWithoutAuthorInput = {
   location?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   liked?: Prisma.BoolFieldUpdateOperationsInput | boolean
   likes?: Prisma.IntFieldUpdateOperationsInput | number
+  dislikes?: Prisma.IntFieldUpdateOperationsInput | number
+  disliked?: Prisma.BoolFieldUpdateOperationsInput | boolean
   readTime?: Prisma.IntFieldUpdateOperationsInput | number
   image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   views?: Prisma.IntFieldUpdateOperationsInput | number
+  reads?: Prisma.IntFieldUpdateOperationsInput | number
   media?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   published?: Prisma.BoolFieldUpdateOperationsInput | boolean
   scheduledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  comments?: Prisma.CommentUpdateManyWithoutArticleNestedInput
 }
 
 export type ArticleUncheckedUpdateWithoutAuthorInput = {
@@ -853,12 +1087,16 @@ export type ArticleUncheckedUpdateWithoutAuthorInput = {
   location?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   liked?: Prisma.BoolFieldUpdateOperationsInput | boolean
   likes?: Prisma.IntFieldUpdateOperationsInput | number
+  dislikes?: Prisma.IntFieldUpdateOperationsInput | number
+  disliked?: Prisma.BoolFieldUpdateOperationsInput | boolean
   readTime?: Prisma.IntFieldUpdateOperationsInput | number
   image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   views?: Prisma.IntFieldUpdateOperationsInput | number
+  reads?: Prisma.IntFieldUpdateOperationsInput | number
   media?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   published?: Prisma.BoolFieldUpdateOperationsInput | boolean
   scheduledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  comments?: Prisma.CommentUncheckedUpdateManyWithoutArticleNestedInput
 }
 
 export type ArticleUncheckedUpdateManyWithoutAuthorInput = {
@@ -873,14 +1111,46 @@ export type ArticleUncheckedUpdateManyWithoutAuthorInput = {
   location?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   liked?: Prisma.BoolFieldUpdateOperationsInput | boolean
   likes?: Prisma.IntFieldUpdateOperationsInput | number
+  dislikes?: Prisma.IntFieldUpdateOperationsInput | number
+  disliked?: Prisma.BoolFieldUpdateOperationsInput | boolean
   readTime?: Prisma.IntFieldUpdateOperationsInput | number
   image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   views?: Prisma.IntFieldUpdateOperationsInput | number
+  reads?: Prisma.IntFieldUpdateOperationsInput | number
   media?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   published?: Prisma.BoolFieldUpdateOperationsInput | boolean
   scheduledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
 
+
+/**
+ * Count Type ArticleCountOutputType
+ */
+
+export type ArticleCountOutputType = {
+  comments: number
+}
+
+export type ArticleCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  comments?: boolean | ArticleCountOutputTypeCountCommentsArgs
+}
+
+/**
+ * ArticleCountOutputType without action
+ */
+export type ArticleCountOutputTypeDefaultArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ArticleCountOutputType
+   */
+  select?: Prisma.ArticleCountOutputTypeSelect<ExtArgs> | null
+}
+
+/**
+ * ArticleCountOutputType without action
+ */
+export type ArticleCountOutputTypeCountCommentsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.CommentWhereInput
+}
 
 
 export type ArticleSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -896,13 +1166,18 @@ export type ArticleSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   location?: boolean
   liked?: boolean
   likes?: boolean
+  dislikes?: boolean
+  disliked?: boolean
   readTime?: boolean
   image?: boolean
   views?: boolean
+  reads?: boolean
   media?: boolean
   published?: boolean
   scheduledAt?: boolean
   author?: boolean | Prisma.UserDefaultArgs<ExtArgs>
+  comments?: boolean | Prisma.Article$commentsArgs<ExtArgs>
+  _count?: boolean | Prisma.ArticleCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["article"]>
 
 export type ArticleSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -918,9 +1193,12 @@ export type ArticleSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Exten
   location?: boolean
   liked?: boolean
   likes?: boolean
+  dislikes?: boolean
+  disliked?: boolean
   readTime?: boolean
   image?: boolean
   views?: boolean
+  reads?: boolean
   media?: boolean
   published?: boolean
   scheduledAt?: boolean
@@ -940,9 +1218,12 @@ export type ArticleSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Exten
   location?: boolean
   liked?: boolean
   likes?: boolean
+  dislikes?: boolean
+  disliked?: boolean
   readTime?: boolean
   image?: boolean
   views?: boolean
+  reads?: boolean
   media?: boolean
   published?: boolean
   scheduledAt?: boolean
@@ -962,17 +1243,22 @@ export type ArticleSelectScalar = {
   location?: boolean
   liked?: boolean
   likes?: boolean
+  dislikes?: boolean
+  disliked?: boolean
   readTime?: boolean
   image?: boolean
   views?: boolean
+  reads?: boolean
   media?: boolean
   published?: boolean
   scheduledAt?: boolean
 }
 
-export type ArticleOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "title" | "content" | "authorId" | "createdAt" | "updatedAt" | "bookmarked" | "category" | "excerpt" | "location" | "liked" | "likes" | "readTime" | "image" | "views" | "media" | "published" | "scheduledAt", ExtArgs["result"]["article"]>
+export type ArticleOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "title" | "content" | "authorId" | "createdAt" | "updatedAt" | "bookmarked" | "category" | "excerpt" | "location" | "liked" | "likes" | "dislikes" | "disliked" | "readTime" | "image" | "views" | "reads" | "media" | "published" | "scheduledAt", ExtArgs["result"]["article"]>
 export type ArticleInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   author?: boolean | Prisma.UserDefaultArgs<ExtArgs>
+  comments?: boolean | Prisma.Article$commentsArgs<ExtArgs>
+  _count?: boolean | Prisma.ArticleCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type ArticleIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   author?: boolean | Prisma.UserDefaultArgs<ExtArgs>
@@ -985,6 +1271,7 @@ export type $ArticlePayload<ExtArgs extends runtime.Types.Extensions.InternalArg
   name: "Article"
   objects: {
     author: Prisma.$UserPayload<ExtArgs>
+    comments: Prisma.$CommentPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -999,9 +1286,12 @@ export type $ArticlePayload<ExtArgs extends runtime.Types.Extensions.InternalArg
     location: string | null
     liked: boolean
     likes: number
+    dislikes: number
+    disliked: boolean
     readTime: number
     image: string | null
     views: number
+    reads: number
     media: runtime.JsonValue | null
     published: boolean
     scheduledAt: Date | null
@@ -1400,6 +1690,7 @@ readonly fields: ArticleFieldRefs;
 export interface Prisma__ArticleClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
   author<T extends Prisma.UserDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.UserDefaultArgs<ExtArgs>>): Prisma.Prisma__UserClient<runtime.Types.Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+  comments<T extends Prisma.Article$commentsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Article$commentsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$CommentPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1441,9 +1732,12 @@ export interface ArticleFieldRefs {
   readonly location: Prisma.FieldRef<"Article", 'String'>
   readonly liked: Prisma.FieldRef<"Article", 'Boolean'>
   readonly likes: Prisma.FieldRef<"Article", 'Int'>
+  readonly dislikes: Prisma.FieldRef<"Article", 'Int'>
+  readonly disliked: Prisma.FieldRef<"Article", 'Boolean'>
   readonly readTime: Prisma.FieldRef<"Article", 'Int'>
   readonly image: Prisma.FieldRef<"Article", 'String'>
   readonly views: Prisma.FieldRef<"Article", 'Int'>
+  readonly reads: Prisma.FieldRef<"Article", 'Int'>
   readonly media: Prisma.FieldRef<"Article", 'Json'>
   readonly published: Prisma.FieldRef<"Article", 'Boolean'>
   readonly scheduledAt: Prisma.FieldRef<"Article", 'DateTime'>
@@ -1840,6 +2134,30 @@ export type ArticleDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.Inter
    * Limit how many Articles to delete.
    */
   limit?: number
+}
+
+/**
+ * Article.comments
+ */
+export type Article$commentsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the Comment
+   */
+  select?: Prisma.CommentSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the Comment
+   */
+  omit?: Prisma.CommentOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.CommentInclude<ExtArgs> | null
+  where?: Prisma.CommentWhereInput
+  orderBy?: Prisma.CommentOrderByWithRelationInput | Prisma.CommentOrderByWithRelationInput[]
+  cursor?: Prisma.CommentWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.CommentScalarFieldEnum | Prisma.CommentScalarFieldEnum[]
 }
 
 /**

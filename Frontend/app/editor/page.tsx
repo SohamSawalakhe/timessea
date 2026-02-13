@@ -61,11 +61,9 @@ export default function EditorPage() {
   const [scheduledAt, setScheduledAt] = useState<string>("");
   const [showScheduleInput, setShowScheduleInput] = useState(false);
 
-  const [user, setUser] = useState<{
-    name: string;
-    email: string;
-    picture?: string;
-  } | null>(null);
+  // Use user from AuthContext
+  // User state is handled by useAuth
+
 
   // Tab state for Editor vs Scheduled
   const [activeTab, setActiveTab] = useState<"editor" | "scheduled">("editor");
@@ -84,7 +82,7 @@ export default function EditorPage() {
 
   // Auth overlay state
   const [showLoginOverlay, setShowLoginOverlay] = useState(false);
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user, token } = useAuth();
 
   // Article types
   const articleTypes = [
@@ -107,16 +105,8 @@ export default function EditorPage() {
     { icon: ImagePlus, label: "Image", action: "image" },
   ];
 
-  useEffect(() => {
-    const storedUser = localStorage.getItem("user");
-    if (storedUser) {
-      try {
-        setUser(JSON.parse(storedUser));
-      } catch (e) {
-        console.error("Failed to parse user from local storage", e);
-      }
-    }
-  }, []);
+  // Removed local storage user loading
+
 
   // Load draft if draft ID is present
   useEffect(() => {
@@ -305,6 +295,7 @@ export default function EditorPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
         },
         body: JSON.stringify({
           title,
@@ -385,6 +376,7 @@ export default function EditorPage() {
         method,
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
         },
         body: JSON.stringify({
           title: title || "Untitled Draft",
@@ -436,6 +428,9 @@ export default function EditorPage() {
     try {
       const res = await fetch(`http://localhost:5000/api/articles/${postId}`, {
         method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+        },
       });
       if (res.ok) {
         setScheduledPosts((prev) => prev.filter((p) => p.id !== postId));
@@ -469,6 +464,9 @@ export default function EditorPage() {
     bookmarked: false,
     likes: 0,
     views: 0,
+    reads: 0,
+    dislikes: 0,
+    disliked: false,
     subheadline,
     location,
     type: articleType as any,
