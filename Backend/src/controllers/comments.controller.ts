@@ -11,7 +11,18 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { Request } from 'express';
 import { CommentsService } from '../services/comments.service';
+import { Comment } from '../generated/prisma/client';
+
+interface RequestWithUser extends Request {
+  user: {
+    id: string;
+    email: string;
+    name: string;
+    picture: string;
+  };
+}
 
 @Controller('api/articles')
 export class CommentsController {
@@ -45,16 +56,19 @@ export class CommentsController {
   async createComment(
     @Param('articleId') articleId: string,
     @Body() body: { content: string; parentId?: string },
-    @Req() req: any,
-  ) {
+    @Req() req: RequestWithUser,
+  ): Promise<Comment> {
     if (!body.content || !body.content.trim()) {
-      throw new HttpException('Comment content is required', HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        'Comment content is required',
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
     return this.commentsService.create({
       content: body.content.trim(),
       articleId,
-      authorId: req.user.userId,
+      authorId: req.user.id,
       parentId: body.parentId,
     });
   }
@@ -64,7 +78,7 @@ export class CommentsController {
    * Like a comment
    */
   @Post(':articleId/comments/:commentId/like')
-  async likeComment(@Param('commentId') commentId: string) {
+  async likeComment(@Param('commentId') commentId: string): Promise<Comment> {
     return this.commentsService.likeComment(commentId);
   }
 
@@ -76,13 +90,13 @@ export class CommentsController {
   @UseGuards(AuthGuard('jwt'))
   async deleteComment(
     @Param('commentId') commentId: string,
-    @Req() req: any,
-  ) {
+    @Req() req: RequestWithUser,
+  ): Promise<Comment> {
     try {
-      return await this.commentsService.delete(commentId, req.user.userId);
-    } catch (error: any) {
+      return await this.commentsService.delete(commentId, req.user.id);
+    } catch (error) {
       throw new HttpException(
-        error.message || 'Failed to delete comment',
+        error instanceof Error ? error.message : 'Failed to delete comment',
         HttpStatus.FORBIDDEN,
       );
     }

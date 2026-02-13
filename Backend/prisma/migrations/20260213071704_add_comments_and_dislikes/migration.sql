@@ -1,10 +1,7 @@
 -- AlterTable
 ALTER TABLE "Article" ADD COLUMN     "dislikes" INTEGER NOT NULL DEFAULT 0,
-ADD COLUMN     "location" TEXT,
-ADD COLUMN     "media" JSONB,
-ADD COLUMN     "published" BOOLEAN NOT NULL DEFAULT true,
-ADD COLUMN     "scheduledAt" TIMESTAMP(3),
-ADD COLUMN     "views" INTEGER NOT NULL DEFAULT 0;
+ADD COLUMN     "reads" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "disliked" BOOLEAN NOT NULL DEFAULT false;
 
 -- CreateTable
 CREATE TABLE "Comment" (
