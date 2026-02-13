@@ -62,11 +62,9 @@ export default function EditorPage() {
   const [scheduledAt, setScheduledAt] = useState<string>("");
   const [showScheduleInput, setShowScheduleInput] = useState(false);
 
-  const [user, setUser] = useState<{
-    name: string;
-    email: string;
-    picture?: string;
-  } | null>(null);
+  // Use user from AuthContext
+  // User state is handled by useAuth
+
 
   // Tab state for Editor vs Scheduled
   const [activeTab, setActiveTab] = useState<"editor" | "scheduled">("editor");
@@ -85,7 +83,7 @@ export default function EditorPage() {
 
   // Auth overlay state
   const [showLoginOverlay, setShowLoginOverlay] = useState(false);
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user, token } = useAuth();
 
   // Article types
   const articleTypes = [
@@ -108,16 +106,8 @@ export default function EditorPage() {
     { icon: ImagePlus, label: "Image", action: "image" },
   ];
 
-  useEffect(() => {
-    const storedUser = localStorage.getItem("user");
-    if (storedUser) {
-      try {
-        setUser(JSON.parse(storedUser));
-      } catch (e) {
-        console.error("Failed to parse user from local storage", e);
-      }
-    }
-  }, []);
+  // Removed local storage user loading
+
 
   // Load draft if draft ID is present
   useEffect(() => {
@@ -349,6 +339,7 @@ export default function EditorPage() {
         method,
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
         },
         body: JSON.stringify(payload),
       });
@@ -434,6 +425,7 @@ export default function EditorPage() {
         method,
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
         },
         body: JSON.stringify(draftPayload),
       });
@@ -461,6 +453,9 @@ export default function EditorPage() {
     try {
       const res = await fetch(`http://localhost:5000/api/articles/${postId}`, {
         method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+        },
       });
       if (res.ok) {
         setScheduledPosts((prev) => prev.filter((p) => p.id !== postId));
@@ -493,6 +488,9 @@ export default function EditorPage() {
     bookmarked: false,
     likes: 0,
     views: 0,
+    reads: 0,
+    dislikes: 0,
+    disliked: false,
     subheadline,
     location,
     type: articleType as any,
@@ -525,7 +523,7 @@ export default function EditorPage() {
       )}
 
       {/* Header */}
-      <header className="sticky top-0 z-40 mb-6 flex items-center justify-between gap-2 overflow-x-auto scrollbar-hide bg-background/95 backdrop-blur-sm pb-4 -mx-4 px-4">
+      <header className="sticky top-0 z-40 mb-6 flex items-center justify-between gap-2 overflow-x-auto bg-background/95 backdrop-blur-sm pb-4 -mx-4 px-4">
         <div className="flex items-center gap-2 shrink-0">
           <motion.button
             whileHover={{ scale: 1.05 }}
@@ -1053,7 +1051,7 @@ export default function EditorPage() {
                 <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                   <Settings2 className="w-3 h-3" /> Category
                 </label>
-                <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-2 scrollbar-hide snap-x">
+                <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-2 snap-x">
                   {categories
                     .filter((c) => c !== "Trending")
                     .map((category) => (
@@ -1173,7 +1171,7 @@ export default function EditorPage() {
               {/* Editor Container */}
               <div className="rounded-3xl border border-border bg-card shadow-sm overflow-hidden focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50 transition-all duration-300">
                 {/* Toolbar */}
-                <div className="flex items-center gap-1 overflow-x-auto border-b border-border bg-muted/30 px-4 py-2 scrollbar-hide">
+                <div className="flex items-center gap-1 overflow-x-auto border-b border-border bg-muted/30 px-4 py-2">
                   {toolbarButtons.map((btn) => (
                     <motion.button
                       whileHover={{

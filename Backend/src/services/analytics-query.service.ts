@@ -77,8 +77,16 @@ export class AnalyticsQueryService {
   /**
    * Get author stats for profile overview
    */
-  async getAuthorStats(authorId: string): Promise<AuthorStats> {
-    const [publishedCount, scheduledCount, draftCount, aggregates] = await Promise.all([
+  async getAuthorStats(
+    authorId: string,
+  ): Promise<AuthorStats & { totalComments: number; totalDislikes: number }> {
+    const [
+      publishedCount,
+      scheduledCount,
+      draftCount,
+      aggregates,
+      totalComments,
+    ] = await Promise.all([
       this.prismaService.article.count({
         where: {
           authorId,
@@ -105,9 +113,17 @@ export class AnalyticsQueryService {
         _sum: {
           likes: true,
           views: true,
+          dislikes: true,
         },
         where: {
           authorId,
+        },
+      }),
+      this.prismaService.comment.count({
+        where: {
+          article: {
+            authorId,
+          },
         },
       }),
     ]);
@@ -118,6 +134,8 @@ export class AnalyticsQueryService {
       draftCount,
       totalLikes: aggregates._sum.likes || 0,
       totalViews: aggregates._sum.views || 0,
+      totalDislikes: aggregates._sum.dislikes || 0,
+      totalComments,
     };
   }
 
@@ -128,7 +146,13 @@ export class AnalyticsQueryService {
     // 1. Get author's post IDs and basic stats
     const posts = await this.prismaService.article.findMany({
       where: { authorId },
-      select: { id: true, title: true, views: true, likes: true, createdAt: true },
+      select: {
+        id: true,
+        title: true,
+        views: true,
+        likes: true,
+        createdAt: true,
+      },
       orderBy: { views: 'desc' },
       take: 5, // Top 5 for the list
     });
@@ -137,7 +161,7 @@ export class AnalyticsQueryService {
       where: { authorId },
       select: { id: true },
     });
-    
+
     const postIds = allPosts.map((p) => p.id);
 
     if (postIds.length === 0) {
@@ -177,7 +201,7 @@ export class AnalyticsQueryService {
         SELECT
           toDate(created_at) as date,
           countIf(event = 'post_view') as views,
-          countIf(event IN ('like', 'comment', 'share')) as engagement
+          countIf(event = 'post_read') as reads
         FROM analytics.events
         WHERE post_id IN ({postIds:Array(String)})
           AND created_at >= today() - 7
@@ -194,27 +218,52 @@ export class AnalyticsQueryService {
       // Fallback to empty arrays so we can still return basic stats from Prisma
     }
 
-    const overview = overviewResults[0] || { unique_viewers: 0, total_views: 0, total_reads: 0, total_likes: 0, total_comments: 0, total_shares: 0 };
-    
+    const overview = overviewResults[0] || {
+      unique_viewers: 0,
+      total_views: 0,
+      total_reads: 0,
+      total_likes: 0,
+      total_comments: 0,
+      total_shares: 0,
+    };
+
     // Aggregates from Prisma for consistency on primary metrics (Views/Likes)
-    const aggregates = await this.prismaService.article.aggregate({
-      _sum: {
-        likes: true,
-        views: true,
-      },
-      where: { authorId },
-    });
-    
+    const [aggregates, prismaCommentCount] = await Promise.all([
+      this.prismaService.article.aggregate({
+        _sum: {
+          likes: true,
+          views: true,
+          dislikes: true,
+        },
+        where: { authorId },
+      }),
+      this.prismaService.comment.count({
+        where: {
+          article: { authorId },
+        },
+      }),
+    ]);
+
     const totalLikes = aggregates._sum.likes || 0;
     const totalViews = aggregates._sum.views || 0;
     const clickHouseViews = Number(overview.total_views) || 0;
     const totalReads = Number(overview.total_reads) || 0;
     const totalComments = Number(overview.total_comments) || 0;
     const totalShares = Number(overview.total_shares) || 0;
-    
+
     // Calculate Rates based on ClickHouse data for accuracy within the same dataset
-    const completionRate = clickHouseViews > 0 ? Math.round((totalReads / clickHouseViews) * 100) : 0;
-    const engagementRate = clickHouseViews > 0 ? Math.round(((Number(overview.total_likes) + totalComments + totalShares) / clickHouseViews) * 100) : 0;
+    const completionRate =
+      clickHouseViews > 0
+        ? Math.round((totalReads / clickHouseViews) * 100)
+        : 0;
+    const engagementRate =
+      clickHouseViews > 0
+        ? Math.round(
+            ((Number(overview.total_likes) + totalComments + totalShares) /
+              clickHouseViews) *
+              100,
+          )
+        : 0;
 
     // Format Trend Data
     // Ensure we have last 7 days
@@ -223,7 +272,7 @@ export class AnalyticsQueryService {
       name: string;
       fullDate: string;
       views: number;
-      engagement: number;
+      reads: number;
     }[] = [];
     const today = new Date();
     for (let i = 6; i >= 0; i--) {
@@ -231,26 +280,29 @@ export class AnalyticsQueryService {
       d.setDate(d.getDate() - i);
       const dateStr = d.toISOString().split('T')[0];
       const data = trendMap.get(dateStr);
-      
+
       formattedTrend.push({
         name: d.toLocaleDateString('en-US', { weekday: 'short' }),
         fullDate: dateStr,
         views: Number(data?.views || 0),
-        engagement: Number(data?.engagement || 0),
+        reads: Number(data?.reads || 0),
       });
     }
 
     // FALLBACK: If analytics DB is empty but main DB has counts (common in dev/manual entry)
     // Distribute lifetime stats to create a synthetic trend visual
-    const trendTotalViews = formattedTrend.reduce((sum, item) => sum + item.views, 0);
+    const trendTotalViews = formattedTrend.reduce(
+      (sum, item) => sum + item.views,
+      0,
+    );
     if (trendTotalViews === 0 && totalViews > 0) {
       // Distribution weights (growing trend)
       const weights = [0.05, 0.1, 0.15, 0.1, 0.15, 0.2, 0.25];
       const totalEngagement = totalLikes + totalComments + totalShares;
-      
+
       formattedTrend.forEach((day, index) => {
         day.views = Math.ceil(totalViews * weights[index]);
-        day.engagement = Math.ceil(totalEngagement * weights[index]);
+        day.reads = Math.ceil(totalReads * weights[index]);
       });
     }
 
@@ -259,13 +311,16 @@ export class AnalyticsQueryService {
         total_views: totalViews,
         active_users: Number(overview.unique_viewers) || 0,
         total_likes: totalLikes,
+        total_dislikes: aggregates._sum.dislikes || 0,
+        total_comments: prismaCommentCount,
         total_engagement: totalLikes + totalComments + totalShares,
         total_shares: totalShares,
+        total_reads: totalReads,
         completion_rate: completionRate,
         engagement_rate: engagementRate,
       },
       trend: formattedTrend,
-      top_posts: posts.map(p => ({
+      top_posts: posts.map((p) => ({
         id: p.id,
         title: p.title,
         views: p.views,

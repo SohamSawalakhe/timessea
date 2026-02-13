@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -10,7 +10,6 @@ import {
   Bookmark,
   ChevronUp,
   MoreHorizontal,
-  Eye,
 } from "lucide-react";
 import type { Article } from "@/lib/data";
 import { cn } from "@/lib/utils";
@@ -51,14 +50,13 @@ export function ReelCard({
   onView,
 }: ReelCardProps) {
   /* eslint-disable react-hooks/exhaustive-deps */
-  const [isExpanded, setIsExpanded] = useState(false);
+
   const [showReadMore, setShowReadMore] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
   const contentRef = useRef<HTMLParagraphElement>(null);
 
   const keyPoints = extractKeyPoints(article.content);
   const commentCount = Math.floor(article.likes * 0.3);
-  const viewCount = article.views;
 
   // Use the new centralized view tracker (10s threshold for articles)
   const { elementRef } = useViewTracker({
@@ -68,8 +66,54 @@ export function ReelCard({
     onTrigger: () => onView(article.id),
   });
 
+  /* eslint-disable react-hooks/exhaustive-deps */
+  const combinedMedia = useMemo(() => {
+    const media: {
+      type: "image" | "video";
+      url: string;
+      caption?: string;
+      poster?: string;
+    }[] = [];
+
+    // 1. Cover Image
+    if (article.image) {
+      media.push({
+        type: "image",
+        url: article.image,
+        caption: article.imageCaption || article.title,
+      });
+    } else if (imageSrc) {
+      media.push({
+        type: "image",
+        url: imageSrc,
+        caption: article.title,
+      });
+    }
+
+    // 2. Explicit Media
+    if (article.media) {
+      article.media.forEach((m) => {
+        if (!media.find((exist) => exist.url === m.url)) {
+          media.push({ ...m, caption: article.title });
+        }
+      });
+    }
+
+    // 3. Content Images
+    const regex = /!\[(.*?)\]\((.*?)\)/g;
+    let match;
+    while ((match = regex.exec(article.content)) !== null) {
+      const [_, alt, url] = match;
+      if (!media.find((exist) => exist.url === url)) {
+        media.push({ type: "image", url, caption: alt });
+      }
+    }
+
+    return media;
+  }, [article, imageSrc]);
+
   const nextSlide = () => {
-    if (article.media && currentSlide < article.media.length - 1) {
+    if (combinedMedia.length > 0 && currentSlide < combinedMedia.length - 1) {
       setCurrentSlide((prev) => prev + 1);
     } else {
       setCurrentSlide(0); // Loop back
@@ -77,10 +121,10 @@ export function ReelCard({
   };
 
   const prevSlide = () => {
-    if (article.media && currentSlide > 0) {
+    if (combinedMedia.length > 0 && currentSlide > 0) {
       setCurrentSlide((prev) => prev - 1);
-    } else if (article.media) {
-      setCurrentSlide(article.media.length - 1); // Loop to end
+    } else if (combinedMedia.length > 0) {
+      setCurrentSlide(combinedMedia.length - 1); // Loop to end
     }
   };
 
@@ -93,10 +137,6 @@ export function ReelCard({
     }
   }, [article.content]);
 
-  const toggleExpand = () => {
-    setIsExpanded(!isExpanded);
-  };
-
   return (
     <div
       ref={elementRef}
@@ -104,13 +144,13 @@ export function ReelCard({
     >
       {/* Top section: Large image - shrinks when content expands */}
       <div className="relative h-[55vh] sm:h-[60vh] w-full shrink-0 overflow-hidden bg-background transition-all duration-500 ease-in-out group/media">
-        {article.media && article.media.length > 0 ? (
+        {combinedMedia.length > 0 ? (
           <>
             <div
               className="flex h-full w-full transition-transform duration-500 ease-out"
               style={{ transform: `translateX(-${currentSlide * 100}%)` }}
             >
-              {article.media.map((item, i) => (
+              {combinedMedia.map((item, i) => (
                 <div
                   key={i}
                   className="relative h-full w-full shrink-0 flex items-center justify-center bg-background"
@@ -128,25 +168,38 @@ export function ReelCard({
                   ) : (
                     <img
                       src={item.url}
-                      alt={`${article.title} - ${i + 1}`}
+                      alt={item.caption || article.title}
                       className="w-full h-auto max-h-full object-contain"
                     />
                   )}
                   {/* Gradient overlay for better text readability */}
                   <div className="absolute inset-0 bg-linear-to-b from-black/15 via-transparent to-black/40 pointer-events-none" />
+
+                  {/* Caption Overlay */}
+                  {item.caption &&
+                    item.caption !== article.title &&
+                    item.caption !== "Image" && (
+                      <div className="absolute bottom-[70px] left-0 right-0 flex justify-center px-4 z-20 pointer-events-none">
+                        <div className="max-w-[90%] bg-black/70 backdrop-blur-md border border-white/20 rounded-xl px-4 py-2 shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-300">
+                          <p className="text-white text-sm font-medium text-center leading-snug line-clamp-2 drop-shadow-md">
+                            {item.caption}
+                          </p>
+                        </div>
+                      </div>
+                    )}
                 </div>
               ))}
             </div>
 
             {/* Navigation Arrows */}
-            {article.media.length > 1 && (
+            {combinedMedia.length > 1 && (
               <>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     prevSlide();
                   }}
-                  className="absolute left-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/30 backdrop-blur-sm text-white opacity-0 group-hover/media:opacity-100 transition-opacity hover:bg-black/50"
+                  className="absolute left-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/30 backdrop-blur-sm text-white opacity-0 group-hover/media:opacity-100 transition-opacity hover:bg-black/50 z-20"
                   aria-label="Previous slide"
                 >
                   <ChevronUp className="h-6 w-6 -rotate-90" />
@@ -156,23 +209,36 @@ export function ReelCard({
                     e.stopPropagation();
                     nextSlide();
                   }}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/30 backdrop-blur-sm text-white opacity-0 group-hover/media:opacity-100 transition-opacity hover:bg-black/50"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/30 backdrop-blur-sm text-white opacity-0 group-hover/media:opacity-100 transition-opacity hover:bg-black/50 z-20"
                   aria-label="Next slide"
                 >
                   <ChevronUp className="h-6 w-6 rotate-90" />
                 </button>
 
-                {/* Dots */}
+                {/* Dots - Enhanced visibility with vibrant colors */}
                 <div className="absolute bottom-16 left-1/2 -translate-x-1/2 flex gap-1.5 z-20">
-                  {article.media.map((_, i) => (
-                    <div
+                  {combinedMedia.map((_, i) => (
+                    <button
                       key={i}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCurrentSlide(i);
+                      }}
                       className={cn(
-                        "h-1.5 rounded-full transition-all shadow-sm",
+                        "h-2 rounded-full transition-all duration-300 shadow-lg cursor-pointer",
                         currentSlide === i
-                          ? "bg-white w-4"
-                          : "bg-white/50 w-1.5 hover:bg-white/80",
+                          ? "w-6"
+                          : "bg-white/70 w-2 hover:bg-white hover:w-3",
                       )}
+                      style={
+                        currentSlide === i
+                          ? {
+                              backgroundColor: "#00d4ff",
+                              boxShadow: "0 0 10px #00d4ff80",
+                            }
+                          : undefined
+                      }
+                      aria-label={`Go to slide ${i + 1}`}
                     />
                   ))}
                 </div>
@@ -181,13 +247,7 @@ export function ReelCard({
           </>
         ) : (
           <div className="h-full w-full flex items-center justify-center bg-background">
-            <img
-              src={imageSrc}
-              alt={article.title}
-              className="w-full h-auto max-h-full object-contain transition-transform duration-700 hover:scale-105"
-            />
-            {/* Gradient overlay for better text readability */}
-            <div className="absolute inset-0 bg-linear-to-b from-black/40 via-transparent to-black/80 pointer-events-none" />
+            <p className="text-muted-foreground text-sm">No media available</p>
           </div>
         )}
 
@@ -197,35 +257,13 @@ export function ReelCard({
             {article.category}
           </span>
         </div>
-
-        {/* Author info at bottom of image */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-5 z-10">
-          <div className="flex items-center gap-2 mb-2">
-            {article.author.picture ? (
-              <Image
-                src={article.author.picture}
-                alt={article.author.name}
-                width={32}
-                height={32}
-                className="h-7 w-7 sm:h-8 sm:w-8 rounded-full border-2 border-white/30 object-cover"
-              />
-            ) : (
-              <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-xs sm:text-sm font-bold text-white border-2 border-white/30">
-                {article.author.name.charAt(0)}
-              </div>
-            )}
-            <span className="text-xs sm:text-sm font-bold text-white drop-shadow-lg">
-              {article.author.name}
-            </span>
-          </div>
-        </div>
       </div>
 
       {/* Bottom section: Title and Content (30-40% of screen) - Expandable like Instagram */}
       <div
         className={cn(
           "flex flex-row bg-background transition-all duration-500 ease-in-out",
-          isExpanded ? "flex-1" : "h-auto",
+          "h-auto",
         )}
       >
         {/* Scrollable Text Content */}
@@ -236,63 +274,52 @@ export function ReelCard({
             msOverflowStyle: "none",
           }}
         >
+          {/* Author info */}
+          <div className="flex items-center gap-2 mb-2 sm:mb-3">
+            {article.author.picture ? (
+              <Image
+                src={article.author.picture}
+                alt={article.author.name}
+                width={32}
+                height={32}
+                className="h-8 w-8 rounded-full object-cover ring-2 ring-border"
+              />
+            ) : (
+              <div className="h-8 w-8 rounded-full bg-linear-to-br from-blue-500 to-purple-600 flex items-center justify-center text-sm font-bold text-white ring-2 ring-border">
+                {article.author.name.charAt(0)}
+              </div>
+            )}
+            <span className="text-sm font-semibold text-foreground">
+              {article.author.name}
+            </span>
+          </div>
+
           {/* Title */}
-          <h2 className="text-xl sm:text-2xl font-black leading-tight text-foreground mb-2 sm:mb-3 font-serif">
+          <h2 className="text-xl sm:text-2xl font-black leading-tight text-foreground mb-3 sm:mb-4 font-serif">
             {article.title}
           </h2>
-
-          {/* Stats row */}
-          <div className="flex items-center gap-3 sm:gap-4 mb-3 sm:mb-4">
-            <div className="flex items-center gap-1.5">
-              <Eye className="h-3.5 sm:h-4 w-3.5 sm:w-4 text-muted-foreground" />
-              <span className="text-[11px] sm:text-xs font-semibold text-muted-foreground">
-                {viewCount.toLocaleString()}
-              </span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Heart className="h-3.5 sm:h-4 w-3.5 sm:w-4 text-muted-foreground" />
-              <span className="text-[11px] sm:text-xs font-semibold text-muted-foreground">
-                {article.likes + (isLiked && !article.liked ? 1 : 0)}
-              </span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <MessageCircle className="h-3.5 sm:h-4 w-3.5 sm:w-4 text-muted-foreground" />
-              <span className="text-[11px] sm:text-xs font-semibold text-muted-foreground">
-                {commentCount}
-              </span>
-            </div>
-          </div>
 
           {/* Expandable Content - Instagram Style */}
           <div className="relative">
             <div className="text-xs sm:text-sm leading-relaxed text-muted-foreground">
               <p
                 ref={contentRef}
-                className={cn(
-                  "whitespace-pre-wrap",
-                  !isExpanded && "line-clamp-5",
-                )}
+                className={cn("whitespace-pre-wrap", "line-clamp-5")}
               >
                 {article.content
-                  .replace(/\*\*([^*]+)\*\*/g, "$1")
+                  .replace(/!\[.*?\]\(.*?\)/g, "") // Remove markdown images
+                  .replace(/\*\*([^*]+)\*\*/g, "$1") // Remove bold syntax
                   .replace(/\n+/g, "\n")
                   .trim()}
               </p>
 
-              {(showReadMore || isExpanded) && (
-                <button
-                  onClick={toggleExpand}
+              {showReadMore && (
+                <Link
+                  href={`/article/${article.id}`}
                   className="inline-flex items-center gap-1 mt-2 text-xs sm:text-sm font-semibold text-foreground hover:text-foreground/80 transition-colors"
                 >
-                  {isExpanded ? (
-                    <>
-                      Show Less
-                      <ChevronUp className="h-3 w-3" />
-                    </>
-                  ) : (
-                    "...Read More"
-                  )}
-                </button>
+                  ...Read More
+                </Link>
               )}
             </div>
           </div>

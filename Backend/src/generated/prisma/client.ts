@@ -52,3 +52,8 @@ export type RefreshToken = Prisma.RefreshTokenModel
  * 
  */
 export type Article = Prisma.ArticleModel
+/**
+ * Model Comment
+ * 
+ */
+export type Comment = Prisma.CommentModel

@@ -4,21 +4,18 @@ import { useState, useEffect } from "react"
 import { AppShell } from "@/components/app-shell"
 import { motion } from "framer-motion"
 import { 
-  BarChart2, 
   TrendingUp, 
-  Users, 
   Eye, 
   MessageCircle, 
   Heart,
   ChevronLeft,
   Calendar,
-  Filter,
   ArrowUpRight,
   ArrowDownRight,
   Share2,
-  Activity,
-  Target,
-  ThumbsUp
+  ThumbsUp,
+  ThumbsDown,
+  BookOpen,
 } from "lucide-react"
 import Link from "next/link"
 import {
@@ -31,32 +28,57 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  Bar,
-  Cell
 } from "recharts"
 import { useAuth } from "@/contexts/AuthContext"
 import { useRouter } from "next/navigation"
 
 const mockTrendData = [
-  { name: "Mon", views: 0, engagement: 0 },
-  { name: "Tue", views: 0, engagement: 0 },
-  { name: "Wed", views: 0, engagement: 0 },
-  { name: "Thu", views: 0, engagement: 0 },
-  { name: "Fri", views: 0, engagement: 0 },
-  { name: "Sat", views: 0, engagement: 0 },
-  { name: "Sun", views: 0, engagement: 0 },
+  { name: "Mon", views: 0, reads: 0 },
+  { name: "Tue", views: 0, reads: 0 },
+  { name: "Wed", views: 0, reads: 0 },
+  { name: "Thu", views: 0, reads: 0 },
+  { name: "Fri", views: 0, reads: 0 },
+  { name: "Sat", views: 0, reads: 0 },
+  { name: "Sun", views: 0, reads: 0 },
 ]
 
-const topPosts = [
-  { id: "1", title: "Where Web 3 is Going to?", views: "12.4k", growth: "+15%" },
-  { id: "2", title: "Guiding Teams: Leadership", views: "8.2k", growth: "+12%" },
-  { id: "3", title: "Minimalist Design Art", views: "6.1k", growth: "-2%" },
-]
+interface DashboardStats {
+  total_views: number;
+  active_users: number;
+  total_likes: number;
+  total_dislikes: number;
+  total_comments: number;
+  total_engagement: number;
+  total_shares: number;
+  total_reads: number;
+  completion_rate: number;
+  engagement_rate: number;
+}
+
+interface TrendItem {
+  name: string;
+  fullDate: string;
+  views: number;
+  reads: number;
+}
+
+interface TopPost {
+  id: string;
+  title: string;
+  views: number;
+  createdAt: string;
+}
+
+interface DashboardData {
+  stats: DashboardStats;
+  trend: TrendItem[];
+  top_posts: TopPost[];
+}
 
 export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
-  const [dashboardData, setDashboardData] = useState<any>(null)
-  const { token, user } = useAuth()
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
+  const { token } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
@@ -99,11 +121,15 @@ export default function DashboardPage() {
     }
   }, [loading, token, router])
 
-  const stats = dashboardData?.stats || {
+  const stats: DashboardStats = dashboardData?.stats || {
     total_views: 0,
     active_users: 0,
+    total_likes: 0,
+    total_dislikes: 0,
+    total_comments: 0,
     total_engagement: 0,
     total_shares: 0,
+    total_reads: 0,
     completion_rate: 0,
     engagement_rate: 0
   }
@@ -131,7 +157,7 @@ export default function DashboardPage() {
         </button>
       </header>
 
-      {/* Main Stats Grid */}
+      {/* Main Stats Grid — 6 cards, 2 cols */}
       <div className="grid grid-cols-2 gap-4 mb-8">
         <StatCard 
           label="Total Views" 
@@ -150,12 +176,20 @@ export default function DashboardPage() {
           color="pink"
         />
         <StatCard 
-          label="Engagement" 
-          value={stats.total_engagement.toLocaleString()} 
+          label="Comments" 
+          value={stats.total_comments ? stats.total_comments.toLocaleString() : "0"} 
           trend="Total" 
           isUp={true} 
-          icon={Heart} 
+          icon={MessageCircle} 
           color="purple"
+        />
+        <StatCard 
+          label="Dislikes" 
+          value={stats.total_dislikes ? stats.total_dislikes.toLocaleString() : "0"} 
+          trend="Total" 
+          isUp={false} 
+          icon={ThumbsDown} 
+          color="orange"
         />
         <StatCard 
           label="Shares" 
@@ -163,23 +197,15 @@ export default function DashboardPage() {
           trend="Total" 
           isUp={true} 
           icon={Share2} 
-          color="orange"
+          color="green"
         />
         <StatCard 
-          label="Completion Rate" 
-          value={`${stats.completion_rate}%`} 
-          trend="Reads/View" 
-          isUp={stats.completion_rate > 50} 
-          icon={Target} 
-          color="green" 
-        />
-        <StatCard 
-          label="Eng. Rate" 
-          value={`${stats.engagement_rate}%`} 
-          trend="Avg/Post" 
-          isUp={stats.engagement_rate > 2} 
-          icon={Activity} 
-          color="indigo" 
+          label="Total Reads" 
+          value={stats.total_reads.toLocaleString()} 
+          trend="Total" 
+          isUp={true} 
+          icon={BookOpen} 
+          color="indigo"
         />
       </div>
 
@@ -198,7 +224,7 @@ export default function DashboardPage() {
             </span>
             <span className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               <span className="h-2 w-2 rounded-full bg-pink-500" />
-              Engagement
+              Reads
             </span>
           </div>
         </div>
@@ -260,7 +286,7 @@ export default function DashboardPage() {
               <Line 
                 yAxisId="right"
                 type="monotone" 
-                dataKey="engagement" 
+                dataKey="reads" 
                 stroke="#ec4899" 
                 strokeWidth={3}
                 dot={{ r: 4, fill: "#ec4899", strokeWidth: 2, stroke: "#fff" }}
@@ -282,7 +308,7 @@ export default function DashboardPage() {
           {topPosts.length === 0 ? (
             <div className="text-center text-muted-foreground p-4">No posts yet</div>
           ) : (
-            topPosts.map((post: any, index: number) => (
+            topPosts.map((post, index) => (
               <motion.div
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -297,10 +323,13 @@ export default function DashboardPage() {
                   <p className="text-sm font-bold text-foreground truncate">{post.title}</p>
                   <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-widest">{post.views} views</p>
                 </div>
-                <div className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-black bg-green-500/10 text-green-500`}>
+                <Link
+                  href={`/article/${post.id}`}
+                  className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-black bg-green-500/10 text-green-500"
+                >
                   <TrendingUp className="h-3 w-3" />
                   View
-                </div>
+                </Link>
               </motion.div>
             ))
           )}
@@ -310,12 +339,21 @@ export default function DashboardPage() {
   )
 }
 
-function StatCard({ label, value, trend, isUp, icon: Icon, color }: any) {
-  const colorMap: any = {
+function StatCard({ label, value, trend, isUp, icon: Icon, color }: {
+  label: string;
+  value: string;
+  trend: string;
+  isUp: boolean;
+  icon: React.ComponentType<{ className?: string }>;
+  color: string;
+}) {
+  const colorMap: Record<string, string> = {
     blue: "bg-blue-500/10 text-blue-500",
     purple: "bg-purple-500/10 text-purple-500",
     pink: "bg-pink-500/10 text-pink-500",
     orange: "bg-orange-500/10 text-orange-500",
+    green: "bg-green-500/10 text-green-500",
+    indigo: "bg-indigo-500/10 text-indigo-500",
   }
 
   return (
@@ -323,7 +361,7 @@ function StatCard({ label, value, trend, isUp, icon: Icon, color }: any) {
       whileHover={{ y: -5 }}
       className="rounded-4xl bg-card p-5 border border-border/50 shadow-sm"
     >
-      <div className={`flex h-10 w-10 items-center justify-center rounded-2xl mb-4 ${colorMap[color]}`}>
+      <div className={`flex h-10 w-10 items-center justify-center rounded-2xl mb-4 ${colorMap[color] || colorMap.blue}`}>
         <Icon className="h-5 w-5" />
       </div>
       <div>
