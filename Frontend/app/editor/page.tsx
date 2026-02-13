@@ -498,7 +498,7 @@ export default function EditorPage() {
       )}
 
       {/* Header */}
-      <header className="sticky top-0 z-40 mb-6 flex items-center justify-between gap-2 overflow-x-auto scrollbar-hide bg-background/95 backdrop-blur-sm pb-4 -mx-4 px-4">
+      <header className="sticky top-0 z-40 mb-6 flex items-center justify-between gap-2 overflow-x-auto bg-background/95 backdrop-blur-sm pb-4 -mx-4 px-4">
         <div className="flex items-center gap-2 shrink-0">
           <motion.button
             whileHover={{ scale: 1.05 }}
@@ -1025,7 +1025,7 @@ export default function EditorPage() {
                 <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                   <Settings2 className="w-3 h-3" /> Category
                 </label>
-                <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-2 scrollbar-hide snap-x">
+                <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-2 snap-x">
                   {categories
                     .filter((c) => c !== "Trending")
                     .map((category) => (
@@ -1145,7 +1145,7 @@ export default function EditorPage() {
               {/* Editor Container */}
               <div className="rounded-3xl border border-border bg-card shadow-sm overflow-hidden focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50 transition-all duration-300">
                 {/* Toolbar */}
-                <div className="flex items-center gap-1 overflow-x-auto border-b border-border bg-muted/30 px-4 py-2 scrollbar-hide">
+                <div className="flex items-center gap-1 overflow-x-auto border-b border-border bg-muted/30 px-4 py-2">
                   {toolbarButtons.map((btn) => (
                     <motion.button
                       whileHover={{

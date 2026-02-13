@@ -41,7 +41,7 @@ export class CreateArticleDto {
   author?: {
     name: string;
     email: string;
-    avatar?: string;
+    picture?: string;
   };
 
   @IsOptional()

@@ -66,11 +66,10 @@ export class ArticlesService {
       author = await this.usersService.create({
         email: dto.author?.email || 'anonymous@example.com',
         name: dto.author?.name || 'Anonymous',
-        picture: dto.author?.avatar,
+        picture: dto.author?.picture,
       });
     }
 
-    // Create article with authorId
     // Create article with authorId
     return this.prisma.article.create({
       data: {
@@ -78,7 +77,7 @@ export class ArticlesService {
         content: dto.content,
         excerpt: dto.excerpt,
         image: dto.image,
-        media: dto.media as any,
+        media: dto.media as Prisma.InputJsonValue,
         category: dto.category,
         location: dto.location,
         readTime: dto.readTime,
