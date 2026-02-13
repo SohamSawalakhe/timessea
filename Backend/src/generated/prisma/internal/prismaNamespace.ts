@@ -702,6 +702,7 @@ export const ArticleScalarFieldEnum = {
   bookmarked: 'bookmarked',
   category: 'category',
   excerpt: 'excerpt',
+  location: 'location',
   liked: 'liked',
   likes: 'likes',
   readTime: 'readTime',

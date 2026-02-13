@@ -22,8 +22,8 @@ import {
   BarChart2,
   Calendar,
   Eye,
-} from "lucide-react"
-import { motion, AnimatePresence } from "framer-motion"
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 const CustomSwitch = ({
   checked,
@@ -75,7 +75,8 @@ export default function ProfilePage() {
 
     if (user && token) {
       const fetchStats = () => {
-        const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+        const API_URL =
+          process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
         fetch(`${API_URL}/analytics/profile/overview`, {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -116,8 +117,16 @@ export default function ProfilePage() {
   }
 
   const activityItems = [
-    { icon: FileText, label: "Published Articles", count: stats.publishedCount.toString() },
-    { icon: Heart, label: "Liked Articles", count: stats.totalLikes.toString() },
+    {
+      icon: FileText,
+      label: "Published Articles",
+      count: stats.publishedCount.toString(),
+    },
+    {
+      icon: Heart,
+      label: "Liked Articles",
+      count: stats.totalLikes.toString(),
+    },
   ];
 
   const generalItems = [
@@ -215,7 +224,7 @@ export default function ProfilePage() {
       </AnimatePresence>
 
       {/* Pro Banner */}
-      
+
       {/* Analytics Banner - Only show for logged in users or consistently */}
       <div className="grid grid-cols-2 gap-4 mb-8">
         {[
@@ -270,26 +279,51 @@ export default function ProfilePage() {
 
       {user && (
         <motion.div
-           initial={{ opacity: 0, scale: 0.95 }}
-           animate={{ opacity: 1, scale: 1 }}
-           whileHover={{ scale: 1.02 }}
-           onClick={() => router.push("/dashboard")}
-           className="mb-6 flex cursor-pointer items-center gap-4 rounded-3xl bg-card p-5 border border-border/50 shadow-sm hover:shadow-md transition-all group"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          whileHover={{ scale: 1.02 }}
+          onClick={() => router.push("/dashboard")}
+          className="mb-6 flex cursor-pointer items-center gap-4 rounded-3xl bg-card p-5 border border-border/50 shadow-sm hover:shadow-md transition-all group"
         >
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary group-hover:scale-110 transition-transform">
-             <BarChart2 className="h-6 w-6" />
+            <BarChart2 className="h-6 w-6" />
           </div>
           <div className="flex-1">
-             <p className="text-base font-bold text-foreground">Analytics Dashboard</p>
-             <p className="text-xs font-medium text-muted-foreground">
-               View your content performance
-             </p>
+            <p className="text-base font-bold text-foreground">
+              Analytics Dashboard
+            </p>
+            <p className="text-xs font-medium text-muted-foreground">
+              View your content performance
+            </p>
           </div>
           <div className="rounded-full bg-secondary p-2 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-             <ChevronRight className="h-4 w-4" />
+            <ChevronRight className="h-4 w-4" />
           </div>
         </motion.div>
       )}
+
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        whileHover={{ scale: 1.02 }}
+        className="mb-8 flex items-center gap-4 rounded-3xl bg-linear-to-br from-primary/10 to-primary/5 p-5 border border-primary/10 shadow-sm"
+      >
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-background shadow-sm text-primary">
+          <Crown className="h-6 w-6" />
+        </div>
+        <div className="flex-1">
+          <p className="text-base font-bold text-foreground">Join Pro</p>
+          <p className="text-xs font-medium text-muted-foreground">
+            Unlock exclusive features & analytics
+          </p>
+        </div>
+        <button
+          type="button"
+          className="rounded-full bg-foreground px-5 py-2 text-xs font-bold text-background shadow-md transform transition-transform active:scale-95"
+        >
+          Upgrade
+        </button>
+      </motion.div>
 
       {/* Activity Section */}
       <div className="mb-8">

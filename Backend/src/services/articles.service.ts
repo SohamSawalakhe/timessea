@@ -71,6 +71,7 @@ export class ArticlesService {
     }
 
     // Create article with authorId
+    // Create article with authorId
     return this.prisma.article.create({
       data: {
         title: dto.title,
@@ -79,6 +80,7 @@ export class ArticlesService {
         image: dto.image,
         media: dto.media as any,
         category: dto.category,
+        location: dto.location,
         readTime: dto.readTime,
         authorId: author.id,
         scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,

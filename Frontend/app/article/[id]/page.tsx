@@ -1,8 +1,9 @@
-"use client"
+"use client";
+import { useAuth } from "@/contexts/AuthContext";
 
-import { use, useState, useEffect } from "react"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { use, useState, useEffect } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Heart,
@@ -13,88 +14,102 @@ import {
   Loader2,
   Share,
   ThumbsDown,
-} from "lucide-react"
-import type { Article } from "@/lib/data"
-import { cn } from "@/lib/utils"
-import { AppShell } from "@/components/app-shell"
+} from "lucide-react";
+import type { Article } from "@/lib/data";
+import { cn } from "@/lib/utils";
+import { AppShell } from "@/components/app-shell";
 
 export default function ArticlePage({
   params,
 }: {
-  params: Promise<{ id: string }>
+  params: Promise<{ id: string }>;
 }) {
-  const { id } = use(params)
-  const router = useRouter()
-  
-  const [article, setArticle] = useState<Article | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { id } = use(params);
+  const router = useRouter();
+  const { isAuthenticated } = useAuth();
+
+  const [article, setArticle] = useState<Article | null>(null);
+  const [loading, setLoading] = useState(true);
 
   // Fetch article
   useEffect(() => {
     async function fetchArticle() {
       try {
-        const res = await fetch(`http://localhost:5000/api/articles/${id}`)
+        const res = await fetch(`http://localhost:5000/api/articles/${id}`);
         if (res.ok) {
-          const data = await res.json()
-          setArticle(data)
-          
+          const data = await res.json();
+          setArticle(data);
+
           // Increment view count
-          fetch(`http://localhost:5000/api/articles/${id}/view`, { method: "POST" })
-            .catch(err => console.error("Failed to increment view", err))
+          fetch(`http://localhost:5000/api/articles/${id}/view`, {
+            method: "POST",
+          }).catch((err) => console.error("Failed to increment view", err));
         } else {
-          setArticle(null)
+          setArticle(null);
         }
       } catch (err) {
-        console.error(err)
+        console.error(err);
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
     }
-    fetchArticle()
-  }, [id])
+    fetchArticle();
+  }, [id]);
 
   const handleLike = async () => {
-    if (!article) return
-    const originalLiked = article.liked
-    const originalLikes = article.likes
+    if (!isAuthenticated) {
+      router.push(`/login?redirect=/article/${id}`);
+      return;
+    }
+    if (!article) return;
+    const originalLiked = article.liked;
+    const originalLikes = article.likes;
 
     // Optimistic update
     setArticle({
       ...article,
       liked: !originalLiked,
-      likes: originalLiked ? originalLikes - 1 : originalLikes + 1
-    })
+      likes: originalLiked ? originalLikes - 1 : originalLikes + 1,
+    });
 
     try {
-      await fetch(`http://localhost:5000/api/articles/${id}/like`, { method: "POST" })
+      await fetch(`http://localhost:5000/api/articles/${id}/like`, {
+        method: "POST",
+      });
     } catch (e) {
-      console.error("Failed to like", e)
+      console.error("Failed to like", e);
       // Revert if failed
-      setArticle({ ...article, liked: originalLiked, likes: originalLikes })
+      setArticle({ ...article, liked: originalLiked, likes: originalLikes });
     }
-  }
+  };
 
   const handleBookmark = async () => {
-    if (!article) return
-    const originalBookmarked = article.bookmarked
+    if (!isAuthenticated) {
+      router.push(`/login?redirect=/article/${id}`);
+      return;
+    }
+    if (!article) return;
+    const originalBookmarked = article.bookmarked;
 
     // Optimistic update
-    setArticle({ ...article, bookmarked: !originalBookmarked })
+    setArticle({ ...article, bookmarked: !originalBookmarked });
 
     try {
-      await fetch(`http://localhost:5000/api/articles/${id}/bookmark`, { method: "POST" })
+      await fetch(`http://localhost:5000/api/articles/${id}/bookmark`, {
+        method: "POST",
+      });
     } catch (e) {
-      console.error("Failed to bookmark", e)
-      setArticle({ ...article, bookmarked: originalBookmarked })
+      console.error("Failed to bookmark", e);
+      setArticle({ ...article, bookmarked: originalBookmarked });
     }
-  }
+  };
 
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
-    )
+    );
   }
 
   if (!article) {
@@ -104,20 +119,16 @@ export default function ArticlePage({
           <p className="text-base font-medium text-foreground">
             Article not found
           </p>
-          <Link
-            href="/"
-            className="mt-2 text-sm text-accent hover:underline"
-          >
+          <Link href="/" className="mt-2 text-sm text-accent hover:underline">
             Go back home
           </Link>
         </div>
       </div>
-    )
+    );
   }
 
-  const paragraphs = article.content.split("\n\n")
+  const paragraphs = article.content.split("\n\n");
 
-  
   return (
     <AppShell>
       {/* Sticky Top Bar */}
@@ -128,14 +139,25 @@ export default function ArticlePage({
           className="flex items-center gap-2 text-foreground/80 hover:text-foreground transition-colors group"
           aria-label="Go back"
         >
-          <ArrowLeft className="h-5 w-5 group-hover:-translate-x-1 transition-transform" strokeWidth={2} />
+          <ArrowLeft
+            className="h-5 w-5 group-hover:-translate-x-1 transition-transform"
+            strokeWidth={2}
+          />
           <span className="text-sm font-semibold">Back</span>
         </button>
         <div className="flex items-center gap-1">
-          <button type="button" aria-label="Share" className="p-2 rounded-full hover:bg-secondary/50 text-muted-foreground hover:text-foreground transition-colors">
+          <button
+            type="button"
+            aria-label="Share"
+            className="p-2 rounded-full hover:bg-secondary/50 text-muted-foreground hover:text-foreground transition-colors"
+          >
             <Share className="h-5 w-5" strokeWidth={2} />
           </button>
-          <button type="button" aria-label="More options" className="p-2 rounded-full hover:bg-secondary/50 text-muted-foreground hover:text-foreground transition-colors">
+          <button
+            type="button"
+            aria-label="More options"
+            className="p-2 rounded-full hover:bg-secondary/50 text-muted-foreground hover:text-foreground transition-colors"
+          >
             <MoreHorizontal className="h-5 w-5" strokeWidth={2} />
           </button>
         </div>
@@ -164,61 +186,80 @@ export default function ArticlePage({
 
         {/* Author & Actions - Top Section */}
         <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-4 sm:px-0">
-           <div className="flex items-center gap-3">
-              <div className="h-10 w-10 overflow-hidden rounded-full ring-2 ring-background shrink-0">
-                 {article.author?.picture ? (
-                    <img src={article.author.picture} alt={article.author.name} className="h-full w-full object-cover" />
-                 ) : (
-                    <div className="h-full w-full flex items-center justify-center bg-secondary font-bold text-muted-foreground">{article.author?.name?.charAt(0)}</div>
-                 )}
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 overflow-hidden rounded-full ring-2 ring-background shrink-0">
+              {article.author?.picture ? (
+                <img
+                  src={article.author.picture}
+                  alt={article.author.name}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="h-full w-full flex items-center justify-center bg-secondary font-bold text-muted-foreground">
+                  {article.author?.name?.charAt(0)}
+                </div>
+              )}
+            </div>
+            <div className="flex flex-col">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">
+                  WRITTEN BY
+                </span>
               </div>
-              <div className="flex flex-col">
-                 <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">WRITTEN BY</span>
-                 </div>
-                 <h3 className="font-bold text-foreground text-sm leading-tight">{article.author?.name || "The Hindu Bureau"}</h3>
-                 <p className="text-[10px] text-muted-foreground">{article.author?.email || "sohamsawalakhe@gmail.com"}</p>
-              </div>
-           </div>
+              <h3 className="font-bold text-foreground text-sm leading-tight">
+                {article.author?.name || "The Hindu Bureau"}
+              </h3>
+              <p className="text-[10px] text-muted-foreground">
+                {article.author?.email || "sohamsawalakhe@gmail.com"}
+              </p>
+            </div>
+          </div>
 
-           <div className="flex items-center gap-3 ml-auto sm:ml-0">
-              <button className="rounded-full px-5 py-1.5 text-xs font-bold text-foreground ring-1 ring-border hover:bg-secondary transition-colors">
-                 Follow
-              </button>
-              <button 
-                 onClick={handleBookmark}
-                 className={cn("p-2 rounded-full hover:bg-secondary transition-colors", article.bookmarked ? "text-foreground" : "text-muted-foreground")}
-              >
-                 <Bookmark className={cn("w-5 h-5", article.bookmarked && "fill-current")} />
-              </button>
-           </div>
+          <div className="flex items-center gap-3 ml-auto sm:ml-0">
+            <button className="rounded-full px-5 py-1.5 text-xs font-bold text-foreground ring-1 ring-border hover:bg-secondary transition-colors">
+              Follow
+            </button>
+            <button
+              onClick={handleBookmark}
+              className={cn(
+                "p-2 rounded-full hover:bg-secondary transition-colors",
+                article.bookmarked
+                  ? "text-foreground"
+                  : "text-muted-foreground",
+              )}
+            >
+              <Bookmark
+                className={cn("w-5 h-5", article.bookmarked && "fill-current")}
+              />
+            </button>
+          </div>
         </div>
 
         {/* Updated Time */}
         <div className="mb-4 text-[10px] sm:text-xs text-muted-foreground px-4 sm:px-0">
-           <span>Updated - {article.publishedAt || "1 min read"}</span>
+          <span>Updated - {article.publishedAt || "1 min read"}</span>
         </div>
 
         {/* Main Image */}
         <figure className="mb-8 w-full">
-           <div className="aspect-video w-full overflow-hidden rounded-lg bg-secondary relative mb-2">
-             {article.image ? (
-               <img 
-                 src={article.image} 
-                 alt={article.title} 
-                 className="h-full w-full object-cover" 
-               />
-             ) : (
-               <div className="flex h-full w-full items-center justify-center bg-linear-to-br from-secondary to-muted">
-                  <div className="text-6xl font-black text-foreground/5 font-serif select-none">
-                    {article.title.charAt(0)}
-                  </div>
-               </div>
-             )}
-           </div>
-           <figcaption className="text-[10px] text-muted-foreground font-medium px-1">
-              {article.title} — Photo Credit: Special Arrangement
-           </figcaption>
+          <div className="aspect-video w-full overflow-hidden rounded-lg bg-secondary relative mb-2">
+            {article.image ? (
+              <img
+                src={article.image}
+                alt={article.title}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center bg-linear-to-br from-secondary to-muted">
+                <div className="text-6xl font-black text-foreground/5 font-serif select-none">
+                  {article.title.charAt(0)}
+                </div>
+              </div>
+            )}
+          </div>
+          <figcaption className="text-[10px] text-muted-foreground font-medium px-1">
+            {article.title} — Photo Credit: Special Arrangement
+          </figcaption>
         </figure>
 
         {/* Article Body */}
@@ -234,10 +275,10 @@ export default function ArticlePage({
 
               return (
                 <figure key={index} className="my-8">
-                  <img 
-                    src={src} 
-                    alt={alt || "Article Image"} 
-                    className="w-full rounded-lg shadow-md border border-border/50" 
+                  <img
+                    src={src}
+                    alt={alt || "Article Image"}
+                    className="w-full rounded-lg shadow-md border border-border/50"
                   />
                   {alt && alt !== "Image" && (
                     <figcaption className="mt-2 text-center text-xs font-medium text-muted-foreground">
@@ -249,31 +290,40 @@ export default function ArticlePage({
             }
 
             if (paragraph.startsWith("**") && paragraph.endsWith("**")) {
-              const text = paragraph.replace(/\*\*/g, "")
+              const text = paragraph.replace(/\*\*/g, "");
               return (
-                <h2 key={index} className="text-xl font-bold text-foreground font-serif pt-4">
+                <h2
+                  key={index}
+                  className="text-xl font-bold text-foreground font-serif pt-4"
+                >
                   {text}
                 </h2>
-              )
+              );
             }
             if (paragraph.startsWith("##")) {
-               const text = paragraph.replace(/^##\s*/, "")
-               return (
-                <h2 key={index} className="text-2xl font-bold text-foreground font-serif pt-6 pb-2">
+              const text = paragraph.replace(/^##\s*/, "");
+              return (
+                <h2
+                  key={index}
+                  className="text-2xl font-bold text-foreground font-serif pt-6 pb-2"
+                >
                   {text}
                 </h2>
-               )
+              );
             }
             if (paragraph.startsWith(">")) {
-               const text = paragraph.replace(/^>\s*/, "")
-               return (
-                 <blockquote key={index} className="border-l-4 border-red-500 pl-4 py-2 my-6 italic text-lg font-serif text-foreground/80 bg-secondary/10">
-                    "{text}"
-                 </blockquote>
-               )
+              const text = paragraph.replace(/^>\s*/, "");
+              return (
+                <blockquote
+                  key={index}
+                  className="border-l-4 border-primary pl-4 py-1 my-6 italic text-lg font-medium text-foreground/80 bg-secondary/30 rounded-r-lg"
+                >
+                  {text}
+                </blockquote>
+              );
             }
 
-            const parts = paragraph.split(/(\*\*[^*]+\*\*)/)
+            const parts = paragraph.split(/(\*\*[^*]+\*\*)/);
             return (
               <p
                 key={index}
@@ -286,53 +336,97 @@ export default function ArticlePage({
                       <strong key={i} className="font-bold text-foreground">
                         {part.replace(/\*\*/g, "")}
                       </strong>
-                    )
+                    );
                   }
-                  return <span key={i}>{part}</span>
+                  return <span key={i}>{part}</span>;
                 })}
               </p>
-            )
+            );
           })}
         </article>
-        
+
         {/* Divider */}
         <div className="h-px w-full bg-border my-8" />
 
-        
         {/* Footer Author & Actions */}
         <div className="mt-10 border-t border-border pt-8">
-           <div className="mb-6">
-              <h3 className="font-black text-foreground text-base uppercase tracking-wider">
-                 {article.author?.name || "THE HINDU BUREAU"}
-              </h3>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1.5 font-medium">
-                 <span>Updated - {article.publishedAt || "February 12, 2026"}</span>
-                 <span className="text-border">|</span>
-                 <span>{article.readTime || "1"} min read</span>
-              </div>
-           </div>
-
-           {/* Actions Row */}
-           <div className="flex items-center gap-8">
-              <button onClick={handleLike} className="flex items-center gap-2 p-0 text-muted-foreground hover:text-red-500 transition-colors group">
-                 <Heart className={cn("w-5 h-5", article.liked && "fill-current text-red-500")} />
-                 <span className={cn("text-sm font-semibold", article.liked && "text-red-500")}>Like</span>
-              </button>
-              
-              <button className="flex items-center gap-2 p-0 text-muted-foreground hover:text-foreground transition-colors group">
-                 <ThumbsDown className="w-5 h-5 group-hover:text-red-500 transition-colors" />
-                 <span className="text-sm font-semibold group-hover:text-red-500 transition-colors">Dislike</span>
-              </button>
-
-              <button className="flex items-center gap-2 p-0 text-muted-foreground hover:text-blue-500 transition-colors group">
-                 <MessageCircle className="w-5 h-5" />
-                 <span className="text-sm font-semibold">Comment</span>
-              </button>
-           </div>
+          <div className="mb-6">
+            <h3 className="font-black text-foreground text-base uppercase tracking-wider">
+              {article.author?.name || "THE HINDU BUREAU"}
+            </h3>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1.5 font-medium">
+              <span>
+                Updated - {article.publishedAt || "February 12, 2026"}
+              </span>
+              <span className="text-border">|</span>
+              <span>{article.readTime || "1"} min read</span>
+            </div>
+          </div>
         </div>
       </div>
 
+      {/* Floating Bottom Action Bar */}
+      <div className="fixed bottom-6 left-0 right-0 z-50 px-4 pointer-events-none">
+        <div className="mx-auto max-w-70 bg-foreground/90 backdrop-blur-xl text-background rounded-full shadow-2xl px-6 py-3 flex items-center justify-between pointer-events-auto ring-1 ring-white/10">
+          <button
+            type="button"
+            className="flex flex-col items-center gap-0.5 group"
+            onClick={handleLike}
+            aria-label={article.liked ? "Unlike" : "Like"}
+          >
+            <Heart
+              className={cn(
+                "h-6 w-6 transition-all duration-300",
+                article.liked
+                  ? "fill-red-500 text-red-500 scale-110"
+                  : "text-background group-hover:scale-110 group-hover:text-red-400",
+              )}
+              strokeWidth={article.liked ? 0 : 2}
+            />
+            <span className="text-[10px] font-bold">{article.likes}</span>
+          </button>
 
+          <div className="w-px h-8 bg-background/20" />
+
+          <button
+            type="button"
+            aria-label="Comment"
+            className="flex flex-col items-center gap-0.5 group"
+            onClick={() => {
+              if (!isAuthenticated) {
+                router.push(`/login?redirect=/article/${id}`);
+                return;
+              }
+              // Logic to open comment modal or scroll to comments
+            }}
+          >
+            <MessageCircle
+              className="h-6 w-6 text-background transition-transform group-hover:scale-110"
+              strokeWidth={2}
+            />
+            <span className="text-[10px] font-bold">24</span>
+          </button>
+
+          <div className="w-px h-8 bg-background/20" />
+
+          <button
+            type="button"
+            onClick={handleBookmark}
+            aria-label={article.bookmarked ? "Remove bookmark" : "Bookmark"}
+            className="group"
+          >
+            <Bookmark
+              className={cn(
+                "h-6 w-6 transition-all duration-300 group-hover:scale-110",
+                article.bookmarked
+                  ? "fill-yellow-400 text-yellow-400"
+                  : "text-background group-hover:text-yellow-400",
+              )}
+              strokeWidth={article.bookmarked ? 0 : 2}
+            />
+          </button>
+        </div>
+      </div>
     </AppShell>
-  )
+  );
 }

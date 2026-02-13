@@ -1,8 +1,11 @@
 "use client";
 
+import { useAuth } from "@/contexts/AuthContext";
+
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
+import { EditorAuthOverlay } from "@/components/editor-auth-overlay";
 import {
   ArrowLeft,
   Bold,
@@ -22,8 +25,12 @@ import {
   Clock,
   Trash2,
 } from "lucide-react";
-import { categories } from "@/lib/data";
+import { categories, Article } from "@/lib/data";
 import { cn } from "@/lib/utils";
+import {
+  ArticleCardFeatured,
+  ArticleCardHorizontal,
+} from "@/components/article-card";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function EditorPage() {
@@ -155,6 +162,10 @@ export default function EditorPage() {
   const readTime = Math.max(1, Math.ceil(wordCount / 200));
 
   const handlePublish = async () => {
+    if (!isAuthenticated) {
+      setShowLoginOverlay(true);
+      return;
+    }
     setIsPublishing(true);
 
     try {
@@ -199,6 +210,15 @@ export default function EditorPage() {
             avatar: user?.picture || user?.name?.charAt(0) || "A",
             email: user?.email || "anonymous@example.com",
           },
+          subheadline,
+          location,
+          type: articleType,
+          status,
+          imageCaption,
+          imageCredit,
+          seoTitle,
+          seoDescription,
+          factChecked,
           scheduledAt: scheduledAt || undefined,
           published: !scheduledAt, // If scheduled, it's not "published" yet
         }),
@@ -251,6 +271,39 @@ export default function EditorPage() {
     } catch (error) {
       console.error("Error deleting post:", error);
     }
+  };
+
+  const previewArticle: Article = {
+    id: "preview",
+    title: title || "Untitled Article",
+    excerpt:
+      subheadline ||
+      blocks.find((b) => b.type === "text")?.content.substring(0, 100) ||
+      "No content...",
+    content: fullContent,
+    author: {
+      name: user?.name || "Anonymous",
+      avatar: user?.picture || user?.name?.charAt(0) || "A",
+      email: user?.email || "anonymous@example.com",
+      picture: user?.picture,
+    },
+    category: selectedCategory || "General",
+    readTime,
+    publishedAt: "Just now",
+    image: imageUrl || blocks.find((b) => b.type === "image")?.content || "",
+    liked: false,
+    bookmarked: false,
+    likes: 0,
+    views: 0,
+    subheadline,
+    location,
+    type: articleType as any,
+    status: status as any,
+    imageCaption,
+    imageCredit,
+    seoTitle,
+    seoDescription,
+    factChecked,
   };
 
   return (
@@ -576,247 +629,423 @@ export default function EditorPage() {
                 </span>
               </div>
 
-              {selectedCategory && (
-                <span className="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary ring-1 ring-inset ring-primary/20">
-                  {selectedCategory}
-                </span>
-              )}
-
-              <div className="h-px w-full bg-border/50" />
-
-              <article className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground">
-                {blocks.length > 0 ? (
-                  blocks.map((block) => {
-                    if (block.type === "image") {
-                      return (
-                        <motion.div
-                          key={block.id}
-                          initial={{ opacity: 0, scale: 0.95 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          className="my-6 overflow-hidden rounded-xl"
-                        >
-                          <img
-                            src={block.content}
-                            alt="Article Image"
-                            className="w-full object-cover"
-                          />
-                        </motion.div>
-                      );
-                    }
-                    return block.content
-                      .split("\n\n")
-                      .map((paragraph, index) => (
-                        <p
-                          key={`${block.id}-${index}`}
-                          className="leading-relaxed"
-                        >
-                          {paragraph}
-                        </p>
-                      ));
-                  })
-                ) : (
-                  <p className="italic text-muted-foreground/50">
-                    No content to preview...
-                  </p>
+                {selectedCategory && (
+                  <span className="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary ring-1 ring-inset ring-primary/20">
+                    {selectedCategory}
+                  </span>
                 )}
-              </article>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="editor"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              transition={{ duration: 0.2 }}
-              className="space-y-6"
-            >
-              <div className="relative group space-y-4">
-                <input
-                  type="text"
-                  placeholder="Article Title"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="w-full bg-transparent text-4xl font-black placeholder:text-muted-foreground/20 focus:outline-none font-serif tracking-tight py-2 border-b-2 border-transparent focus:border-primary/20 transition-colors"
-                />
-                <div className="relative">
-                  {imageUrl ? (
-                    <div className="relative h-48 w-full overflow-hidden rounded-xl border border-border">
-                      <img
-                        src={imageUrl}
-                        alt="Cover"
-                        className="h-full w-full object-cover"
-                      />
-                      <button
-                        onClick={() => setImageUrl("")}
-                        className="absolute top-2 right-2 rounded-full bg-black/50 p-1.5 text-white backdrop-blur-sm transition-colors hover:bg-black/70"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
+
+                <div className="h-px w-full bg-border/50" />
+
+                <article className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground">
+                  {blocks.length > 0 ? (
+                    blocks.map((block) => {
+                      if (block.type === "image") {
+                        return (
+                          <motion.div
+                            key={block.id}
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="my-6 overflow-hidden rounded-xl"
+                          >
+                            <img
+                              src={block.content}
+                              alt="Article Image"
+                              className="w-full object-cover"
+                            />
+                          </motion.div>
+                        );
+                      }
+                      return block.content
+                        .split("\n\n")
+                        .map((paragraph, index) => (
+                          <p
+                            key={`${block.id}-${index}`}
+                            className="leading-relaxed"
+                          >
+                            {paragraph}
+                          </p>
+                        ));
+                    })
                   ) : (
-                    <button
-                      onClick={() => coverImageInputRef.current?.click()}
-                      className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-muted/20 py-8 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
-                    >
-                      <ImagePlus className="h-4 w-4" />
-                      Add Cover Image (Optional)
-                    </button>
+                    <p className="italic text-muted-foreground/50">
+                      No content to preview...
+                    </p>
                   )}
+                </article>
+
+                <div className="mt-12 pt-8 border-t border-border/50">
+                  <h2 className="text-xl font-bold font-serif mb-6">
+                    Home Feed Preview
+                  </h2>
+                  <div className="grid gap-8">
+                    <div className="space-y-3">
+                      <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                        Featured Card
+                      </h3>
+                      <div className="max-w-2xl border border-dashed border-border/50 p-6 rounded-2xl bg-secondary/10">
+                        <ArticleCardFeatured article={previewArticle} />
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                        Standard Card
+                      </h3>
+                      <div className="max-w-2xl border border-dashed border-border/50 p-6 rounded-2xl bg-secondary/10">
+                        <ArticleCardHorizontal article={previewArticle} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="editor"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+                transition={{ duration: 0.2 }}
+                className="space-y-6"
+              >
+                <div className="relative group space-y-4">
                   <input
-                    type="file"
-                    ref={coverImageInputRef}
-                    className="hidden"
-                    accept="image/*"
-                    onChange={handleCoverImageSelect}
+                    type="text"
+                    placeholder="Article Headline"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    className="w-full bg-transparent text-4xl font-black placeholder:text-muted-foreground/20 focus:outline-none font-serif tracking-tight py-2 border-b-2 border-transparent focus:border-primary/20 transition-colors"
                   />
-                </div>
-              </div>
+                  <input
+                    type="text"
+                    placeholder="Subheadline / Deck (Optional)"
+                    value={subheadline}
+                    onChange={(e) => setSubheadline(e.target.value)}
+                    className="w-full bg-transparent text-xl font-medium placeholder:text-muted-foreground/30 focus:outline-none tracking-tight py-2 border-b border-transparent focus:border-primary/20 transition-colors text-muted-foreground"
+                  />
 
-              {/* Category Selector */}
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                  <Settings2 className="w-3 h-3" /> Category
-                </label>
-                <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-2 scrollbar-hide snap-x">
-                  {categories
-                    .filter((c) => c !== "Trending")
-                    .map((category) => (
-                      <motion.button
-                        whileTap={{ scale: 0.95 }}
-                        key={category}
-                        type="button"
-                        onClick={() =>
-                          setSelectedCategory(
-                            selectedCategory === category ? "" : category,
-                          )
-                        }
-                        className={cn(
-                          "snap-start shrink-0 rounded-full px-4 py-2 text-xs font-bold transition-all shadow-sm border border-transparent",
-                          selectedCategory === category
-                            ? "bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20 ring-offset-2 ring-offset-background"
-                            : "bg-secondary/50 text-muted-foreground border-border hover:bg-secondary hover:text-foreground",
-                        )}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                        Location
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          placeholder="City, Country"
+                          value={location}
+                          onChange={(e) => setLocation(e.target.value)}
+                          className="w-full bg-secondary/30 rounded-lg px-3 py-2 text-sm font-medium focus:outline-none focus:ring-1 focus:ring-primary/20"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                        Article Type
+                      </label>
+                      <select
+                        value={articleType}
+                        onChange={(e) => setArticleType(e.target.value)}
+                        className="w-full bg-secondary/30 rounded-lg px-3 py-2 text-sm font-medium focus:outline-none focus:ring-1 focus:ring-primary/20 appearance-none cursor-pointer"
                       >
-                        {category}
-                      </motion.button>
-                    ))}
-                </div>
-              </div>
+                        {articleTypes.map((t) => (
+                          <option key={t} value={t}>
+                            {t}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
 
-              {/* Editor Container */}
-              <div className="rounded-3xl border border-border bg-card shadow-sm overflow-hidden focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50 transition-all duration-300">
-                {/* Toolbar */}
-                <div className="flex items-center gap-1 overflow-x-auto border-b border-border bg-muted/30 px-4 py-2 scrollbar-hide">
-                  {toolbarButtons.map((btn) => (
-                    <motion.button
-                      whileHover={{
-                        scale: 1.1,
-                        backgroundColor: "rgba(0,0,0,0.05)",
-                      }}
-                      whileTap={{ scale: 0.9 }}
-                      key={btn.label}
-                      type="button"
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors"
-                      title={btn.label}
-                      onClick={() => {
-                        if (btn.label === "Image") {
-                          fileInputRef.current?.click();
-                        } else {
-                          // Insert action into active block
-                          setBlocks((prev) =>
-                            prev.map((b) =>
-                              b.id === activeBlockId
-                                ? { ...b, content: b.content + btn.action }
-                                : b,
-                            ),
-                          );
-                        }
-                      }}
-                    >
-                      <btn.icon className="h-4 w-4" strokeWidth={2} />
-                      <span className="sr-only">{btn.label}</span>
-                    </motion.button>
-                  ))}
-                  <div className="ml-auto text-[10px] font-medium text-muted-foreground bg-background/50 px-2 py-1 rounded-md border border-border">
-                    {wordCount} words
+                  <div className="relative">
+                    {imageUrl ? (
+                      <div className="relative h-64 w-full overflow-hidden rounded-xl border border-border group/image">
+                        <img
+                          src={imageUrl}
+                          alt="Cover"
+                          className="h-full w-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/image:opacity-100 transition-opacity flex flex-col justify-end p-4">
+                          <div className="space-y-2">
+                            <input
+                              type="text"
+                              placeholder="Image Caption"
+                              value={imageCaption}
+                              onChange={(e) => setImageCaption(e.target.value)}
+                              className="w-full bg-transparent text-white placeholder:text-white/50 text-xs border-b border-white/20 pb-1 focus:outline-none focus:border-white"
+                            />
+                            <input
+                              type="text"
+                              placeholder="Image Credit / Source"
+                              value={imageCredit}
+                              onChange={(e) => setImageCredit(e.target.value)}
+                              className="w-full bg-transparent text-white placeholder:text-white/50 text-xs border-b border-white/20 pb-1 focus:outline-none focus:border-white"
+                            />
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setImageUrl("")}
+                          className="absolute top-2 right-2 rounded-full bg-black/50 p-1.5 text-white backdrop-blur-sm transition-colors hover:bg-black/70"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => coverImageInputRef.current?.click()}
+                        className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-muted/20 py-12 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
+                      >
+                        <ImagePlus className="h-4 w-4" />
+                        Add Cover Image (Required for News)
+                      </button>
+                    )}
+                    <input
+                      type="file"
+                      ref={coverImageInputRef}
+                      className="hidden"
+                      accept="image/*"
+                      onChange={handleCoverImageSelect}
+                    />
                   </div>
                 </div>
 
-                {/* Content Editor */}
-                <div className="min-h-[400px] bg-transparent p-6">
-                  {blocks.map((block, index) => {
-                    if (block.type === "image") {
-                      return (
-                        <div key={block.id} className="relative group my-4">
-                          <img
-                            src={block.content}
-                            alt="Inserted"
-                            className="w-full rounded-lg object-cover max-h-125"
+                {/* Category Selector */}
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                    <Settings2 className="w-3 h-3" /> Category
+                  </label>
+                  <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-2 scrollbar-hide snap-x">
+                    {categories
+                      .filter((c) => c !== "Trending")
+                      .map((category) => (
+                        <motion.button
+                          whileTap={{ scale: 0.95 }}
+                          key={category}
+                          type="button"
+                          onClick={() =>
+                            setSelectedCategory(
+                              selectedCategory === category ? "" : category,
+                            )
+                          }
+                          className={cn(
+                            "snap-start shrink-0 rounded-full px-4 py-2 text-xs font-bold transition-all shadow-sm border border-transparent",
+                            selectedCategory === category
+                              ? "bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20 ring-offset-2 ring-offset-background"
+                              : "bg-secondary/50 text-muted-foreground border-border hover:bg-secondary hover:text-foreground",
+                          )}
+                        >
+                          {category}
+                        </motion.button>
+                      ))}
+                  </div>
+                </div>
+
+                {/* Advanced Panels */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Trust & Verification */}
+                  <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                      <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                      Trust & Verification
+                    </h3>
+                    <div className="space-y-3">
+                      <label className="flex items-center gap-2 cursor-pointer group">
+                        <div
+                          className={cn(
+                            "h-4 w-4 rounded border flex items-center justify-center transition-colors",
+                            factChecked
+                              ? "bg-green-500 border-green-500 text-white"
+                              : "border-muted-foreground/30",
+                          )}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={factChecked}
+                            onChange={(e) => setFactChecked(e.target.checked)}
+                            className="hidden"
                           />
-                          <button
-                            onClick={() => {
-                              setBlocks(
-                                blocks.filter((b) => b.id !== block.id),
-                              );
-                            }}
-                            className="absolute top-2 right-2 bg-red-500/80 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
+                          {factChecked && (
                             <svg
                               xmlns="http://www.w3.org/2000/svg"
-                              width="16"
-                              height="16"
                               viewBox="0 0 24 24"
                               fill="none"
                               stroke="currentColor"
-                              strokeWidth="2"
+                              strokeWidth="3"
                               strokeLinecap="round"
                               strokeLinejoin="round"
+                              className="w-3 h-3"
                             >
-                              <path d="M18 6 6 18" />
-                              <path d="m6 6 12 12" />
+                              <polyline points="20 6 9 17 4 12" />
                             </svg>
-                          </button>
+                          )}
                         </div>
-                      );
-                    }
+                        <span className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">
+                          Fact-checked content
+                        </span>
+                      </label>
+                      <div>
+                        <label className="text-[10px] font-bold text-muted-foreground">
+                          Sources (Optional)
+                        </label>
+                        <textarea
+                          placeholder="List primary sources here..."
+                          className="w-full h-16 bg-secondary/30 rounded-lg p-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 resize-none mt-1"
+                        />
+                      </div>
+                    </div>
+                  </div>
 
-                    return (
-                      <textarea
-                        key={block.id}
-                        placeholder={
-                          index === 0 ? "Start writing your story..." : ""
-                        }
-                        value={block.content}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setBlocks((prev) =>
-                            prev.map((b) =>
-                              b.id === block.id ? { ...b, content: val } : b,
-                            ),
-                          );
-                          // Auto-resize
-                          e.target.style.height = "auto";
-                          e.target.style.height = e.target.scrollHeight + "px";
-                        }}
-                        onFocus={() => setActiveBlockId(block.id)}
-                        className="w-full resize-none bg-transparent text-base leading-relaxed placeholder:text-muted-foreground/30 focus:outline-none font-medium text-foreground overflow-hidden"
-                        style={{ height: "auto" }}
-                        rows={1}
-                      />
-                    );
-                  })}
+                  {/* SEO & Distribution */}
+                  <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                      <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                      SEO & Distribution
+                    </h3>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-[10px] font-bold text-muted-foreground">
+                          Meta Title
+                        </label>
+                        <input
+                          type="text"
+                          placeholder={title || "Article Title"}
+                          value={seoTitle}
+                          onChange={(e) => setSeoTitle(e.target.value)}
+                          className="w-full bg-secondary/30 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 mt-1"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-muted-foreground">
+                          Meta Description
+                        </label>
+                        <textarea
+                          placeholder={
+                            subheadline || "Summary for search engines..."
+                          }
+                          value={seoDescription}
+                          onChange={(e) => setSeoDescription(e.target.value)}
+                          className="w-full h-16 bg-secondary/30 rounded-lg p-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 resize-none mt-1"
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <input
-                type="file"
-                ref={fileInputRef}
-                className="hidden"
-                accept="image/*"
-                onChange={handleImageSelect}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
+
+                {/* Editor Container */}
+                <div className="rounded-3xl border border-border bg-card shadow-sm overflow-hidden focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50 transition-all duration-300">
+                  {/* Toolbar */}
+                  <div className="flex items-center gap-1 overflow-x-auto border-b border-border bg-muted/30 px-4 py-2 scrollbar-hide">
+                    {toolbarButtons.map((btn) => (
+                      <motion.button
+                        whileHover={{
+                          scale: 1.1,
+                          backgroundColor: "rgba(0,0,0,0.05)",
+                        }}
+                        whileTap={{ scale: 0.9 }}
+                        key={btn.label}
+                        type="button"
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors"
+                        title={btn.label}
+                        onClick={() => {
+                          if (btn.label === "Image") {
+                            fileInputRef.current?.click();
+                          } else {
+                            // Insert action into active block
+                            setBlocks((prev) =>
+                              prev.map((b) =>
+                                b.id === activeBlockId
+                                  ? { ...b, content: b.content + btn.action }
+                                  : b,
+                              ),
+                            );
+                          }
+                        }}
+                      >
+                        <btn.icon className="h-4 w-4" strokeWidth={2} />
+                        <span className="sr-only">{btn.label}</span>
+                      </motion.button>
+                    ))}
+                    <div className="ml-auto text-[10px] font-medium text-muted-foreground bg-background/50 px-2 py-1 rounded-md border border-border">
+                      {wordCount} words
+                    </div>
+                  </div>
+
+                  {/* Content Editor */}
+                  <div className="min-h-[400px] bg-transparent p-6">
+                    {blocks.map((block, index) => {
+                      if (block.type === "image") {
+                        return (
+                          <div key={block.id} className="relative group my-4">
+                            <img
+                              src={block.content}
+                              alt="Inserted"
+                              className="w-full rounded-lg object-cover max-h-125"
+                            />
+                            <button
+                              onClick={() => {
+                                setBlocks(
+                                  blocks.filter((b) => b.id !== block.id),
+                                );
+                              }}
+                              className="absolute top-2 right-2 bg-red-500/80 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <path d="M18 6 6 18" />
+                                <path d="m6 6 12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <textarea
+                          key={block.id}
+                          placeholder={
+                            index === 0 ? "Start writing your story..." : ""
+                          }
+                          value={block.content}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setBlocks((prev) =>
+                              prev.map((b) =>
+                                b.id === block.id ? { ...b, content: val } : b,
+                              ),
+                            );
+                            // Auto-resize
+                            e.target.style.height = "auto";
+                            e.target.style.height =
+                              e.target.scrollHeight + "px";
+                          }}
+                          onFocus={() => setActiveBlockId(block.id)}
+                          className="w-full resize-none bg-transparent text-base leading-relaxed placeholder:text-muted-foreground/30 focus:outline-none font-medium text-foreground overflow-hidden"
+                          style={{ height: "auto" }}
+                          rows={1}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  className="hidden"
+                  accept="image/*"
+                  onChange={handleImageSelect}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
     </AppShell>
   );
