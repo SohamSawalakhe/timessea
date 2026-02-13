@@ -103,7 +103,7 @@ export function ReelCard({
       className="relative h-dvh w-full snap-start snap-always flex flex-col bg-background overflow-hidden"
     >
       {/* Top section: Large image - shrinks when content expands */}
-      <div className="relative h-[55vh] sm:h-[60vh] w-full shrink-0 overflow-hidden bg-muted transition-all duration-500 ease-in-out group/media">
+      <div className="relative h-[55vh] sm:h-[60vh] w-full shrink-0 overflow-hidden bg-background transition-all duration-500 ease-in-out group/media">
         {article.media && article.media.length > 0 ? (
           <>
             <div
@@ -113,7 +113,7 @@ export function ReelCard({
               {article.media.map((item, i) => (
                 <div
                   key={i}
-                  className="relative h-full w-full shrink-0 flex items-center justify-center bg-muted"
+                  className="relative h-full w-full shrink-0 flex items-center justify-center bg-background"
                 >
                   {item.type === "video" ? (
                     <video
@@ -133,7 +133,7 @@ export function ReelCard({
                     />
                   )}
                   {/* Gradient overlay for better text readability */}
-                  <div className="absolute inset-0 bg-linear-to-b from-black/20 via-transparent to-black/60 pointer-events-none" />
+                  <div className="absolute inset-0 bg-linear-to-b from-black/15 via-transparent to-black/40 pointer-events-none" />
                 </div>
               ))}
             </div>
@@ -180,7 +180,7 @@ export function ReelCard({
             )}
           </>
         ) : (
-          <div className="h-full w-full flex items-center justify-center bg-muted">
+          <div className="h-full w-full flex items-center justify-center bg-background">
             <img
               src={imageSrc}
               alt={article.title}
