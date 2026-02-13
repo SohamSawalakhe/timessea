@@ -10,7 +10,6 @@ import {
   Bookmark,
   ChevronUp,
   MoreHorizontal,
-  Eye,
 } from "lucide-react";
 import type { Article } from "@/lib/data";
 import { cn } from "@/lib/utils";
@@ -51,14 +50,13 @@ export function ReelCard({
   onView,
 }: ReelCardProps) {
   /* eslint-disable react-hooks/exhaustive-deps */
-  const [isExpanded, setIsExpanded] = useState(false);
+
   const [showReadMore, setShowReadMore] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
   const contentRef = useRef<HTMLParagraphElement>(null);
 
   const keyPoints = extractKeyPoints(article.content);
   const commentCount = Math.floor(article.likes * 0.3);
-  const viewCount = article.views;
 
   // Use the new centralized view tracker (10s threshold for articles)
   const { elementRef } = useViewTracker({
@@ -139,10 +137,6 @@ export function ReelCard({
     }
   }, [article.content]);
 
-  const toggleExpand = () => {
-    setIsExpanded(!isExpanded);
-  };
-
   return (
     <div
       ref={elementRef}
@@ -221,17 +215,30 @@ export function ReelCard({
                   <ChevronUp className="h-6 w-6 rotate-90" />
                 </button>
 
-                {/* Dots */}
+                {/* Dots - Enhanced visibility with vibrant colors */}
                 <div className="absolute bottom-16 left-1/2 -translate-x-1/2 flex gap-1.5 z-20">
                   {combinedMedia.map((_, i) => (
-                    <div
+                    <button
                       key={i}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCurrentSlide(i);
+                      }}
                       className={cn(
-                        "h-1.5 rounded-full transition-all shadow-sm",
+                        "h-2 rounded-full transition-all duration-300 shadow-lg cursor-pointer",
                         currentSlide === i
-                          ? "bg-white w-4"
-                          : "bg-white/50 w-1.5 hover:bg-white/80",
+                          ? "w-6"
+                          : "bg-white/70 w-2 hover:bg-white hover:w-3",
                       )}
+                      style={
+                        currentSlide === i
+                          ? {
+                              backgroundColor: "#00d4ff",
+                              boxShadow: "0 0 10px #00d4ff80",
+                            }
+                          : undefined
+                      }
+                      aria-label={`Go to slide ${i + 1}`}
                     />
                   ))}
                 </div>
@@ -250,35 +257,13 @@ export function ReelCard({
             {article.category}
           </span>
         </div>
-
-        {/* Author info at bottom of image */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-5 z-10">
-          <div className="flex items-center gap-2 mb-2">
-            {article.author.picture ? (
-              <Image
-                src={article.author.picture}
-                alt={article.author.name}
-                width={32}
-                height={32}
-                className="h-7 w-7 sm:h-8 sm:w-8 rounded-full border-2 border-white/30 object-cover"
-              />
-            ) : (
-              <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-xs sm:text-sm font-bold text-white border-2 border-white/30">
-                {article.author.name.charAt(0)}
-              </div>
-            )}
-            <span className="text-xs sm:text-sm font-bold text-white drop-shadow-lg">
-              {article.author.name}
-            </span>
-          </div>
-        </div>
       </div>
 
       {/* Bottom section: Title and Content (30-40% of screen) - Expandable like Instagram */}
       <div
         className={cn(
           "flex flex-row bg-background transition-all duration-500 ease-in-out",
-          isExpanded ? "flex-1" : "h-auto",
+          "h-auto",
         )}
       >
         {/* Scrollable Text Content */}
@@ -289,42 +274,37 @@ export function ReelCard({
             msOverflowStyle: "none",
           }}
         >
+          {/* Author info */}
+          <div className="flex items-center gap-2 mb-2 sm:mb-3">
+            {article.author.picture ? (
+              <Image
+                src={article.author.picture}
+                alt={article.author.name}
+                width={32}
+                height={32}
+                className="h-8 w-8 rounded-full object-cover ring-2 ring-border"
+              />
+            ) : (
+              <div className="h-8 w-8 rounded-full bg-linear-to-br from-blue-500 to-purple-600 flex items-center justify-center text-sm font-bold text-white ring-2 ring-border">
+                {article.author.name.charAt(0)}
+              </div>
+            )}
+            <span className="text-sm font-semibold text-foreground">
+              {article.author.name}
+            </span>
+          </div>
+
           {/* Title */}
-          <h2 className="text-xl sm:text-2xl font-black leading-tight text-foreground mb-2 sm:mb-3 font-serif">
+          <h2 className="text-xl sm:text-2xl font-black leading-tight text-foreground mb-3 sm:mb-4 font-serif">
             {article.title}
           </h2>
-
-          {/* Stats row */}
-          <div className="flex items-center gap-3 sm:gap-4 mb-3 sm:mb-4">
-            <div className="flex items-center gap-1.5">
-              <Eye className="h-3.5 sm:h-4 w-3.5 sm:w-4 text-muted-foreground" />
-              <span className="text-[11px] sm:text-xs font-semibold text-muted-foreground">
-                {viewCount.toLocaleString()}
-              </span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Heart className="h-3.5 sm:h-4 w-3.5 sm:w-4 text-muted-foreground" />
-              <span className="text-[11px] sm:text-xs font-semibold text-muted-foreground">
-                {article.likes + (isLiked && !article.liked ? 1 : 0)}
-              </span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <MessageCircle className="h-3.5 sm:h-4 w-3.5 sm:w-4 text-muted-foreground" />
-              <span className="text-[11px] sm:text-xs font-semibold text-muted-foreground">
-                {commentCount}
-              </span>
-            </div>
-          </div>
 
           {/* Expandable Content - Instagram Style */}
           <div className="relative">
             <div className="text-xs sm:text-sm leading-relaxed text-muted-foreground">
               <p
                 ref={contentRef}
-                className={cn(
-                  "whitespace-pre-wrap",
-                  !isExpanded && "line-clamp-5",
-                )}
+                className={cn("whitespace-pre-wrap", "line-clamp-5")}
               >
                 {article.content
                   .replace(/!\[.*?\]\(.*?\)/g, "") // Remove markdown images
@@ -333,20 +313,13 @@ export function ReelCard({
                   .trim()}
               </p>
 
-              {(showReadMore || isExpanded) && (
-                <button
-                  onClick={toggleExpand}
+              {showReadMore && (
+                <Link
+                  href={`/article/${article.id}`}
                   className="inline-flex items-center gap-1 mt-2 text-xs sm:text-sm font-semibold text-foreground hover:text-foreground/80 transition-colors"
                 >
-                  {isExpanded ? (
-                    <>
-                      Show Less
-                      <ChevronUp className="h-3 w-3" />
-                    </>
-                  ) : (
-                    "...Read More"
-                  )}
-                </button>
+                  ...Read More
+                </Link>
               )}
             </div>
           </div>
