@@ -14,7 +14,6 @@ import {
   Bell,
   Settings,
   ChevronRight,
-  Crown,
   LogOut,
   Moon,
   LogIn,
@@ -22,6 +21,8 @@ import {
   BarChart2,
   Calendar,
   Eye,
+  MessageCircle,
+  ThumbsDown,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -68,6 +69,8 @@ export default function ProfilePage() {
     scheduledCount: 0,
     totalLikes: 0,
     totalViews: 0,
+    totalComments: 0,
+    totalDislikes: 0,
   });
 
   useEffect(() => {
@@ -223,10 +226,8 @@ export default function ProfilePage() {
         )}
       </AnimatePresence>
 
-      {/* Pro Banner */}
-
-      {/* Analytics Banner - Only show for logged in users or consistently */}
-      <div className="grid grid-cols-2 gap-4 mb-8">
+      {/* Analytics Banner */}
+      <div className="grid grid-cols-2 gap-3 mb-6">
         {[
           {
             label: "Published",
@@ -243,14 +244,14 @@ export default function ProfilePage() {
             bg: "bg-orange-500/10",
           },
           {
-            label: "Total Likes",
+            label: "Likes",
             count: stats.totalLikes,
             icon: Heart,
             color: "text-red-500",
             bg: "bg-red-500/10",
           },
           {
-            label: "Total Views",
+            label: "Views",
             count: stats.totalViews,
             icon: Eye,
             color: "text-green-500",
@@ -260,17 +261,17 @@ export default function ProfilePage() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
+            transition={{ delay: index * 0.08 }}
             key={item.label}
-            className="flex flex-col items-center justify-center rounded-3xl bg-card p-4 border border-border/50 shadow-sm"
+            className="flex flex-col items-center justify-center rounded-2xl bg-card p-3 border border-border/50 shadow-sm"
           >
-            <div className={`mb-2 rounded-full p-2 ${item.bg} ${item.color}`}>
-              <item.icon className="h-5 w-5" />
+            <div className={`mb-1.5 rounded-full p-1.5 ${item.bg} ${item.color}`}>
+              <item.icon className="h-4 w-4" />
             </div>
-            <span className="text-2xl font-bold text-foreground">
+            <span className="text-xl font-bold text-foreground">
               {item.count}
             </span>
-            <span className="text-xs font-medium text-muted-foreground">
+            <span className="text-[10px] font-medium text-muted-foreground">
               {item.label}
             </span>
           </motion.div>
@@ -302,28 +303,6 @@ export default function ProfilePage() {
         </motion.div>
       )}
 
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        whileHover={{ scale: 1.02 }}
-        className="mb-8 flex items-center gap-4 rounded-3xl bg-linear-to-br from-primary/10 to-primary/5 p-5 border border-primary/10 shadow-sm"
-      >
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-background shadow-sm text-primary">
-          <Crown className="h-6 w-6" />
-        </div>
-        <div className="flex-1">
-          <p className="text-base font-bold text-foreground">Join Pro</p>
-          <p className="text-xs font-medium text-muted-foreground">
-            Unlock exclusive features & analytics
-          </p>
-        </div>
-        <button
-          type="button"
-          className="rounded-full bg-foreground px-5 py-2 text-xs font-bold text-background shadow-md transform transition-transform active:scale-95"
-        >
-          Upgrade
-        </button>
-      </motion.div>
 
       {/* Activity Section */}
       <div className="mb-8">

@@ -8,6 +8,16 @@ import { cn } from "@/lib/utils";
 import { analytics, AnalyticsEventType } from "@/lib/analytics";
 import { formatDistanceToNow } from "date-fns";
 
+// Helper to remove markdown images from text
+const stripImageMarkdown = (text: string) => {
+  // Handle various markdown image formats and raw data URIs
+  return text
+    .replace(/!\[.*?\]\s*\(.*?\)/gs, "") // Standard markdown (dotAll)
+    .replace(/!?\[Image\]/g, "")         // Legacy markers [Image] or ![Image]
+    .replace(/\(data:.*?(\)|$)/gs, "")   // Any data URI (images or other)
+    .trim();
+};
+
 // Helper to track article clicks
 const trackArticleClick = (articleId: string) => {
   analytics.track({
@@ -94,7 +104,7 @@ export function ArticleCardFeatured({ article }: { article: Article }) {
         </h3>
         {article.subheadline && (
           <p className="mb-4 text-sm font-medium leading-normal text-muted-foreground line-clamp-2 text-balance">
-            {article.subheadline}
+            {stripImageMarkdown(article.subheadline)}
           </p>
         )}
         <div className="flex items-center justify-between mt-4 border-t border-border/50 pt-3">
@@ -207,7 +217,7 @@ export function ArticleCardHorizontal({ article }: { article: Article }) {
             {article.title}
           </h3>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground line-clamp-2 font-medium">
-            {article.subheadline || article.excerpt}
+            {stripImageMarkdown(article.subheadline || article.excerpt || "")}
           </p>
         </div>
         <div className="mt-3 flex items-center gap-3">

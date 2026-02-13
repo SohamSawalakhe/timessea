@@ -61,6 +61,10 @@ export default function EditorPage() {
   const [scheduledAt, setScheduledAt] = useState<string>("");
   const [showScheduleInput, setShowScheduleInput] = useState(false);
 
+  // Use user from AuthContext
+  // User state is handled by useAuth
+
+
   // Tab state for Editor vs Scheduled
   const [activeTab, setActiveTab] = useState<"editor" | "scheduled">("editor");
   const [scheduledPosts, setScheduledPosts] = useState<any[]>([]);
@@ -78,7 +82,7 @@ export default function EditorPage() {
 
   // Auth overlay state
   const [showLoginOverlay, setShowLoginOverlay] = useState(false);
-  const { user, isAuthenticated } = useAuth();
+  const { isAuthenticated, user, token } = useAuth();
 
   // Article types
   const articleTypes = [
@@ -100,6 +104,9 @@ export default function EditorPage() {
     { icon: Link2, label: "Link", action: "[](url)" },
     { icon: ImagePlus, label: "Image", action: "image" },
   ];
+
+  // Removed local storage user loading
+
 
   // Load draft if draft ID is present
   useEffect(() => {
@@ -288,6 +295,7 @@ export default function EditorPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
         },
         body: JSON.stringify({
           title,
@@ -368,6 +376,7 @@ export default function EditorPage() {
         method,
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
         },
         body: JSON.stringify({
           title: title || "Untitled Draft",
@@ -419,6 +428,9 @@ export default function EditorPage() {
     try {
       const res = await fetch(`http://localhost:5000/api/articles/${postId}`, {
         method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+        },
       });
       if (res.ok) {
         setScheduledPosts((prev) => prev.filter((p) => p.id !== postId));
@@ -452,6 +464,9 @@ export default function EditorPage() {
     bookmarked: false,
     likes: 0,
     views: 0,
+    reads: 0,
+    dislikes: 0,
+    disliked: false,
     subheadline,
     location,
     type: articleType as any,

@@ -65,9 +65,21 @@ export class ArticlesController {
     return await this.articlesService.toggleBookmark(id);
   }
 
+  @Post(':id/dislike')
+  async toggleDislike(@Param('id') id: string) {
+    return await this.articlesService.toggleDislike(id);
+  }
+
+
   @Post(':id/view')
   async incrementViews(@Param('id') id: string, @Req() req: Request) {
     const viewerId = (req as any).user?.id || req.ip || 'anonymous';
     return await this.articlesService.incrementViews(id, viewerId);
+  }
+
+  @Post(':id/read')
+  async incrementReads(@Param('id') id: string, @Req() req: Request) {
+    const readerId = (req as any).user?.id || req.ip || 'anonymous';
+    return await this.articlesService.incrementReads(id, readerId);
   }
 }

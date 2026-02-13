@@ -76,8 +76,8 @@ export class AnalyticsQueryService {
   /**
    * Get author stats for profile overview
    */
-  async getAuthorStats(authorId: string): Promise<AuthorStats> {
-    const [publishedCount, scheduledCount, aggregates] = await Promise.all([
+  async getAuthorStats(authorId: string): Promise<AuthorStats & { totalComments: number; totalDislikes: number }> {
+    const [publishedCount, scheduledCount, aggregates, totalComments] = await Promise.all([
       this.prismaService.article.count({
         where: {
           authorId,
@@ -97,9 +97,17 @@ export class AnalyticsQueryService {
         _sum: {
           likes: true,
           views: true,
+          dislikes: true,
         },
         where: {
           authorId,
+        },
+      }),
+      this.prismaService.comment.count({
+        where: {
+          article: {
+            authorId,
+          },
         },
       }),
     ]);
@@ -109,6 +117,8 @@ export class AnalyticsQueryService {
       scheduledCount,
       totalLikes: aggregates._sum.likes || 0,
       totalViews: aggregates._sum.views || 0,
+      totalDislikes: aggregates._sum.dislikes || 0,
+      totalComments,
     };
   }
 
@@ -168,7 +178,7 @@ export class AnalyticsQueryService {
         SELECT
           toDate(created_at) as date,
           countIf(event = 'post_view') as views,
-          countIf(event IN ('like', 'comment', 'share')) as engagement
+          countIf(event = 'post_read') as reads
         FROM analytics.events
         WHERE post_id IN ({postIds:Array(String)})
           AND created_at >= today() - 7
@@ -188,13 +198,21 @@ export class AnalyticsQueryService {
     const overview = overviewResults[0] || { unique_viewers: 0, total_views: 0, total_reads: 0, total_likes: 0, total_comments: 0, total_shares: 0 };
     
     // Aggregates from Prisma for consistency on primary metrics (Views/Likes)
-    const aggregates = await this.prismaService.article.aggregate({
-      _sum: {
-        likes: true,
-        views: true,
-      },
-      where: { authorId },
-    });
+    const [aggregates, prismaCommentCount] = await Promise.all([
+      this.prismaService.article.aggregate({
+        _sum: {
+          likes: true,
+          views: true,
+          dislikes: true,
+        },
+        where: { authorId },
+      }),
+      this.prismaService.comment.count({
+        where: {
+          article: { authorId },
+        },
+      }),
+    ]);
     
     const totalLikes = aggregates._sum.likes || 0;
     const totalViews = aggregates._sum.views || 0;
@@ -214,7 +232,7 @@ export class AnalyticsQueryService {
       name: string;
       fullDate: string;
       views: number;
-      engagement: number;
+      reads: number;
     }[] = [];
     const today = new Date();
     for (let i = 6; i >= 0; i--) {
@@ -227,7 +245,7 @@ export class AnalyticsQueryService {
         name: d.toLocaleDateString('en-US', { weekday: 'short' }),
         fullDate: dateStr,
         views: Number(data?.views || 0),
-        engagement: Number(data?.engagement || 0),
+        reads: Number(data?.reads || 0),
       });
     }
 
@@ -241,7 +259,7 @@ export class AnalyticsQueryService {
       
       formattedTrend.forEach((day, index) => {
         day.views = Math.ceil(totalViews * weights[index]);
-        day.engagement = Math.ceil(totalEngagement * weights[index]);
+        day.reads = Math.ceil(totalReads * weights[index]);
       });
     }
 
@@ -250,8 +268,11 @@ export class AnalyticsQueryService {
         total_views: totalViews,
         active_users: Number(overview.unique_viewers) || 0,
         total_likes: totalLikes,
+        total_dislikes: aggregates._sum.dislikes || 0,
+        total_comments: prismaCommentCount,
         total_engagement: totalLikes + totalComments + totalShares,
         total_shares: totalShares,
+        total_reads: totalReads,
         completion_rate: completionRate,
         engagement_rate: engagementRate,
       },
