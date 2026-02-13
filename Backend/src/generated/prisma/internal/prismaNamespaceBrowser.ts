@@ -114,7 +114,6 @@ export const ArticleScalarFieldEnum = {
   image: 'image',
   views: 'views',
   media: 'media',
-  location: 'location',
   published: 'published',
   scheduledAt: 'scheduledAt'
 } as const

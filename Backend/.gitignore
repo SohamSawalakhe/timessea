@@ -7,6 +7,7 @@ node_modules/
 /dist
 /build
 *.tsbuildinfo
+tsconfig.tsbuildinfo
 
 # Logs
 logs
@@ -14,7 +15,6 @@ logs
 npm-debug.log*
 pnpm-debug.log*
 yarn-debug.log*
-yarn-error.log*
 lerna-debug.log*
 
 # OS
@@ -26,27 +26,21 @@ Thumbs.db
 /.nyc_output
 /test-results/
 
-# IDE - VSCode
+# IDE
 .vscode/*
 !.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
-
-# IDE - JetBrains
 /.idea
 *.iml
 *.iws
 *.ipr
-
-# IDE - Eclipse
 .project
 .classpath
 .c9/
 *.launch
 .settings/
-
-# IDE - Sublime
 *.sublime-workspace
 *.sublime-project
 
@@ -54,28 +48,22 @@ Thumbs.db
 .env
 .env.*
 !.env.example
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
 
 # NestJS specific
 /tmp
 /out-tsc
 
 # Prisma
-prisma/*.db
-prisma/*.db-journal
-prisma/migrations/*.migration
-
-# Database
+# Keep migrations in version control
+# prisma/migrations/ 
+# Ignore SQLite database files if used
 *.sqlite
 *.sqlite3
 *.db
+*.db-journal
 
-# TypeScript
-*.tsbuildinfo
-tsconfig.tsbuildinfo
+# Generated Prisma Client
+src/generated/prisma
 
 # Temp files
 *.swp
@@ -85,12 +73,6 @@ tsconfig.tsbuildinfo
 temp/
 tmp/
 
-# Lock files (keep one based on your package manager)
-# Uncomment the ones you don't use:
-# package-lock.json
-# yarn.lock
-# pnpm-lock.yaml
-
 # Uploads
 uploads/
 public/uploads/
@@ -98,13 +80,8 @@ public/uploads/
 # Cache
 .cache
 .eslintcache
-.stylelintcache
 
-# Miscellaneous
-*.bak
-*.backup
-*.old
-
-# Docker volumes and data
+# Docker
 clickhouse-data/
 redis-data/
+postgres-data/
