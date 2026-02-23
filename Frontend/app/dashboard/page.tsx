@@ -1,7 +1,9 @@
 "use client"
 
+
 import { useState, useEffect } from "react"
 import { AppShell } from "@/components/app-shell"
+import { Skeleton } from "@/components/skeleton"
 import { motion } from "framer-motion"
 import { 
   TrendingUp, 
@@ -78,7 +80,7 @@ interface DashboardData {
 export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
-  const { token } = useAuth()
+  const { token, isLoading: authLoading } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
@@ -98,6 +100,24 @@ export default function DashboardPage() {
         if (res.ok) {
           const data = await res.json()
           setDashboardData(data)
+          try {
+            localStorage.setItem('dashboard_analytics', JSON.stringify(data))
+          } catch (e) {
+            console.warn("LocalStorage quota exceeded, clearing all analytics cache...")
+            try {
+              // Clear ALL analytics data to make space (both dashboard and posts)
+              Object.keys(localStorage).forEach(key => {
+                if (key.startsWith('analytics_') || key === 'dashboard_analytics') {
+                  localStorage.removeItem(key)
+                }
+              })
+              
+              // Retry saving
+              localStorage.setItem('dashboard_analytics', JSON.stringify(data))
+            } catch (retryError) {
+              console.error("Failed to cache dashboard data even after cleanup. Storage full.")
+            }
+          }
         }
       } catch (error) {
         console.error("Failed to fetch analytics", error)
@@ -114,12 +134,87 @@ export default function DashboardPage() {
     }
   }, [token])
 
+  // Load cached data immediately on mount
+  useEffect(() => {
+    try {
+      const cachedData = localStorage.getItem('dashboard_analytics')
+      if (cachedData) {
+        setDashboardData(JSON.parse(cachedData))
+        // If we have cached data, we can consider loading "done" for the purpose of showing content, 
+        // though the auth check still needs to happen.
+        setLoading(false) 
+      }
+    } catch (e) {
+      console.error("Error loading cached dashboard data:", e)
+    }
+  }, [])
+
   // Protect route
   useEffect(() => {
-    if (!loading && !token) {
+    if (!authLoading && !loading && !token) {
       router.push("/login")
     }
-  }, [loading, token, router])
+  }, [loading, token, router, authLoading])
+
+  // Show skeleton loading state while fetching initial data (and no cache exists)
+  if (authLoading || (loading && !dashboardData)) {
+    return (
+      <AppShell>
+        <div className="pb-8">
+          {/* Header Skeleton */}
+          <div className="mb-8 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-9 w-9 rounded-full" />
+              <Skeleton className="h-8 w-40" />
+            </div>
+            <Skeleton className="h-9 w-9 rounded-xl" />
+          </div>
+
+          {/* Stats Grid Skeleton */}
+          <div className="grid grid-cols-2 gap-4 mb-8">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="rounded-4xl bg-card p-5 border border-border/50">
+                <Skeleton className="h-10 w-10 rounded-2xl mb-4" />
+                <Skeleton className="h-3 w-20 mb-2" />
+                <Skeleton className="h-8 w-24 mb-2" />
+                <Skeleton className="h-3 w-16" />
+              </div>
+            ))}
+          </div>
+
+          {/* Chart Skeleton */}
+          <div className="mb-8 rounded-[2.5rem] bg-card border border-border/50 p-6">
+            <div className="flex justify-between mb-6">
+              <Skeleton className="h-6 w-40" />
+              <div className="flex gap-4">
+                <Skeleton className="h-4 w-16" />
+                <Skeleton className="h-4 w-16" />
+                <Skeleton className="h-4 w-16" />
+              </div>
+            </div>
+            <Skeleton className="h-72 w-full rounded-2xl" />
+          </div>
+
+          {/* Top Content Skeleton */}
+          <div>
+            <Skeleton className="h-6 w-32 mb-4" />
+            <div className="space-y-3">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="flex items-center gap-4 rounded-3xl bg-card p-4 border border-border/50">
+                  <Skeleton className="h-12 w-12 rounded-2xl" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-3 w-20" />
+                  </div>
+                  <Skeleton className="h-6 w-16 rounded-full" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </AppShell>
+    )
+  }
 
   const stats: DashboardStats = dashboardData?.stats || {
     total_views: 0,

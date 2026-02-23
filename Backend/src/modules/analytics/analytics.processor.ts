@@ -23,12 +23,30 @@ export class AnalyticsProcessor extends WorkerHost {
     try {
       const event = job.data;
 
+      // Validate UUIDs
+      const isValidUUID = (id: string) =>
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
+      const userId =
+        event.user_id && isValidUUID(event.user_id)
+          ? event.user_id
+          : '00000000-0000-0000-0000-000000000000';
+
+      const postId =
+        event.post_id && isValidUUID(event.post_id) ? event.post_id : null;
+
+      if (event.post_id && !postId) {
+        console.warn(
+          `⚠️ Invalid UUID for post_id: ${event.post_id}. Event ${event.event} will be logged without post_id.`,
+        );
+      }
+
       // 1. Insert into main events table (General Log)
       await this.clickhouseService.insert('analytics.events', [
         {
           event: event.event,
-          user_id: event.user_id || '00000000-0000-0000-0000-000000000000', // Ensure user_id is a valid UUID for ClickHouse
-          post_id: event.post_id || null,
+          user_id: userId,
+          post_id: postId,
           post_status: event.post_status || null,
           location_id: event.location_id || null,
           device: event.device || 'unknown',

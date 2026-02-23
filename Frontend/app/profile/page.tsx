@@ -23,8 +23,12 @@ import {
   Eye,
   MessageCircle,
   ThumbsDown,
+  History,
+  Activity,
 } from "lucide-react";
+
 import { motion, AnimatePresence } from "framer-motion";
+import { Skeleton } from "@/components/skeleton";
 
 const CustomSwitch = ({
   checked,
@@ -70,7 +74,10 @@ export default function ProfilePage() {
     draftCount: 0,
     totalLikes: 0,
     totalViews: 0,
-    totalComments: 0,
+  });
+  const [activityStats, setActivityStats] = useState({
+    likesCount: 0,
+    commentsCount: 0,
   });
 
   useEffect(() => {
@@ -80,6 +87,8 @@ export default function ProfilePage() {
       const fetchStats = () => {
         const API_URL =
           process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+        
+        // Fetch Author Stats
         fetch(`${API_URL}/analytics/profile/overview`, {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -91,6 +100,19 @@ export default function ProfilePage() {
           })
           .then((data) => setStats(data))
           .catch((err) => console.error("Error fetching stats:", err));
+
+        // Fetch User Activity Stats
+        fetch(`${API_URL}/analytics/profile/activity`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          })
+            .then((res) => {
+              if (res.ok) return res.json();
+              throw new Error("Failed to fetch activity stats");
+            })
+            .then((data) => setActivityStats(data))
+            .catch((err) => console.error("Error fetching activity stats:", err));
       };
 
       // Initial fetch
@@ -111,13 +133,57 @@ export default function ProfilePage() {
 
   if (isLoading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-4">
-          <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      <AppShell>
+        <header className="mb-6 px-2">
+          <Skeleton className="h-8 w-32" />
+        </header>
+
+        {/* Profile Card Skeleton */}
+        <div className="mb-8 flex flex-col items-center">
+          <Skeleton className="mb-4 h-24 w-24 rounded-full" />
+          <Skeleton className="mb-2 h-6 w-40" />
+          <Skeleton className="h-4 w-32" />
         </div>
-      </div>
+
+        {/* Analytics Banner Skeleton */}
+        <div className="grid grid-cols-2 gap-3 mb-6">
+          {[1, 2, 3, 4].map((i) => (
+            <div
+              key={i}
+              className="flex flex-col items-center justify-center rounded-2xl bg-card p-3 border border-border/50 shadow-sm"
+            >
+              <Skeleton className="mb-2 h-8 w-8 rounded-full" />
+              <Skeleton className="mb-1 h-6 w-12" />
+              <Skeleton className="h-3 w-16" />
+            </div>
+          ))}
+        </div>
+
+        {/* Dashboard Link Skeleton */}
+        <div className="mb-6 h-20 rounded-3xl bg-card border border-border/50 shadow-sm p-4 flex items-center gap-4">
+           <Skeleton className="h-12 w-12 rounded-2xl" />
+           <div className="flex-1 space-y-2">
+             <Skeleton className="h-4 w-32" />
+             <Skeleton className="h-3 w-24" />
+           </div>
+           <Skeleton className="h-8 w-8 rounded-full" />
+        </div>
+
+        {/* Activity Section Skeleton */}
+        <div className="mb-8 space-y-4">
+          <Skeleton className="h-4 w-24 px-2" />
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="flex items-center gap-4 rounded-2xl bg-card p-4 border border-border/50">
+              <Skeleton className="h-8 w-8 rounded-xl" />
+              <Skeleton className="h-4 flex-1" />
+              <Skeleton className="h-6 w-8 rounded-md" />
+            </div>
+          ))}
+        </div>
+      </AppShell>
     );
   }
+
 
   const activityItems = [
     {
@@ -131,9 +197,12 @@ export default function ProfilePage() {
       count: (stats.draftCount + stats.scheduledCount).toString(),
     },
     {
-      icon: Heart,
-      label: "Liked Articles",
-      count: stats.totalLikes.toString(),
+      icon: Activity,
+      label: "Your Activity",
+      count: String(
+        (activityStats.likesCount || 0) + (activityStats.commentsCount || 0)
+      ),
+      href: "/profile/activity",
     },
   ];
 
@@ -318,52 +387,37 @@ export default function ProfilePage() {
           {activityItems.map((item, index) => {
             const isDrafts = item.label === "Draft Articles";
             const isPublished = item.label === "Published Articles";
-            const href = isDrafts ? "/drafts" : isPublished ? "/published" : "#";
-
-            const content = (
-              <>
-                <div className="p-2 rounded-xl bg-secondary group-hover:bg-background transition-colors text-foreground">
-                  <item.icon className="h-5 w-5" strokeWidth={2} />
-                </div>
-                <span className="flex-1 text-left text-sm font-bold text-foreground">
-                   {item.label}
-                </span>
-                <span className="text-xs font-bold text-muted-foreground bg-secondary px-2.5 py-1 rounded-md group-hover:bg-background transition-colors">
-                  {item.count}
-                </span>
-                <ChevronRight className="h-4 w-4 text-muted-foreground/50 group-hover:text-foreground transition-colors" />
-              </>
-            );
-
-            if (isDrafts || isPublished) {
-              return (
-                <motion.div
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                  key={item.label}
-                >
-                  <Link
-                    href={href}
-                    className="group flex w-full items-center gap-4 rounded-2xl bg-card p-4 transition-all hover:bg-secondary/50 border border-transparent hover:border-border/50 shadow-sm hover:shadow-md"
-                  >
-                    {content}
-                  </Link>
-                </motion.div>
-              );
-            }
+            const href = (item as any).href
+              ? (item as any).href
+              : item.label === "Draft Articles"
+                ? "/drafts"
+                : item.label === "Published Articles"
+                  ? "/published"
+                  : "#";
 
             return (
-              <motion.button
+              <motion.div
+                key={item.label}
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: index * 0.1 }}
-                key={item.label}
-                type="button"
-                className="group flex w-full items-center gap-4 rounded-2xl bg-card p-4 transition-all hover:bg-secondary/50 border border-transparent hover:border-border/50 shadow-sm hover:shadow-md"
               >
-                {content}
-              </motion.button>
+                <Link
+                  href={href}
+                  className="group flex w-full items-center gap-4 rounded-2xl bg-card p-4 transition-all hover:bg-secondary/50 border border-transparent hover:border-border/50 shadow-sm hover:shadow-md"
+                >
+                  <div className="p-2 rounded-xl bg-secondary group-hover:bg-background transition-colors text-foreground">
+                    <item.icon className="h-5 w-5" strokeWidth={2} />
+                  </div>
+                  <span className="flex-1 text-left text-sm font-bold text-foreground">
+                    {item.label}
+                  </span>
+                  <span className="text-xs font-bold text-muted-foreground bg-secondary px-2.5 py-1 rounded-md group-hover:bg-background transition-colors">
+                    {item.count}
+                  </span>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground/50 group-hover:text-foreground transition-colors" />
+                </Link>
+              </motion.div>
             );
           })}
         </div>

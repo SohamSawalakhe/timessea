@@ -14,6 +14,12 @@ import { AnalyticsService } from '../services/analytics.service';
 import { AnalyticsQueryService } from '../services/analytics-query.service';
 import type { AnalyticsEvent } from '../modules/analytics/analytics.interface';
 
+interface AuthenticatedRequest extends Request {
+  user: {
+    id: string;
+  };
+}
+
 /**
  * Analytics Controller
  * Provides endpoints for tracking events and querying analytics
@@ -31,7 +37,7 @@ export class AnalyticsController {
    */
   @Post('track')
   async trackEvent(@Body() event: AnalyticsEvent, @Req() req: Request) {
-    const ip = (req as any).ip || (req as any).connection?.remoteAddress;
+    const ip = req.ip || req.socket?.remoteAddress;
     event.metadata = { ...event.metadata, ip };
 
     await this.analyticsService.track(event);
@@ -44,10 +50,14 @@ export class AnalyticsController {
    */
   @Post('track/batch')
   async trackBatch(@Body() body: any, @Req() req: Request) {
-    const ip = (req as any).ip || (req as any).connection?.remoteAddress;
+    const ip = req.ip || req.socket?.remoteAddress;
 
     // Support both { events: [...] } and [...]
-    const events = Array.isArray(body) ? body : body.events || [];
+    const events = (
+      Array.isArray(body)
+        ? body
+        : (body as { events?: AnalyticsEvent[] })?.events || []
+    ) as AnalyticsEvent[];
 
     const enrichedEvents = events.map((event: AnalyticsEvent) => ({
       ...event,
@@ -64,8 +74,90 @@ export class AnalyticsController {
    */
   @Get('profile/overview')
   @UseGuards(AuthGuard('jwt'))
-  async getProfileOverview(@Req() req) {
+  async getProfileOverview(@Req() req: AuthenticatedRequest) {
     return await this.analyticsQueryService.getAuthorStats(req.user.id);
+  }
+
+  /**
+   * Get user activity stats (likes count, comments count, etc)
+   * GET /analytics/profile/activity
+   */
+  @Get('profile/activity')
+  @UseGuards(AuthGuard('jwt'))
+  async getProfileActivityStats(@Req() req: AuthenticatedRequest) {
+    return await this.analyticsQueryService.getUserActivityStats(req.user.id);
+  }
+
+  /**
+   * Get user liked articles
+   * GET /analytics/profile/likes
+   */
+  @Get('profile/likes')
+  @UseGuards(AuthGuard('jwt'))
+  async getProfileLikedArticles(
+    @Req() req: AuthenticatedRequest,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    return await this.analyticsQueryService.getUserLikedArticles(
+      req.user.id,
+      Number(limit) || 20,
+      Number(offset) || 0,
+    );
+  }
+
+  /**
+   * Get user commented articles
+   * GET /analytics/profile/comments
+   */
+  @Get('profile/comments')
+  @UseGuards(AuthGuard('jwt'))
+  async getProfileCommentedArticles(
+    @Req() req: AuthenticatedRequest,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    return await this.analyticsQueryService.getUserCommentedArticles(
+      req.user.id,
+      Number(limit) || 20,
+      Number(offset) || 0,
+    );
+  }
+
+  /**
+   * Get user reading history
+   * GET /analytics/profile/history
+   */
+  @Get('profile/history')
+  @UseGuards(AuthGuard('jwt'))
+  async getProfileReadHistory(
+    @Req() req: AuthenticatedRequest,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    return await this.analyticsQueryService.getUserReadHistory(
+      req.user.id,
+      Number(limit) || 20,
+      Number(offset) || 0,
+    );
+  }
+
+  /**
+   * Get user viewing history
+   * GET /analytics/profile/views
+   */
+  @Get('profile/views')
+  @UseGuards(AuthGuard('jwt'))
+  async getProfileViewHistory(
+    @Req() req: AuthenticatedRequest,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    return await this.analyticsQueryService.getUserViewHistory(
+      req.user.id,
+      Number(limit) || 20,
+      Number(offset) || 0,
+    );
   }
 
   /**
@@ -74,7 +166,7 @@ export class AnalyticsController {
    */
   @Get('dashboard')
   @UseGuards(AuthGuard('jwt'))
-  async getDashboardAnalytics(@Req() req) {
+  async getDashboardAnalytics(@Req() req: AuthenticatedRequest) {
     return await this.analyticsQueryService.getAuthorDashboardStats(
       req.user.id,
     );

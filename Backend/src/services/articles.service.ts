@@ -575,9 +575,9 @@ export class ArticlesService {
 
     return this.prisma.article.update({
       where: { id },
-      data: { 
+      data: {
         deletedAt: new Date(),
-        published: false // Also unpublish it from public feed
+        published: false, // Also unpublish it from public feed
       },
     });
   }

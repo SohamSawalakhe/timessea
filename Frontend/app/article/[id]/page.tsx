@@ -31,6 +31,7 @@ import {
   ArticleCardVertical,
   ArticleCardHorizontal,
 } from "@/components/article-card";
+import { analytics, AnalyticsEventType } from "@/lib/analytics";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
@@ -284,6 +285,14 @@ export default function ArticlePage({
   // Delayed read counting (1 minute threshold for "read")
   useEffect(() => {
     const timer = setTimeout(() => {
+      // Track READ event
+      analytics.track({
+        event: AnalyticsEventType.POST_READ,
+        post_id: id,
+        user_id: user?.id,
+      });
+
+      // Legacy support (optional, if you still use postgres counters separately)
       fetch(`${API_URL}/api/articles/${id}/read`, {
         method: "POST",
       })
@@ -295,7 +304,7 @@ export default function ArticlePage({
             ),
         )
         .catch((err) => console.error("Failed to increment read", err));
-    }, 60000); // 60 seconds
+    }, 15000); // Changed to 15 seconds for easier testing, can be 60s later
 
     return () => clearTimeout(timer);
   }, [id]);
@@ -313,7 +322,14 @@ export default function ArticlePage({
   useEffect(() => {
     async function fetchArticle() {
       try {
-        // Increment view immediately
+        // Track VIEW event
+        analytics.track({
+          event: AnalyticsEventType.POST_VIEW,
+          post_id: id,
+          user_id: user?.id,
+        });
+
+        // Legacy support
         fetch(`${API_URL}/api/articles/${id}/view`, { method: "POST" }).catch(
           () => {},
         );
@@ -987,7 +1003,7 @@ export default function ArticlePage({
             <div className="text-[12px] leading-relaxed text-muted-foreground flex items-center flex-wrap gap-x-2.5">
               {(article.imageDescription || article.imageCaption) && (
                 <>
-                  <span className="font-semibold text-foreground/80 lowercase first-letter:uppercase">
+                  <span className="font-semibold italic text-foreground/90 lowercase first-letter:uppercase">
                     {(() => {
                       const desc = article.imageDescription || article.imageCaption || "";
                       // Strip any HTML tags that might have been pasted (e.g. from rich text editor)
@@ -1015,13 +1031,14 @@ export default function ArticlePage({
             className="prose prose-lg dark:prose-invert max-w-none font-serif leading-relaxed prose-img:rounded-xl prose-img:w-full prose-headings:font-black prose-a:text-primary prose-blockquote:border-l-4 prose-blockquote:border-red-600 dark:prose-blockquote:border-red-400 prose-blockquote:bg-secondary/10 prose-blockquote:py-1 prose-blockquote:px-4 prose-blockquote:not-italic"
             dangerouslySetInnerHTML={{
               __html: article.content
+                // 1. Markdown Images
                 .replace(
                   /!\[(.*?)\]\((.*?)(\s+"(.*?)")?\)/g,
                   (_match, alt, url, _space, title) => {
                     const parts = alt.split("|");
                     let desc = (parts[0]?.trim() || "").replace(/^image$/i, "");
-                    // Fallback to title if alt is empty or generic
                     if (!desc && title) desc = title;
+                    desc = desc.replace(/<[^>]*>?/gm, "").trim();
                     
                     const credit = parts[1]?.trim() || article.author?.name || "Special Arrangement";
                     const cleanUrl = url.trim();
@@ -1029,42 +1046,98 @@ export default function ArticlePage({
                     return `
                       <figure class="my-12 mx-auto max-w-[90%] sm:max-w-[700px]">
                         <div class="w-full overflow-hidden rounded-2xl bg-secondary/30 shadow-sm border border-border/10">
-                          <img src="${cleanUrl}" alt="${desc}" class="w-full h-auto"/>
+                          <img src="${cleanUrl}" alt="${desc}" class="w-full h-auto data-processed" data-processed="true"/>
                         </div>
-                        <figcaption class="pt-4 px-1 text-[12px] leading-relaxed text-muted-foreground flex items-center flex-wrap gap-x-2.5">
-                          ${
-                            desc
-                              ? `<span class="font-semibold text-foreground/80 lowercase first-letter:uppercase">${desc}</span> <span class="text-border/80 font-light px-1">|</span>`
-                              : ""
-                          }
-                          <div class="flex items-center gap-1.5">
-                            <span class="font-black text-muted-foreground/40 uppercase text-[9px] tracking-[0.2em] shrink-0">PHOTO:</span>
-                            <span class="font-semibold text-muted-foreground shrink-0">${credit}</span>
+                        <figcaption class="mt-4 px-5">
+                          <div class="font-sans text-[12px] leading-relaxed text-muted-foreground flex items-center flex-wrap gap-x-2.5">
+                            ${
+                              desc
+                                ? `<span class="font-semibold italic text-foreground/90 lowercase first-letter:uppercase">${desc}</span> <span class="text-border/80 font-light px-1">|</span>`
+                                : ""
+                            }
+                            <div class="flex items-center gap-1.5">
+                              <span class="font-black text-muted-foreground/40 uppercase text-[9px] tracking-[0.2em] shrink-0">PHOTO:</span>
+                              <span class="font-semibold text-muted-foreground shrink-0">${credit}</span>
+                            </div>
                           </div>
                         </figcaption>
                       </figure>
                     `;
                   },
                 )
+                // 2. Existing HTML Figures (captures <figcaption>)
                 .replace(
-                  /<img.*?src="(.*?)".*?alt="(.*?)".*?>/g,
+                  /<figure[^>]*>([\s\S]*?)<\/figure>/g,
+                  (match, innerContent) => {
+                    // Skip if already processed (contains our marker)
+                    if (innerContent.includes('data-processed="true"')) return match;
+
+                    const srcMatch = innerContent.match(/src="([^"]+)"/);
+                    const captionMatch = innerContent.match(/<figcaption[^>]*>([\s\S]*?)<\/figcaption>/);
+                    
+                    if (!srcMatch) return match; // No image, leave it alone
+                    
+                    const url = srcMatch[1];
+                    let desc = captionMatch ? captionMatch[1] : "";
+                    
+                    // Fallback to alt if no caption
+                    if (!desc) {
+                       const altMatch = innerContent.match(/alt="([^"]*)"/);
+                       if (altMatch) desc = altMatch[1];
+                    }
+
+                    // Clean tags
+                    desc = desc.replace(/<[^>]*>?/gm, "").trim();
+                    desc = desc.replace(/^image$/i, "");
+                    
+                    const credit = article.author?.name || "Special Arrangement";
+
+                    return `
+                      <figure class="my-12 mx-auto max-w-[90%] sm:max-w-[700px]">
+                        <div class="w-full overflow-hidden rounded-2xl bg-secondary/30 shadow-sm border border-border/10">
+                          <img src="${url}" alt="${desc}" class="w-full h-auto data-processed" data-processed="true"/>
+                        </div>
+                        <figcaption class="mt-4 px-5">
+                          <div class="font-sans text-[12px] leading-relaxed text-muted-foreground flex items-center flex-wrap gap-x-2.5">
+                            ${
+                              desc
+                                ? `<span class="font-semibold italic text-foreground/90 lowercase first-letter:uppercase">${desc}</span> <span class="text-border/80 font-light px-1">|</span>`
+                                : ""
+                            }
+                            <div class="flex items-center gap-1.5">
+                              <span class="font-black text-muted-foreground/40 uppercase text-[9px] tracking-[0.2em] shrink-0">PHOTO:</span>
+                              <span class="font-semibold text-muted-foreground shrink-0">${credit}</span>
+                            </div>
+                          </div>
+                        </figcaption>
+                      </figure>
+                    `;
+                  }
+                )
+                // 3. Orphan HTML Images (not inside figures, or processed)
+                .replace(
+                  /<img(?![^>]*data-processed="true")[^>]*src="([^"]+)"[^>]*alt="([^"]*)"[^>]*>/g,
                   (_match, url, alt) => {
-                    const cleanAlt = (alt?.trim() || "").replace(/^image$/i, "");
+                    let cleanAlt = (alt?.trim() || "").replace(/^image$/i, "");
+                    cleanAlt = cleanAlt.replace(/<[^>]*>?/gm, "").trim();
+                    
                     const credit = article.author?.name || "Special Arrangement";
                     return `
                       <figure class="my-12 mx-auto max-w-[90%] sm:max-w-[700px]">
                         <div class="w-full overflow-hidden rounded-2xl bg-secondary/30 shadow-sm border border-border/10">
-                          <img src="${url}" alt="${cleanAlt}" class="w-full h-auto"/>
+                          <img src="${url}" alt="${cleanAlt}" class="w-full h-auto data-processed" data-processed="true"/>
                         </div>
-                        <figcaption class="pt-4 px-1 text-[12px] leading-relaxed text-muted-foreground flex items-center flex-wrap gap-x-2.5">
-                          ${
-                            cleanAlt
-                              ? `<span class="font-semibold text-foreground/80 lowercase first-letter:uppercase">${cleanAlt}</span> <span class="text-border/80 font-light px-1">|</span>`
-                              : ""
-                          }
-                          <div class="flex items-center gap-1.5">
-                            <span class="font-black text-muted-foreground/40 uppercase text-[9px] tracking-[0.2em] shrink-0">PHOTO:</span>
-                            <span class="font-semibold text-muted-foreground shrink-0">${credit}</span>
+                        <figcaption class="mt-4 px-5">
+                          <div class="font-sans text-[12px] leading-relaxed text-muted-foreground flex items-center flex-wrap gap-x-2.5">
+                            ${
+                              cleanAlt
+                                ? `<span class="font-semibold italic text-foreground/90 lowercase first-letter:uppercase">${cleanAlt}</span> <span class="text-border/80 font-light px-1">|</span>`
+                                : ""
+                            }
+                            <div class="flex items-center gap-1.5">
+                              <span class="font-black text-muted-foreground/40 uppercase text-[9px] tracking-[0.2em] shrink-0">PHOTO:</span>
+                              <span class="font-semibold text-muted-foreground shrink-0">${credit}</span>
+                            </div>
                           </div>
                         </figcaption>
                       </figure>

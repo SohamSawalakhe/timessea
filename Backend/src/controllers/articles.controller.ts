@@ -129,7 +129,12 @@ export class ArticlesController {
     const limitNum = limit ? parseInt(limit, 10) : 4;
     const offsetNum = offset ? parseInt(offset, 10) : 0;
     const userId = this.getUserIdFromRequest(req);
-    return this.articlesService.findTrending(limitNum, offsetNum, excludeId, userId);
+    return this.articlesService.findTrending(
+      limitNum,
+      offsetNum,
+      excludeId,
+      userId,
+    );
   }
 
   @Put(':id')

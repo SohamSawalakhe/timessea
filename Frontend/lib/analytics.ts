@@ -39,6 +39,7 @@ const CLIENT_ID_KEY = "ts_client_id";
 class AnalyticsService {
   private queue: AnalyticsEvent[] = [];
   private isProcessing = false;
+  private currentUserId: string | null = null;
   private BATCH_SIZE = 5;
   private FLUSH_INTERVAL = 3000;
   private timer: NodeJS.Timeout | null = null;
@@ -81,12 +82,22 @@ class AnalyticsService {
   }
 
   /**
+   * Set User ID (called on login)
+   */
+  public setUserId(userId: string | null) {
+    this.currentUserId = userId;
+  }
+
+  /**
    * Track a single event
    */
   public track(event: AnalyticsEvent) {
     // Add defaults
     if (!event.client_id) {
       event.client_id = this.getClientId();
+    }
+    if (this.currentUserId && !event.user_id) {
+      event.user_id = this.currentUserId;
     }
     if (!event.device && typeof window !== "undefined") {
       event.device = this.getDeviceType();

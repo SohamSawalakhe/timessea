@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { Heart, MapPin } from "lucide-react";
+import { Heart, MapPin, Eye, BookOpen } from "lucide-react";
 import type { Article } from "@/lib/data";
 import { cn } from "@/lib/utils";
 import { analytics, AnalyticsEventType } from "@/lib/analytics";
@@ -203,12 +203,20 @@ export function ArticleCardHorizontal({ article }: { article: Article }) {
             </div>
             <span className="text-[11px] font-semibold text-muted-foreground">
               {article.author.name} ·{" "}
-              {article.publishedAt ||
-                (article.createdAt &&
-                  formatDistanceToNow(new Date(article.createdAt), {
-                    addSuffix: true,
-                  })) ||
-                "Just now"}
+              {article.viewedAt
+                ? `Viewed ${formatDistanceToNow(new Date(article.viewedAt), { addSuffix: true })}`
+                : article.readAt
+                  ? `Read ${formatDistanceToNow(new Date(article.readAt), { addSuffix: true })}`
+                  : article.likedAt
+                    ? `Liked ${formatDistanceToNow(new Date(article.likedAt), { addSuffix: true })}`
+                    : article.commentedAt
+                      ? `Commented ${formatDistanceToNow(new Date(article.commentedAt), { addSuffix: true })}`
+                      : article.publishedAt ||
+                        (article.createdAt &&
+                          formatDistanceToNow(new Date(article.createdAt), {
+                            addSuffix: true,
+                          })) ||
+                        "Just now"}
             </span>
           </div>
           {isSpecialType && (
@@ -228,18 +236,34 @@ export function ArticleCardHorizontal({ article }: { article: Article }) {
             {article.category}
           </span>
           <span className="text-[10px] font-medium text-muted-foreground">
-            {article.publishedAt ||
-              (article.createdAt &&
-                formatDistanceToNow(new Date(article.createdAt), {
-                  addSuffix: true,
-                })) ||
-              "Just now"}
+            {article.viewedAt
+              ? `Viewed ${formatDistanceToNow(new Date(article.viewedAt), { addSuffix: true })}`
+              : article.readAt
+                ? `Read ${formatDistanceToNow(new Date(article.readAt), { addSuffix: true })}`
+                : article.publishedAt ||
+                  (article.createdAt &&
+                    formatDistanceToNow(new Date(article.createdAt), {
+                      addSuffix: true,
+                    })) ||
+                  "Just now"}
           </span>
           {article.location && (
             <span className="text-[10px] font-medium text-muted-foreground">
               • {article.location}
             </span>
           )}
+          <div className="ml-auto flex items-center gap-3">
+            <div className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground">
+              <Eye className="w-3 h-3" />
+              <span>{article.views}</span>
+            </div>
+            {article.reads !== undefined && (
+              <div className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground">
+                <BookOpen className="w-3 h-3" />
+                <span>{article.reads}</span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
       <div className="h-24 w-24 shrink-0 rounded-2xl bg-secondary flex items-center justify-center overflow-hidden shadow-inset-sm relative">

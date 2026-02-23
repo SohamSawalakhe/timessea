@@ -115,12 +115,78 @@ export default function PostAnalyticsPage({ params }: { params: Promise<{ id: st
       if (Array.isArray(trendData)) {
         setTrend(trendData);
       }
+
+      // Cache data for instant load on refresh
+      // Cache data safely
+      const minimalArticle = {
+        id: artData.id,
+        title: artData.title,
+        image: artData.image,
+        category: artData.category,
+        createdAt: artData.createdAt,
+        excerpt: artData.excerpt
+      };
+
+      try {
+        // Truncate trend data to save space (keep last 30 days)
+        const recentTrend = Array.isArray(trendData) ? trendData.slice(-30) : [];
+        
+        localStorage.setItem(`analytics_${id}_article`, JSON.stringify(minimalArticle));
+        localStorage.setItem(`analytics_${id}_stats`, JSON.stringify(statsData));
+        localStorage.setItem(`analytics_${id}_trend`, JSON.stringify(recentTrend));
+      } catch (e) {
+        // Quota exceeded - clear ALL analytics data to make space
+        console.warn("LocalStorage quota exceeded, clearing all analytics cache...");
+        try {
+          Object.keys(localStorage).forEach(key => {
+            if (key.startsWith('analytics_') || key === 'dashboard_analytics') {
+              localStorage.removeItem(key);
+            }
+          });
+          
+          // Retry saving with truncated data
+          // Re-truncate just in case
+          const recentTrendRetry = Array.isArray(trendData) ? trendData.slice(-30) : [];
+          
+          localStorage.setItem(`analytics_${id}_article`, JSON.stringify(minimalArticle));
+          localStorage.setItem(`analytics_${id}_stats`, JSON.stringify(statsData));
+          localStorage.setItem(`analytics_${id}_trend`, JSON.stringify(recentTrendRetry));
+        } catch (retryError) {
+          console.warn("Could not cache analytics data. Storage full even after cleanup.");
+        }
+      }
     } catch (err) {
       console.error("Error fetching analytics data:", err);
     } finally {
       setLoading(false);
     }
   };
+
+  // Load cached data immediately on mount
+  useEffect(() => {
+    if (!id) return;
+    try {
+      const cachedArticle = localStorage.getItem(`analytics_${id}_article`);
+      const cachedStats = localStorage.getItem(`analytics_${id}_stats`);
+      const cachedTrend = localStorage.getItem(`analytics_${id}_trend`);
+
+      if (cachedArticle && cachedStats) {
+        setArticle(JSON.parse(cachedArticle));
+        setStats(JSON.parse(cachedStats));
+        if (cachedTrend) setTrend(JSON.parse(cachedTrend));
+      } else {
+        // Clear state if no cache exists for this ID to avoid showing stale data from previous navigation
+        setArticle(null);
+        setStats(null);
+        setTrend([]);
+      }
+    } catch (e) {
+      console.error("Error loading cached analytics:", e);
+      setArticle(null);
+      setStats(null);
+      setTrend([]);
+    }
+  }, [id]);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -131,7 +197,7 @@ export default function PostAnalyticsPage({ params }: { params: Promise<{ id: st
     fetchData();
   }, [id, user, token, authLoading, router]);
 
-  if (authLoading || loading) {
+  if (authLoading || (!article && loading)) {
     return (
       <AppShell>
         <div className="pb-32">
@@ -355,7 +421,7 @@ export default function PostAnalyticsPage({ params }: { params: Promise<{ id: st
                     axisLine={false}
                     tickLine={false}
                     tick={{ fontSize: 10, fontWeight: 800, fill: "hsl(var(--muted-foreground))" }}
-                    tickFormatter={(val) => val ? format(new Date(val), "MMM d") : ""}
+                    tickFormatter={(val: any) => val ? format(new Date(val), "MMM d") : ""}
                     dy={10}
                   />
                   
@@ -374,7 +440,7 @@ export default function PostAnalyticsPage({ params }: { params: Promise<{ id: st
                         return (
                           <div className="rounded-3xl border border-border/50 bg-background/95 backdrop-blur-xl p-5 shadow-2xl min-w-[180px]">
                             <p className="mb-3 text-[10px] font-black text-muted-foreground uppercase tracking-widest border-b border-border/40 pb-2">
-                              {format(new Date(label), "EEEE, MMM dd")}
+                              {label ? format(new Date(label), "EEEE, MMM dd") : ""}
                             </p>
                             <div className="space-y-2.5">
                               {payload.map((entry: any) => (

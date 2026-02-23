@@ -45,6 +45,12 @@ export type Article = {
   seoDescription?: string;
   factChecked?: boolean;
   sources?: string[];
+
+  // Analytics fields
+  viewedAt?: string;
+  readAt?: string;
+  commentedAt?: string | Date;
+  likedAt?: string | Date;
 };
 
 export const categories = [

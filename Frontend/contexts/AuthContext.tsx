@@ -8,6 +8,7 @@ import {
   ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
+import { analytics } from "@/lib/analytics";
 
 interface User {
   id: string;
@@ -65,11 +66,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         credentials: "include", // Important: sends cookies
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        setToken(data.access_token);
-        setUser(data.user);
-        return data.access_token;
+        if (response.ok) {
+          const data = await response.json();
+          setToken(data.access_token);
+          setUser(data.user);
+          analytics.setUserId(data.user.id);
+          return data.access_token;
       } else {
         // Refresh token invalid or expired
         setUser(null);
@@ -108,6 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Refresh token is in httpOnly cookie set by backend
     setToken(newToken);
     setUser(newUser);
+    analytics.setUserId(newUser.id);
   };
 
   const logout = async () => {
@@ -126,6 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setToken(null);
     setUser(null);
+    analytics.setUserId(null);
     router.push("/login");
   };
 
