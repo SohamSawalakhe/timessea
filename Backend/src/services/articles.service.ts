@@ -133,7 +133,10 @@ export class ArticlesService {
     };
 
     if (hasMedia) {
-      where.OR = [{ image: { not: null } }, { media: { not: Prisma.DbNull } }];
+      where.OR = [
+        { AND: [{ image: { not: null } }, { image: { not: '' } }] },
+        { media: { not: Prisma.DbNull } }
+      ];
     }
 
     console.log(`ArticlesService: findAll called with userId: ${userId}`);

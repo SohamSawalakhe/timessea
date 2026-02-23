@@ -1041,48 +1041,42 @@ export default function ArticlePage({
         </div>
 
         {/* ── Section 6: COVER IMAGE with Caption ── */}
-        <figure className="mb-10 -mx-5 bg-secondary/5">
-          <div className="w-full overflow-hidden bg-secondary relative aspect-16/10 sm:aspect-[21/9]">
-            {article.image ? (
+        {article.image && (
+          <figure className="mb-10 -mx-5 bg-secondary/5">
+            <div className="w-full overflow-hidden bg-secondary relative aspect-16/10 sm:aspect-[21/9]">
               <img
                 src={article.image}
                 alt={article.imageCaption || article.title}
                 className="w-full h-full object-cover"
               />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-secondary to-muted">
-                <div className="text-7xl font-black text-foreground/5 select-none font-serif">
-                  {article.title.charAt(0)}
+            </div>
+            {/* Image Caption — The Hindu style */}
+            <figcaption className="mt-4 px-5">
+              <div className="text-[12px] leading-relaxed text-muted-foreground flex items-center flex-wrap gap-x-2.5">
+                {(article.imageDescription || article.imageCaption) && (
+                  <>
+                    <span className="font-semibold italic text-foreground/90 lowercase first-letter:uppercase">
+                      {(() => {
+                        const desc = article.imageDescription || article.imageCaption || "";
+                        // Strip any HTML tags that might have been pasted (e.g. from rich text editor)
+                        return desc.replace(/<[^>]*>?/gm, "").trim();
+                      })()}
+                    </span>
+                    <span className="text-border/80 font-light px-1">|</span>
+                  </>
+                )}
+                <div className="flex items-center gap-1.5">
+                  <span className="font-black text-muted-foreground/40 uppercase text-[9px] tracking-[0.2em] shrink-0">
+                    PHOTO:
+                  </span>
+                  <span className="font-semibold text-muted-foreground shrink-0">
+                    {article.imageCredit || article.author?.name || "Special Arrangement"}
+                  </span>
                 </div>
               </div>
-            )}
-          </div>
-          {/* Image Caption — The Hindu style */}
-          <figcaption className="mt-4 px-5">
-            <div className="text-[12px] leading-relaxed text-muted-foreground flex items-center flex-wrap gap-x-2.5">
-              {(article.imageDescription || article.imageCaption) && (
-                <>
-                  <span className="font-semibold italic text-foreground/90 lowercase first-letter:uppercase">
-                    {(() => {
-                      const desc = article.imageDescription || article.imageCaption || "";
-                      // Strip any HTML tags that might have been pasted (e.g. from rich text editor)
-                      return desc.replace(/<[^>]*>?/gm, "").trim();
-                    })()}
-                  </span>
-                  <span className="text-border/80 font-light px-1">|</span>
-                </>
-              )}
-              <div className="flex items-center gap-1.5">
-                <span className="font-black text-muted-foreground/40 uppercase text-[9px] tracking-[0.2em] shrink-0">
-                  PHOTO:
-                </span>
-                <span className="font-semibold text-muted-foreground shrink-0">
-                  {article.imageCredit || article.author?.name || "Special Arrangement"}
-                </span>
-              </div>
-            </div>
-          </figcaption>
-        </figure>
+            </figcaption>
+          </figure>
+        )}
 
         {/* ── Section 7: ARTICLE BODY ── */}
         <article className="space-y-6 px-1">

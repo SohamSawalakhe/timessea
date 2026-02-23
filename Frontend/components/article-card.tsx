@@ -44,39 +44,49 @@ export function ArticleCardFeatured({ article }: { article: Article }) {
       className="group block overflow-hidden rounded-3xl border border-transparent bg-card shadow-sm hover:shadow-lg hover:border-border/60 transition-all duration-300"
       onClick={() => trackArticleClick(article.id)}
     >
-      <div className="aspect-video bg-secondary flex items-center justify-center relative overflow-hidden">
-        {article.image ? (
+      {article.image ? (
+        <div className="aspect-video bg-secondary flex items-center justify-center relative overflow-hidden">
           <Image
             src={article.image}
             alt={article.title}
             fill
             className="object-cover transition-transform duration-500 group-hover:scale-105"
           />
-        ) : (
-          <>
-            <div className="absolute inset-0 bg-linear-to-tr from-secondary/80 to-muted/20" />
-            <div className="relative text-7xl font-black text-foreground/5 font-serif select-none transform group-hover:scale-110 transition-transform duration-500">
-              {article.title.charAt(0)}
-            </div>
-          </>
-        )}
-        <div className="absolute top-4 left-4 flex flex-col gap-2">
-          <span className="self-start rounded-full bg-background/90 backdrop-blur-md px-3 py-1 text-[10px] font-bold text-foreground shadow-sm uppercase tracking-wider border border-border/50">
-            FEATURED {isSpecialType ? " • " + article.type : ""}
-          </span>
-          {isSpecialType && (
-            <span className="self-start relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+          <div className="absolute top-4 left-4 flex flex-col gap-2">
+            <span className="self-start rounded-full bg-background/90 backdrop-blur-md px-3 py-1 text-[10px] font-bold text-foreground shadow-sm uppercase tracking-wider border border-border/50">
+              FEATURED {isSpecialType ? " • " + article.type : ""}
             </span>
-          )}
+            {isSpecialType && (
+              <span className="self-start relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+              </span>
+            )}
+          </div>
+          <div className="absolute bottom-4 left-4">
+            <span className="rounded-full bg-background/80 backdrop-blur-md px-3 py-1 text-[10px] font-bold text-foreground shadow-sm">
+              {article.category}
+            </span>
+          </div>
         </div>
-        <div className="absolute bottom-4 left-4">
-          <span className="rounded-full bg-background/80 backdrop-blur-md px-3 py-1 text-[10px] font-bold text-foreground shadow-sm">
-            {article.category}
-          </span>
+      ) : (
+        <div className="p-5 pb-0 flex flex-col gap-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="rounded-full bg-secondary px-3 py-1 text-[10px] font-bold text-foreground uppercase tracking-wider">
+              FEATURED {isSpecialType ? " • " + article.type : ""}
+            </span>
+            {isSpecialType && (
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+              </span>
+            )}
+            <span className="rounded-full bg-secondary/50 px-3 py-1 text-[10px] font-bold text-foreground">
+              {article.category}
+            </span>
+          </div>
         </div>
-      </div>
+      )}
       <div className="p-5">
         <div className="mb-4 flex items-center gap-3">
           <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary ring-2 ring-background overflow-hidden relative">
@@ -138,19 +148,15 @@ export function ArticleCardCompact({ article }: { article: Article }) {
       className="group flex gap-4 rounded-2xl border border-transparent bg-card p-3 hover:bg-secondary/40 transition-colors"
       onClick={() => trackArticleClick(article.id)}
     >
-      <div className="h-20 w-20 shrink-0 rounded-xl bg-secondary flex items-center justify-center overflow-hidden">
-        {article.image ? (
+      {article.image && (
+        <div className="h-20 w-20 shrink-0 rounded-xl bg-secondary flex items-center justify-center overflow-hidden">
           <img
             src={article.image}
             alt={article.title}
             className="h-full w-full object-cover group-hover:scale-110 transition-transform"
           />
-        ) : (
-          <div className="text-2xl font-black text-muted-foreground/20 font-serif group-hover:scale-110 transition-transform">
-            {article.title.charAt(0)}
-          </div>
-        )}
-      </div>
+        </div>
+      )}
       <div className="flex flex-1 flex-col justify-between py-1">
         <div>
           <h3 className="text-sm font-bold leading-tight text-foreground line-clamp-2 font-serif group-hover:text-primary transition-colors">
@@ -274,20 +280,16 @@ export function ArticleCardHorizontal({ article }: { article: Article }) {
           </div>
         </div>
       </div>
-      <div className="h-24 w-24 shrink-0 rounded-2xl bg-secondary flex items-center justify-center overflow-hidden shadow-inset-sm relative">
-        {article.image ? (
+      {article.image && (
+        <div className="h-24 w-24 shrink-0 rounded-2xl bg-secondary flex items-center justify-center overflow-hidden shadow-inset-sm relative">
           <Image
             src={article.image}
             alt={article.title}
             fill
             className="object-cover transition-transform duration-500 group-hover:scale-105"
           />
-        ) : (
-          <div className="text-3xl font-black text-muted-foreground/15 font-serif group-hover:scale-110 transition-transform duration-500">
-            {article.title.charAt(0)}
-          </div>
-        )}
-      </div>
+        </div>
+      )}
     </Link>
   );
 }
@@ -299,28 +301,27 @@ export function ArticleCardVertical({ article }: { article: Article }) {
       className="group flex flex-col h-full rounded-2xl border border-border/40 bg-card overflow-hidden hover:shadow-lg hover:border-border/80 transition-all duration-300"
       onClick={() => trackArticleClick(article.id)}
     >
-      <div className="aspect-video w-full bg-secondary relative overflow-hidden">
-        {article.image ? (
+      {article.image ? (
+        <div className="aspect-video w-full bg-secondary relative overflow-hidden">
           <Image
             src={article.image}
             alt={article.title}
             fill
             className="object-cover transition-transform duration-500 group-hover:scale-105"
           />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center bg-linear-to-br from-secondary to-muted/20">
-            <div className="text-4xl font-black text-foreground/10 font-serif select-none transform group-hover:scale-110 transition-transform duration-500">
-              {article.title.charAt(0)}
-            </div>
+          <div className="absolute top-2 left-2">
+            <span className="rounded-full bg-background/90 backdrop-blur-md px-2 py-0.5 text-[9px] font-bold text-foreground shadow-sm uppercase tracking-wider border border-border/50">
+              {article.category}
+            </span>
           </div>
-        )}
-
-        <div className="absolute top-2 left-2">
-          <span className="rounded-full bg-background/90 backdrop-blur-md px-2 py-0.5 text-[9px] font-bold text-foreground shadow-sm uppercase tracking-wider border border-border/50">
+        </div>
+      ) : (
+        <div className="px-4 pt-4 pb-0">
+          <span className="inline-block rounded-full bg-secondary/80 px-2 py-0.5 text-[9px] font-bold text-foreground uppercase tracking-wider border border-border/50">
             {article.category}
           </span>
         </div>
-      </div>
+      )}
 
       <div className="flex flex-1 flex-col p-4">
         {/* Author & Date */}
