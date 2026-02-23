@@ -65,6 +65,12 @@ export class ArticlesController {
     return this.articlesService.findPublished(req.user.id);
   }
 
+  @Get('user/bookmarks')
+  @UseGuards(AuthGuard('jwt'))
+  async getUserBookmarks(@Req() req: Request & { user: { id: string } }) {
+    return this.articlesService.findUserBookmarks(req.user.id);
+  }
+
   @Get()
   async findAll(
     @Query('limit') limit?: string,
@@ -161,8 +167,12 @@ export class ArticlesController {
   }
 
   @Post(':id/bookmark')
-  async toggleBookmark(@Param('id') id: string) {
-    return await this.articlesService.toggleBookmark(id);
+  @UseGuards(AuthGuard('jwt'))
+  async toggleBookmark(
+    @Param('id') id: string,
+    @Req() req: Request & { user: { id: string } },
+  ) {
+    return await this.articlesService.toggleBookmark(id, req.user.id);
   }
 
   @Post(':id/view')

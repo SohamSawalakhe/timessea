@@ -139,9 +139,17 @@ export function ArticleCardCompact({ article }: { article: Article }) {
       onClick={() => trackArticleClick(article.id)}
     >
       <div className="h-20 w-20 shrink-0 rounded-xl bg-secondary flex items-center justify-center overflow-hidden">
-        <div className="text-2xl font-black text-muted-foreground/20 font-serif group-hover:scale-110 transition-transform">
-          {article.title.charAt(0)}
-        </div>
+        {article.image ? (
+          <img
+            src={article.image}
+            alt={article.title}
+            className="h-full w-full object-cover group-hover:scale-110 transition-transform"
+          />
+        ) : (
+          <div className="text-2xl font-black text-muted-foreground/20 font-serif group-hover:scale-110 transition-transform">
+            {article.title.charAt(0)}
+          </div>
+        )}
       </div>
       <div className="flex flex-1 flex-col justify-between py-1">
         <div>

@@ -20,6 +20,7 @@ interface ArticleWithRelations extends Article {
     picture: string | null;
   };
   likedBy?: { id: string }[];
+  bookmarkedBy?: { id: string }[];
 }
 
 @Injectable()
@@ -155,22 +156,24 @@ export class ArticlesService {
               select: { id: true },
             }
           : undefined,
+        bookmarkedBy: userId
+          ? {
+              where: { userId },
+              select: { id: true },
+            }
+          : undefined,
       },
       orderBy: { createdAt: 'desc' },
     });
-    console.log(`findAll found ${articles.length} articles`);
-    if (articles.length > 0 && userId) {
-      const typedFirstArticle = articles[0] as unknown as ArticleWithRelations;
-      console.log('First article likedBy:', typedFirstArticle.likedBy);
-    }
 
     const typedArticles = articles as unknown as ArticleWithRelations[];
 
     return typedArticles.map((article) => {
-      const { likedBy, ...rest } = article;
+      const { likedBy, bookmarkedBy, ...rest } = article;
       return {
         ...rest,
-        liked: likedBy && likedBy.length > 0 ? true : false,
+        liked: !!(likedBy && likedBy.length > 0),
+        bookmarked: !!(bookmarkedBy && bookmarkedBy.length > 0),
       };
     });
   }
@@ -252,7 +255,7 @@ export class ArticlesService {
   async findOne(
     id: string,
     userId?: string,
-  ): Promise<(Article & { liked: boolean }) | null> {
+  ): Promise<(Article & { liked: boolean; bookmarked: boolean }) | null> {
     const article = await this.prisma.article.findUnique({
       where: { id },
       include: {
@@ -270,6 +273,12 @@ export class ArticlesService {
               select: { userId: true },
             }
           : false,
+        bookmarkedBy: userId
+          ? {
+              where: { userId },
+              select: { id: true },
+            }
+          : false,
       },
     });
 
@@ -279,6 +288,7 @@ export class ArticlesService {
     return {
       ...article,
       liked: userId ? (typedArticle.likedBy?.length ?? 0) > 0 : false,
+      bookmarked: userId ? (typedArticle.bookmarkedBy?.length ?? 0) > 0 : false,
     };
   }
 
@@ -303,6 +313,12 @@ export class ArticlesService {
     const authorInclude = {
       author: { select: { id: true, name: true, email: true, picture: true } },
       likedBy: userId
+        ? {
+            where: { userId },
+            select: { id: true },
+          }
+        : undefined,
+      bookmarkedBy: userId
         ? {
             where: { userId },
             select: { id: true },
@@ -467,14 +483,15 @@ export class ArticlesService {
 
   private mapToWithLiked(
     articles: ArticleWithRelations[],
-  ): (Article & { liked: boolean })[] {
+  ): (Article & { liked: boolean; bookmarked: boolean })[] {
     return articles.map((article) => {
-      const { likedBy, ...rest } = article;
+      const { likedBy, bookmarkedBy, ...rest } = article;
       return {
         ...rest,
         liked: !!(likedBy && likedBy.length > 0),
+        bookmarked: !!(bookmarkedBy && bookmarkedBy.length > 0),
       };
-    }) as (Article & { liked: boolean })[];
+    }) as (Article & { liked: boolean; bookmarked: boolean })[];
   }
 
   async findTrending(
@@ -486,6 +503,12 @@ export class ArticlesService {
     const authorInclude = {
       author: { select: { id: true, name: true, email: true, picture: true } },
       likedBy: userId
+        ? {
+            where: { userId },
+            select: { id: true },
+          }
+        : undefined,
+      bookmarkedBy: userId
         ? {
             where: { userId },
             select: { id: true },
@@ -650,6 +673,24 @@ export class ArticlesService {
         user_id: this.ensureValidUUID(userId),
         created_at: new Date(),
       });
+
+      // Create notification for article author (if not self)
+      if (article.authorId !== userId) {
+        const actor = await this.prisma.user.findUnique({
+          where: { id: userId },
+          select: { name: true, picture: true },
+        });
+        await this.createNotification({
+          userId: article.authorId,
+          type: 'like',
+          title: 'New Like',
+          message: `${actor?.name || 'Someone'} liked your article "${article.title}"`,
+          articleId: id,
+          actorId: userId,
+          actorName: actor?.name || null,
+          actorPicture: actor?.picture || null,
+        });
+      }
     }
 
     return this.prisma.article.findUnique({
@@ -658,19 +699,111 @@ export class ArticlesService {
     }) as Promise<Article>;
   }
 
-  async toggleBookmark(id: string): Promise<Article> {
+  async toggleBookmark(id: string, userId: string): Promise<{ bookmarked: boolean }> {
     const article = await this.prisma.article.findUnique({ where: { id } });
     if (!article) {
       throw new Error('Article not found');
     }
 
-    return this.prisma.article.update({
-      where: { id },
-      data: {
-        bookmarked: !article.bookmarked,
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment
+    const existingBookmark = await (this.prisma as any).bookmark.findUnique({
+      where: {
+        userId_articleId: {
+          userId,
+          articleId: id,
+        },
       },
-      include: { author: true },
     });
+
+    if (existingBookmark) {
+      // Remove bookmark
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+      await (this.prisma as any).bookmark.delete({
+        where: {
+          userId_articleId: {
+            userId,
+            articleId: id,
+          },
+        },
+      });
+      return { bookmarked: false };
+    } else {
+      // Add bookmark
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+      await (this.prisma as any).bookmark.create({
+        data: {
+          userId,
+          articleId: id,
+        },
+      });
+
+      // Create notification for article author (if not self)
+      if (article.authorId !== userId) {
+        const actor = await this.prisma.user.findUnique({
+          where: { id: userId },
+          select: { name: true, picture: true },
+        });
+        await this.createNotification({
+          userId: article.authorId,
+          type: 'bookmark',
+          title: 'Article Saved',
+          message: `${actor?.name || 'Someone'} saved your article "${article.title}"`,
+          articleId: id,
+          actorId: userId,
+          actorName: actor?.name || null,
+          actorPicture: actor?.picture || null,
+        });
+      }
+
+      return { bookmarked: true };
+    }
+  }
+
+  async findUserBookmarks(userId: string): Promise<any[]> {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment
+    const bookmarks = await (this.prisma as any).bookmark.findMany({
+      where: { userId },
+      include: {
+        article: {
+          include: {
+            author: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                picture: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+    return bookmarks.map((b: any) => ({
+      ...b.article,
+      bookmarked: true,
+      liked: false, // Could be enhanced to check if user liked
+    }));
+  }
+
+  async createNotification(data: {
+    userId: string;
+    type: string;
+    title: string;
+    message: string;
+    articleId?: string;
+    actorId?: string;
+    actorName?: string | null;
+    actorPicture?: string | null;
+  }) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+      await (this.prisma as any).notification.create({ data });
+    } catch (err) {
+      console.error('Failed to create notification:', err);
+    }
   }
 
   async incrementViews(id: string, userId: string): Promise<Article> {

@@ -54,6 +54,31 @@ export class CommentsService {
         created_at: new Date(),
       });
 
+      // Create notification for article author (if not self)
+      const article = await tx.article.findUnique({
+        where: { id: data.articleId },
+        select: { authorId: true, title: true },
+      });
+      if (article && article.authorId !== data.authorId) {
+        const actor = await tx.user.findUnique({
+          where: { id: data.authorId },
+          select: { name: true, picture: true },
+        });
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+        await (tx as any).notification.create({
+          data: {
+            userId: article.authorId,
+            type: 'comment',
+            title: 'New Comment',
+            message: `${actor?.name || 'Someone'} commented on your article "${article.title}"`,
+            articleId: data.articleId,
+            actorId: data.authorId,
+            actorName: actor?.name || null,
+            actorPicture: actor?.picture || null,
+          },
+        });
+      }
+
       return comment;
     });
   }

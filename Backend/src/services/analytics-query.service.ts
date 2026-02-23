@@ -97,13 +97,15 @@ export class AnalyticsQueryService {
    */
   async getAuthorStats(
     authorId: string,
-  ): Promise<AuthorStats & { totalComments: number }> {
+  ): Promise<AuthorStats & { totalComments: number; totalFollowers: number; totalFollowing: number }> {
     const [
       publishedCount,
       scheduledCount,
       draftCount,
       aggregates,
       totalComments,
+      totalFollowers,
+      totalFollowing,
     ] = await Promise.all([
       this.prismaService.article.count({
         where: {
@@ -148,6 +150,16 @@ export class AnalyticsQueryService {
           deletedAt: null,
         },
       }),
+      this.prismaService.follow.count({
+        where: {
+          followingId: authorId,
+        },
+      }),
+      this.prismaService.follow.count({
+        where: {
+          followerId: authorId,
+        },
+      }),
     ]);
 
     return {
@@ -157,6 +169,8 @@ export class AnalyticsQueryService {
       totalLikes: aggregates._sum.likes || 0,
       totalViews: aggregates._sum.views || 0,
       totalComments,
+      totalFollowers,
+      totalFollowing,
     };
   }
 

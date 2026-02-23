@@ -74,11 +74,14 @@ export default function ProfilePage() {
     draftCount: 0,
     totalLikes: 0,
     totalViews: 0,
+    totalFollowers: 0,
+    totalFollowing: 0,
   });
   const [activityStats, setActivityStats] = useState({
     likesCount: 0,
     commentsCount: 0,
   });
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   useEffect(() => {
     let intervalId: NodeJS.Timeout;
@@ -113,6 +116,19 @@ export default function ProfilePage() {
             })
             .then((data) => setActivityStats(data))
             .catch((err) => console.error("Error fetching activity stats:", err));
+
+        // Fetch unread notifications count
+        fetch(`${API_URL}/api/notifications/unread-count`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          })
+            .then((res) => {
+              if (res.ok) return res.json();
+              throw new Error("Failed to fetch notifications");
+            })
+            .then((data) => setUnreadNotifications(data.count || 0))
+            .catch((err) => console.error("Error fetching notifications:", err));
       };
 
       // Initial fetch
@@ -214,8 +230,10 @@ export default function ProfilePage() {
     },
     {
       icon: Bell,
-      label: "Push Notifications",
-      action: "switch" as const,
+      label: "Notifications",
+      action: "chevron" as const,
+      href: "/notifications",
+      badge: unreadNotifications > 0 ? unreadNotifications : undefined,
     },
     {
       icon: mounted && theme === "dark" ? Moon : Sun,
@@ -273,6 +291,24 @@ export default function ProfilePage() {
             <p className="text-sm font-medium text-muted-foreground">
               {user.email}
             </p>
+            <div className="mt-4 flex gap-6 text-sm">
+              <div className="flex flex-col items-center">
+                <span className="font-bold text-foreground">
+                  {stats.totalFollowers}
+                </span>
+                <span className="text-muted-foreground text-[11px] uppercase tracking-wider font-semibold">
+                  Followers
+                </span>
+              </div>
+              <div className="flex flex-col items-center">
+                <span className="font-bold text-foreground">
+                  {stats.totalFollowing}
+                </span>
+                <span className="text-muted-foreground text-[11px] uppercase tracking-wider font-semibold">
+                  Following
+                </span>
+              </div>
+            </div>
           </motion.div>
         ) : (
           <motion.div
@@ -429,39 +465,53 @@ export default function ProfilePage() {
           General
         </h3>
         <div className="space-y-2">
-          {generalItems.map((item, index) => (
-            <motion.div
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.2 + index * 0.1 }}
-              key={item.label}
-              className="group flex w-full items-center gap-4 rounded-2xl bg-card p-4 transition-all hover:bg-secondary/50 border border-transparent hover:border-border/50 shadow-sm hover:shadow-md"
-            >
-              <div className="p-2 rounded-xl bg-secondary group-hover:bg-background transition-colors text-foreground">
-                <item.icon className="h-5 w-5" strokeWidth={2} />
-              </div>
-              <span className="flex-1 text-left text-sm font-bold text-foreground">
-                {item.label}
-              </span>
-              {item.action === "switch" && (
-                <CustomSwitch
-                  checked={notifications}
-                  onCheckedChange={setNotifications}
-                />
-              )}
-              {item.action === "theme" && mounted && (
-                <CustomSwitch
-                  checked={theme === "dark"}
-                  onCheckedChange={(checked) =>
-                    setTheme(checked ? "dark" : "light")
-                  }
-                />
-              )}
-              {item.action === "chevron" && (
-                <ChevronRight className="h-4 w-4 text-muted-foreground/50 group-hover:text-foreground transition-colors" />
-              )}
-            </motion.div>
-          ))}
+          {generalItems.map((item, index) => {
+            const Wrapper = (item as any).href ? Link : 'div';
+            const wrapperProps = (item as any).href ? { href: (item as any).href } : {};
+
+            return (
+              <motion.div
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.2 + index * 0.1 }}
+                key={item.label}
+              >
+                <Wrapper
+                  {...wrapperProps}
+                  className="group flex w-full items-center gap-4 rounded-2xl bg-card p-4 transition-all hover:bg-secondary/50 border border-transparent hover:border-border/50 shadow-sm hover:shadow-md"
+                >
+                  <div className="p-2 rounded-xl bg-secondary group-hover:bg-background transition-colors text-foreground relative">
+                    <item.icon className="h-5 w-5" strokeWidth={2} />
+                    {(item as any).badge && (
+                      <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[8px] font-bold text-destructive-foreground shadow-sm">
+                        {(item as any).badge > 9 ? '9+' : (item as any).badge}
+                      </span>
+                    )}
+                  </div>
+                  <span className="flex-1 text-left text-sm font-bold text-foreground">
+                    {item.label}
+                  </span>
+                  {item.action === "switch" && (
+                    <CustomSwitch
+                      checked={notifications}
+                      onCheckedChange={setNotifications}
+                    />
+                  )}
+                  {item.action === "theme" && mounted && (
+                    <CustomSwitch
+                      checked={theme === "dark"}
+                      onCheckedChange={(checked) =>
+                        setTheme(checked ? "dark" : "light")
+                      }
+                    />
+                  )}
+                  {item.action === "chevron" && (
+                    <ChevronRight className="h-4 w-4 text-muted-foreground/50 group-hover:text-foreground transition-colors" />
+                  )}
+                </Wrapper>
+              </motion.div>
+            );
+          })}
         </div>
       </div>
 

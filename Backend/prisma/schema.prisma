@@ -22,6 +22,10 @@ model User {
   comments      Comment[]
   commentLikes  CommentLike[]
   articleLikes  ArticleLike[]
+  bookmarks     Bookmark[]
+  notifications Notification[]
+  followers     Follow[] @relation("Followers")
+  following     Follow[] @relation("Following")
 }
 
 model RefreshToken {
@@ -43,7 +47,6 @@ model Article {
   authorId    String
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
-  bookmarked  Boolean   @default(false)
   category    String    @default("Technology")
   excerpt     String?
   location    String?
@@ -72,6 +75,8 @@ model Article {
   author      User      @relation(fields: [authorId], references: [id])
   comments    Comment[]
   likedBy     ArticleLike[]
+  bookmarkedBy Bookmark[]
+  notifications Notification[]
 
   @@index([authorId])
   @@index([category])
@@ -127,4 +132,53 @@ model CommentLike {
   comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
 
   @@unique([userId, commentId])
+}
+
+model Bookmark {
+  id        String   @id @default(uuid())
+  userId    String
+  articleId String
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, articleId])
+  @@index([userId])
+  @@index([articleId])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  type      String   // 'like', 'comment', 'bookmark', 'follow', 'system'
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  articleId String?
+  actorId   String?  // The user who triggered the notification
+  actorName String?
+  actorPicture String?
+  createdAt DateTime @default(now())
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  article Article? @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, read])
+  @@index([createdAt])
+}
+
+model Follow {
+  id          String   @id @default(uuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+
+  follower  User @relation("Following", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("Followers", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
 }

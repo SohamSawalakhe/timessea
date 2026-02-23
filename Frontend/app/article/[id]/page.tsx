@@ -281,6 +281,8 @@ export default function ArticlePage({
   const [trendingVisibleCount, setTrendingVisibleCount] = useState(4);
   const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
   const [isDeletingComment, setIsDeletingComment] = useState(false);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [isFollowLoading, setIsFollowLoading] = useState(false);
 
   // Delayed read counting (1 minute threshold for "read")
   useEffect(() => {
@@ -343,6 +345,14 @@ export default function ArticlePage({
         if (res.ok) {
           const data = await res.json();
           setArticle(data);
+
+          // Fetch follow status if user is logged in
+          if (token && data.author?.id) {
+            fetch(`${API_URL}/users/${data.author.id}/follow-status`, { headers })
+              .then((r) => r.ok ? r.json() : { following: false })
+              .then((d) => setIsFollowing(d.following))
+              .catch(() => setIsFollowing(false));
+          }
 
           // View count removed from here - handled by delayed timer
         } else {
@@ -458,6 +468,41 @@ export default function ArticlePage({
     }
   };
 
+  const handleFollowToggle = async () => {
+    if (!isAuthenticated) {
+      setShowAuthModal(true);
+      return;
+    }
+    if (!article?.author?.id) return;
+
+    if (user?.id === article.author.id) {
+      toast.error("You cannot follow yourself");
+      return;
+    }
+
+    setIsFollowLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/users/${article.author.id}/follow`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setIsFollowing(data.following);
+        toast.success(data.following ? `Following ${article.author.name}` : `Unfollowed ${article.author.name}`);
+      } else {
+        toast.error("Failed to update follow status");
+      }
+    } catch (e) {
+      toast.error("Failed to update follow status");
+    } finally {
+      setIsFollowLoading(false);
+    }
+  };
+
   // Fetch comments
   const fetchComments = useCallback(async () => {
     setLoadingComments(true);
@@ -484,6 +529,8 @@ export default function ArticlePage({
             return acc + countReplies(c);
           }, 0),
         );
+      } else {
+        throw new Error("Failed to fetch comments");
       }
     } catch (err) {
       console.error("Failed to fetch comments", err);
@@ -492,7 +539,7 @@ export default function ArticlePage({
     }
   }, [id, token]);
 
-  // Load comments when section opens
+  // Load comments when section is opened
   useEffect(() => {
     if (showCommentSection) {
       fetchComments();
@@ -610,7 +657,7 @@ export default function ArticlePage({
   };
 
   // Delete a comment trigger
-  const handleDeleteComment = (commentId: string) => {
+  const handleDeleteComment = async (commentId: string) => {
     setDeletingCommentId(commentId);
   };
 
@@ -963,9 +1010,21 @@ export default function ArticlePage({
                 )}
               </div>
             </div>
-            <button className="rounded-full px-4 py-1.5 text-[11px] font-bold text-primary ring-1 ring-primary/30 hover:bg-primary/5 transition-colors shrink-0">
-              Follow
-            </button>
+            {user?.id !== article.author?.id && (
+              <button
+                onClick={handleFollowToggle}
+                disabled={isFollowLoading}
+                className={cn(
+                  "rounded-full px-4 py-1.5 text-[11px] font-bold transition-all shrink-0",
+                  isFollowing
+                    ? "bg-secondary text-foreground hover:bg-secondary/80 ring-1 ring-border"
+                    : "text-primary ring-1 ring-primary/30 hover:bg-primary/5",
+                  isFollowLoading && "opacity-50 cursor-not-allowed"
+                )}
+              >
+                {isFollowLoading ? "..." : isFollowing ? "Following" : "Follow"}
+              </button>
+            )}
           </div>
 
           {/* ── Metadata Bar (Read Time, Views, Date) ── */}

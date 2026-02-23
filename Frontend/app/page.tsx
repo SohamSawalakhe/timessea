@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import {
@@ -13,14 +13,40 @@ import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+
 export default function HomePage() {
-  const { user } = useAuth();
+  const { user, token, isAuthenticated } = useAuth();
   const [activeCategory, setActiveCategory] = useState("Trending");
   const [searchQuery, setSearchQuery] = useState("");
   const [articles, setArticles] = useState<Article[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const [visibleCount, setVisibleCount] = useState(4);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Fetch notification unread count
+  const fetchUnreadCount = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_URL}/api/notifications/unread-count`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUnreadCount(data.count || 0);
+      }
+    } catch {
+      // Silently fail
+    }
+  }, [token]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !token) return;
+    fetchUnreadCount();
+    const interval = setInterval(fetchUnreadCount, 30000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated, token, fetchUnreadCount]);
 
   useEffect(() => {
     async function fetchArticles() {
@@ -74,14 +100,18 @@ export default function HomePage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <button
-            type="button"
+          <Link
+            href={isAuthenticated ? "/notifications" : "/login?redirect=/notifications"}
             className="relative p-2 rounded-full hover:bg-secondary transition-colors"
             aria-label="Notifications"
           >
             <Bell className="h-6 w-6 text-foreground" strokeWidth={2} />
-            <span className="absolute top-2 right-2 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-background" />
-          </button>
+            {unreadCount > 0 && (
+              <span className="absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white ring-2 ring-background">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
+          </Link>
           <Link href={user ? "/profile" : "/login"} className="relative group">
             <div className="h-10 w-10 overflow-hidden rounded-full ring-2 ring-background shadow-md transition-transform group-hover:scale-105">
               {user ? (

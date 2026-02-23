@@ -211,36 +211,44 @@ export function ExploreClient({ initialArticles }: ExploreClientProps) {
     [token],
   );
 
-  const toggleSave = useCallback(async (id: string) => {
-    // Optimistic update
-    setArticles((prev) =>
-      prev.map((article) =>
-        article.id === id
-          ? { ...article, bookmarked: !article.bookmarked }
-          : article,
-      ),
-    );
-
-    try {
-      const response = await fetch(
-        `http://127.0.0.1:5000/api/articles/${id}/bookmark`,
-        { method: "POST" },
+  const toggleSave = useCallback(
+    async (id: string) => {
+      // Optimistic update
+      setArticles((prev) =>
+        prev.map((article) =>
+          article.id === id
+            ? { ...article, bookmarked: !article.bookmarked }
+            : article,
+        ),
       );
-      if (!response.ok) {
-        // Revert if failed
-        setArticles((prev) =>
-          prev.map((article) =>
-            article.id === id
-              ? { ...article, bookmarked: !article.bookmarked }
-              : article,
-          ),
+
+      try {
+        const response = await fetch(
+          `http://127.0.0.1:5000/api/articles/${id}/bookmark`,
+          {
+            method: "POST",
+            headers: {
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+          },
         );
-        throw new Error("Failed to bookmark article");
+        if (!response.ok) {
+          // Revert if failed
+          setArticles((prev) =>
+            prev.map((article) =>
+              article.id === id
+                ? { ...article, bookmarked: !article.bookmarked }
+                : article,
+            ),
+          );
+          throw new Error("Failed to bookmark article");
+        }
+      } catch (error) {
+        console.error("Error bookmarking article:", error);
       }
-    } catch (error) {
-      console.error("Error bookmarking article:", error);
-    }
-  }, []);
+    },
+    [token],
+  );
 
   const handleView = useCallback(async (id: string) => {
     // Optimistic update (increment view count locally)
