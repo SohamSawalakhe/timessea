@@ -20,6 +20,16 @@ export class UsersService {
     });
   }
 
+  async update(id: string, data: Prisma.UserUpdateInput): Promise<User> {
+    if (data.handle === "") {
+      data.handle = null;
+    }
+    return this.prisma.user.update({
+      where: { id },
+      data,
+    });
+  }
+
   async toggleFollow(followerId: string, followingId: string) {
     if (followerId === followingId) {
       throw new Error('You cannot follow yourself');
@@ -92,6 +102,9 @@ export class UsersService {
         id: true,
         name: true,
         picture: true,
+        coverImage: true,
+        bio: true,
+        handle: true,
         createdAt: true,
         _count: {
           select: {
@@ -115,5 +128,47 @@ export class UsersService {
       ...user,
       isFollowing,
     };
+  }
+
+  async getFollowers(userId: string) {
+    const follows = await this.prisma.follow.findMany({
+      where: { followingId: userId },
+      select: {
+        follower: {
+          select: {
+            id: true,
+            name: true,
+            picture: true,
+          }
+        },
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    return follows.map((f) => ({
+      ...f.follower,
+      followedAt: f.createdAt,
+    }));
+  }
+
+  async getFollowing(userId: string) {
+    const follows = await this.prisma.follow.findMany({
+      where: { followerId: userId },
+      select: {
+        following: {
+          select: {
+            id: true,
+            name: true,
+            picture: true,
+          }
+        },
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    return follows.map((f) => ({
+      ...f.following,
+      followedAt: f.createdAt,
+    }));
   }
 }

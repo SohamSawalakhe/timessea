@@ -13,6 +13,9 @@ model User {
   email         String         @unique
   name          String?
   picture       String?
+  coverImage    String?
+  bio           String?
+  handle        String?        @unique
   googleId      String?        @unique
   provider      String?        @default("google")
   createdAt     DateTime       @default(now())

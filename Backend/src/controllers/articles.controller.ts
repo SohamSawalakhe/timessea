@@ -76,6 +76,7 @@ export class ArticlesController {
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
     @Query('hasMedia') hasMedia?: string,
+    @Query('authorId') authorId?: string,
     @Req() req?: Request,
   ) {
     const limitNum = limit ? parseInt(limit, 10) : 20;
@@ -101,6 +102,7 @@ export class ArticlesController {
       offsetNum,
       hasMediaBool,
       userId,
+      authorId,
     );
   }
 

@@ -126,11 +126,16 @@ export class ArticlesService {
     offset = 0,
     hasMedia = false,
     userId?: string,
+    authorId?: string,
   ): Promise<any[]> {
     const where: Prisma.ArticleWhereInput = {
       published: true,
       deletedAt: null,
     };
+
+    if (authorId) {
+      where.authorId = authorId;
+    }
 
     if (hasMedia) {
       where.OR = [
@@ -696,10 +701,14 @@ export class ArticlesService {
       }
     }
 
-    return this.prisma.article.findUnique({
+    const updatedArticle = await this.prisma.article.findUnique({
       where: { id },
       include: { author: true },
-    }) as Promise<Article>;
+    }) as unknown as Article;
+
+    this.articlesGateway.notifyArticleLiked(id, updatedArticle.likes);
+
+    return updatedArticle;
   }
 
   async toggleBookmark(id: string, userId: string): Promise<{ bookmarked: boolean }> {

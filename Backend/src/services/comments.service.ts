@@ -2,12 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
 import { AnalyticsService } from './analytics.service';
 import { AnalyticsEventType } from '../modules/analytics/analytics.interface';
+import { ArticlesGateway } from '../gateways/articles.gateway';
 
 @Injectable()
 export class CommentsService {
   constructor(
     private prisma: PrismaService,
     private analyticsService: AnalyticsService,
+    private articlesGateway: ArticlesGateway,
   ) {}
 
   /**
@@ -41,10 +43,12 @@ export class CommentsService {
         },
       });
 
-      await tx.article.update({
+      const updatedArticle = await tx.article.update({
         where: { id: data.articleId },
         data: { commentCount: { increment: 1 } },
       });
+      
+      this.articlesGateway.notifyCommentCountUpdate(data.articleId, updatedArticle.commentCount);
 
       // Track comment event
       this.analyticsService.track({
@@ -276,10 +280,12 @@ export class CommentsService {
       });
 
       // Decrement article comment count by total number of deleted comments
-      await tx.article.update({
+      const updatedArticle = await tx.article.update({
         where: { id: comment.articleId },
         data: { commentCount: { decrement: allToDelete.length } },
       });
+
+      this.articlesGateway.notifyCommentCountUpdate(comment.articleId, updatedArticle.commentCount);
 
       return comment;
     });

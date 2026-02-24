@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Heart,
+  Bookmark,
   MessageCircle,
   Share2,
   MoreHorizontal,
@@ -32,6 +33,7 @@ import {
   ArticleCardHorizontal,
 } from "@/components/article-card";
 import { analytics, AnalyticsEventType } from "@/lib/analytics";
+import { io } from "socket.io-client";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
@@ -320,6 +322,27 @@ export default function ArticlePage({
     return () => document.body.classList.remove("toast-overlay-active");
   }, [deletingCommentId]);
 
+  // Real-time updates via Socket.IO
+  useEffect(() => {
+    const socket = io(API_URL);
+
+    socket.on("articleLiked", (data: { articleId: string; likes: number }) => {
+      if (data.articleId === id) {
+        setArticle((prev) => prev ? { ...prev, likes: data.likes } : null);
+      }
+    });
+
+    socket.on("commentCountUpdate", (data: { articleId: string; commentCount: number }) => {
+      if (data.articleId === id) {
+        setCommentCount(data.commentCount);
+      }
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [id]);
+
   // Fetch article
   useEffect(() => {
     async function fetchArticle() {
@@ -582,6 +605,42 @@ export default function ArticlePage({
         ...article,
         liked: originalLiked,
         likes: originalLikes,
+      });
+    }
+  };
+
+  const handleBookmark = async () => {
+    if (!isAuthenticated) {
+      setShowAuthModal(true);
+      return;
+    }
+    if (!article) return;
+
+    const originalBookmarked = article.bookmarked;
+    const willBookmark = !originalBookmarked;
+
+    // Optimistic update
+    setArticle({
+      ...article,
+      bookmarked: willBookmark,
+    });
+
+    try {
+      const headers: HeadersInit = {};
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
+      await fetch(`${API_URL}/api/articles/${id}/bookmark`, {
+        method: "POST",
+        headers,
+      });
+    } catch (e) {
+      console.error("Failed to bookmark", e);
+      // Revert logic
+      setArticle({
+        ...article,
+        bookmarked: originalBookmarked,
       });
     }
   };
@@ -925,6 +984,14 @@ export default function ArticlePage({
             className="p-2 rounded-full text-muted-foreground hover:text-foreground transition-colors"
           >
             <Share2 className="h-5 w-5" strokeWidth={1.8} />
+          </button>
+          <button
+            type="button"
+            onClick={handleBookmark}
+            aria-label="Bookmark"
+            className="p-2 rounded-full text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Bookmark className={cn("h-5 w-5", article?.bookmarked && "fill-current text-primary")} strokeWidth={1.8} />
           </button>
           <button
             type="button"
@@ -1281,16 +1348,42 @@ export default function ArticlePage({
             </motion.button>
           </div>
 
-          <motion.button
-            whileTap={{ scale: 0.9 }}
-            onClick={handleShare}
-            className="flex items-center gap-2 text-[14px] font-bold text-muted-foreground hover:text-foreground transition-all group"
-          >
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary group-hover:bg-foreground/5 transition-colors">
-              <Share2 className="w-5 h-5" strokeWidth={2} />
-            </div>
-            <span className="hidden sm:inline">Share Story</span>
-          </motion.button>
+          <div className="flex items-center gap-2 sm:gap-6">
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              onClick={handleBookmark}
+              className={cn(
+                "flex items-center gap-2 text-[14px] font-bold transition-all group",
+                article.bookmarked
+                  ? "text-primary"
+                  : "text-muted-foreground hover:text-primary",
+              )}
+            >
+              <div
+                className={cn(
+                  "flex h-9 w-9 items-center justify-center rounded-full transition-colors",
+                  article.bookmarked
+                    ? "bg-primary/10"
+                    : "bg-secondary group-hover:bg-primary/10",
+                )}
+              >
+                <Bookmark
+                  className={cn("w-5 h-5", article.bookmarked && "fill-current")}
+                  strokeWidth={2}
+                />
+              </div>
+            </motion.button>
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              onClick={handleShare}
+              className="flex items-center gap-2 text-[14px] font-bold text-muted-foreground hover:text-foreground transition-all group"
+            >
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary group-hover:bg-foreground/5 transition-colors">
+                <Share2 className="w-5 h-5" strokeWidth={2} />
+              </div>
+              <span className="hidden sm:inline">Share Story</span>
+            </motion.button>
+          </div>
         </div>
 
         {/* ── Section 11: Comment Section (Conditional) ── */}

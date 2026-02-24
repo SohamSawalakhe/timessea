@@ -36,4 +36,12 @@ export class ArticlesGateway
   notifyArticleViewed(articleId: string, views: number) {
     this.server.emit('articleViewed', { articleId, views });
   }
+
+  notifyArticleLiked(articleId: string, likes: number) {
+    this.server.emit('articleLiked', { articleId, likes });
+  }
+
+  notifyCommentCountUpdate(articleId: string, commentCount: number) {
+    this.server.emit('commentCountUpdate', { articleId, commentCount });
+  }
 }

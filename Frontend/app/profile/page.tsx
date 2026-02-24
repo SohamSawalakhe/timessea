@@ -18,6 +18,9 @@ import {
   Moon,
   LogIn,
   Sun,
+  Edit2,
+  Settings2,
+  Pencil,
   BarChart2,
   Calendar,
   Eye,
@@ -25,6 +28,8 @@ import {
   ThumbsDown,
   History,
   Activity,
+  Users,
+  UserPlus,
 } from "lucide-react";
 
 import { motion, AnimatePresence } from "framer-motion";
@@ -266,47 +271,88 @@ export default function ProfilePage() {
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mb-8 flex flex-col items-center"
+            className="mb-8 flex flex-col bg-card rounded-3xl overflow-hidden border border-border/40 shadow-sm"
           >
-            <div className="relative mb-4 group">
-              <div className="h-24 w-24 overflow-hidden rounded-full ring-4 ring-background shadow-xl">
-                {user.picture ? (
-                  <img
-                    src={user.picture}
-                    alt={user.name}
-                    className="h-full w-full object-cover"
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <div className="h-full w-full bg-primary/10 flex items-center justify-center text-3xl font-bold text-primary">
-                    {user.name?.charAt(0) || "U"}
+            <div className="w-full h-32 sm:h-48 md:h-56 bg-secondary/50 relative">
+              {user.coverImage ? (
+                <img src={user.coverImage} alt="Cover" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-r from-primary/10 to-primary/5"></div>
+              )}
+              {/* Fade at the bottom 50% of the cover image for proper text overlay */}
+              <div className="absolute inset-x-0 bottom-0 h-1/2 bg-linear-to-t from-card to-transparent pointer-events-none"></div>
+              
+              <Link 
+                href="/profile/edit" 
+                className="absolute top-4 right-4 bg-background/40 hover:bg-background/80 backdrop-blur text-foreground p-2 rounded-full transition-all border border-border/20 shadow-sm z-20"
+              >
+                <Pencil className="w-4 h-4" />
+              </Link>
+            </div>
+
+            <div className="w-full px-5 sm:px-8 pb-6 relative z-10">
+              <div className="flex justify-between items-start mb-4 gap-4">
+                <div className="flex flex-col pt-1 z-10 flex-1 text-left min-w-0">
+                  <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-foreground tracking-tight leading-none mb-1.5 drop-shadow-md whitespace-normal">
+                    {user.name}
+                  </h2>
+                  <p className="text-foreground/80 text-sm font-bold drop-shadow-sm whitespace-normal">
+                    {user.handle ? user.handle : user.email}
+                  </p>
+                </div>
+
+                <div className="flex flex-col items-end gap-3 -mt-12 sm:-mt-16 z-20 shrink-0">
+                  <div className="relative group">
+                    <div className="h-24 w-24 sm:h-32 sm:w-32 overflow-hidden rounded-full ring-4 ring-card shadow-xl bg-card">
+                      {user.picture ? (
+                        <img
+                          src={user.picture}
+                          alt={user.name}
+                          className="h-full w-full object-cover group-hover:opacity-90 transition-opacity"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <div className="h-full w-full bg-primary/10 flex items-center justify-center text-5xl font-bold text-primary">
+                          {user.name?.charAt(0) || "U"}
+                        </div>
+                      )}
+                    </div>
+                    <div className="absolute bottom-1 right-1 h-5 w-5 sm:h-6 sm:w-6 rounded-full border-4 border-card bg-green-500 shadow-sm" title="Online" />
                   </div>
+                  
+                  <Link
+                    href="/profile/edit"
+                    className="inline-flex items-center justify-center gap-2 rounded-full px-5 py-2 text-sm font-bold bg-secondary/80 hover:bg-secondary text-foreground transition-all shadow-sm border border-border/40"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                    Edit profile
+                  </Link>
+                </div>
+              </div>
+
+              <div className="mt-4 text-left">
+                {user.bio && (
+                  <p className="text-foreground/90 text-sm sm:text-base max-w-2xl leading-relaxed whitespace-pre-wrap mb-5">
+                    {user.bio}
+                  </p>
                 )}
               </div>
-              <div className="absolute bottom-1 right-1 h-6 w-6 rounded-full border-4 border-background bg-green-500 shadow-sm" />
-            </div>
-            <h2 className="text-xl font-bold text-foreground tracking-tight">
-              {user.name}
-            </h2>
-            <p className="text-sm font-medium text-muted-foreground">
-              {user.email}
-            </p>
-            <div className="mt-4 flex gap-6 text-sm">
-              <div className="flex flex-col items-center">
-                <span className="font-bold text-foreground">
-                  {stats.totalFollowers}
-                </span>
-                <span className="text-muted-foreground text-[11px] uppercase tracking-wider font-semibold">
+
+              <div className="mt-4 flex gap-6 text-sm font-medium text-muted-foreground border-t border-border/40 pt-5">
+                <Link href="/profile/followers" className="hover:text-foreground hover:underline transition-colors flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  <span className="font-bold text-foreground text-base">
+                    {stats.totalFollowers}
+                  </span>
                   Followers
-                </span>
-              </div>
-              <div className="flex flex-col items-center">
-                <span className="font-bold text-foreground">
-                  {stats.totalFollowing}
-                </span>
-                <span className="text-muted-foreground text-[11px] uppercase tracking-wider font-semibold">
+                </Link>
+                <Link href="/profile/following" className="hover:text-foreground hover:underline transition-colors flex items-center gap-2">
+                  <UserPlus className="w-4 h-4" />
+                  <span className="font-bold text-foreground text-base">
+                    {stats.totalFollowing}
+                  </span>
                   Following
-                </span>
+                </Link>
               </div>
             </div>
           </motion.div>
@@ -476,39 +522,74 @@ export default function ProfilePage() {
                 transition={{ delay: 0.2 + index * 0.1 }}
                 key={item.label}
               >
-                <Wrapper
-                  {...wrapperProps}
-                  className="group flex w-full items-center gap-4 rounded-2xl bg-card p-4 transition-all hover:bg-secondary/50 border border-transparent hover:border-border/50 shadow-sm hover:shadow-md"
-                >
-                  <div className="p-2 rounded-xl bg-secondary group-hover:bg-background transition-colors text-foreground relative">
-                    <item.icon className="h-5 w-5" strokeWidth={2} />
-                    {(item as any).badge && (
-                      <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[8px] font-bold text-destructive-foreground shadow-sm">
-                        {(item as any).badge > 9 ? '9+' : (item as any).badge}
-                      </span>
+                {(item as any).href ? (
+                  <Link
+                    href={(item as any).href}
+                    className="group flex w-full items-center gap-4 rounded-2xl bg-card p-4 transition-all hover:bg-secondary/50 border border-transparent hover:border-border/50 shadow-sm hover:shadow-md"
+                  >
+                    <div className="p-2 rounded-xl bg-secondary group-hover:bg-background transition-colors text-foreground relative">
+                      <item.icon className="h-5 w-5" strokeWidth={2} />
+                      {(item as any).badge && (
+                        <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[8px] font-bold text-destructive-foreground shadow-sm">
+                          {(item as any).badge > 9 ? '9+' : (item as any).badge}
+                        </span>
+                      )}
+                    </div>
+                    <span className="flex-1 text-left text-sm font-bold text-foreground">
+                      {item.label}
+                    </span>
+                    {(item as any).action === "switch" && (
+                      <CustomSwitch
+                        checked={notifications}
+                        onCheckedChange={setNotifications}
+                      />
+                    )}
+                    {(item as any).action === "theme" && mounted && (
+                      <CustomSwitch
+                        checked={theme === "dark"}
+                        onCheckedChange={(checked) =>
+                          setTheme(checked ? "dark" : "light")
+                        }
+                      />
+                    )}
+                    {(item as any).action === "chevron" && (
+                      <ChevronRight className="h-4 w-4 text-muted-foreground/50 group-hover:text-foreground transition-colors" />
+                    )}
+                  </Link>
+                ) : (
+                  <div
+                    className="group flex w-full items-center gap-4 rounded-2xl bg-card p-4 transition-all hover:bg-secondary/50 border border-transparent hover:border-border/50 shadow-sm hover:shadow-md cursor-pointer"
+                  >
+                    <div className="p-2 rounded-xl bg-secondary group-hover:bg-background transition-colors text-foreground relative">
+                      <item.icon className="h-5 w-5" strokeWidth={2} />
+                      {(item as any).badge && (
+                        <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[8px] font-bold text-destructive-foreground shadow-sm">
+                          {(item as any).badge > 9 ? '9+' : (item as any).badge}
+                        </span>
+                      )}
+                    </div>
+                    <span className="flex-1 text-left text-sm font-bold text-foreground">
+                      {item.label}
+                    </span>
+                    {(item as any).action === "switch" && (
+                      <CustomSwitch
+                        checked={notifications}
+                        onCheckedChange={setNotifications}
+                      />
+                    )}
+                    {(item as any).action === "theme" && mounted && (
+                      <CustomSwitch
+                        checked={theme === "dark"}
+                        onCheckedChange={(checked) =>
+                          setTheme(checked ? "dark" : "light")
+                        }
+                      />
+                    )}
+                    {(item as any).action === "chevron" && (
+                      <ChevronRight className="h-4 w-4 text-muted-foreground/50 group-hover:text-foreground transition-colors" />
                     )}
                   </div>
-                  <span className="flex-1 text-left text-sm font-bold text-foreground">
-                    {item.label}
-                  </span>
-                  {item.action === "switch" && (
-                    <CustomSwitch
-                      checked={notifications}
-                      onCheckedChange={setNotifications}
-                    />
-                  )}
-                  {item.action === "theme" && mounted && (
-                    <CustomSwitch
-                      checked={theme === "dark"}
-                      onCheckedChange={(checked) =>
-                        setTheme(checked ? "dark" : "light")
-                      }
-                    />
-                  )}
-                  {item.action === "chevron" && (
-                    <ChevronRight className="h-4 w-4 text-muted-foreground/50 group-hover:text-foreground transition-colors" />
-                  )}
-                </Wrapper>
+                )}
               </motion.div>
             );
           })}
