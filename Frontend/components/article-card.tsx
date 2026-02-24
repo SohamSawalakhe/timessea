@@ -7,6 +7,31 @@ import type { Article } from "@/lib/data";
 import { cn } from "@/lib/utils";
 import { analytics, AnalyticsEventType } from "@/lib/analytics";
 import { formatDistanceToNow } from "date-fns";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
+
+function AuthorProfileButton({ author, children, className }: { author: { id: string, name: string }, children: React.ReactNode, className?: string }) {
+  const { user } = useAuth();
+  const router = useRouter();
+
+  const handleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (author.id) {
+      if (user && user.id === author.id) {
+        router.push("/profile");
+      } else {
+        router.push(`/user/${author.id}`);
+      }
+    }
+  };
+
+  return (
+    <button type="button" onClick={handleClick} className={cn("text-left flex items-center gap-2 outline-none group/author cursor-pointer hover:opacity-80 transition-opacity z-10 relative", className)}>
+      {children}
+    </button>
+  );
+}
 
 // Helper to remove markdown images from text
 const stripImageMarkdown = (text: string) => {
@@ -88,8 +113,8 @@ export function ArticleCardFeatured({ article }: { article: Article }) {
         </div>
       )}
       <div className="p-5">
-        <div className="mb-4 flex items-center gap-3">
-          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary ring-2 ring-background overflow-hidden relative">
+        <AuthorProfileButton author={article.author as any} className="mb-4 flex items-start gap-3">
+          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary ring-2 ring-background overflow-hidden relative shrink-0">
             {/* Author Avatar Logic */}
             {article.author.picture ? (
               <Image
@@ -102,8 +127,8 @@ export function ArticleCardFeatured({ article }: { article: Article }) {
               <span>{article.author.name.charAt(0)}</span>
             )}
           </div>
-          <div>
-            <p className="text-xs font-bold text-foreground hover:underline cursor-pointer">
+          <div className="flex flex-col text-left">
+            <p className="text-xs font-bold text-foreground group-hover/author:underline group-hover/author:text-primary transition-colors">
               {article.author.name}
             </p>
             <div className="flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground">
@@ -113,7 +138,7 @@ export function ArticleCardFeatured({ article }: { article: Article }) {
               )}
             </div>
           </div>
-        </div>
+        </AuthorProfileButton>
         <h3 className="mb-2 text-xl font-black leading-tight text-foreground font-serif text-balance group-hover:text-primary transition-colors">
           {article.title}
         </h3>
@@ -162,9 +187,11 @@ export function ArticleCardCompact({ article }: { article: Article }) {
           <h3 className="text-sm font-bold leading-tight text-foreground line-clamp-2 font-serif group-hover:text-primary transition-colors">
             {article.title}
           </h3>
-          <p className="mt-1 text-[10px] font-medium text-muted-foreground">
-            {article.author.name}
-          </p>
+          <AuthorProfileButton author={article.author as any} className="mt-1">
+            <p className="text-[10px] font-medium text-muted-foreground group-hover/author:text-primary group-hover/author:underline transition-colors">
+              {article.author.name}
+            </p>
+          </AuthorProfileButton>
         </div>
         <div className="flex items-center gap-2 mt-2">
           <span className="text-[10px] font-medium text-muted-foreground/80">
@@ -202,8 +229,8 @@ export function ArticleCardHorizontal({ article }: { article: Article }) {
     >
       <div className="flex flex-1 flex-col justify-between">
         <div>
-          <div className="mb-2 flex items-center gap-2">
-            <div className="h-5 w-5 rounded-full bg-secondary flex items-center justify-center text-[9px] font-bold text-muted-foreground overflow-hidden relative">
+          <AuthorProfileButton author={article.author as any} className="mb-2 flex items-center gap-2">
+            <div className="h-5 w-5 rounded-full bg-secondary flex items-center justify-center text-[9px] font-bold text-muted-foreground overflow-hidden relative shrink-0">
               {article.author.picture ? (
                 <Image
                   src={article.author.picture}
@@ -215,8 +242,8 @@ export function ArticleCardHorizontal({ article }: { article: Article }) {
                 <span>{article.author.name.charAt(0)}</span>
               )}
             </div>
-            <span className="text-[11px] font-semibold text-muted-foreground">
-              {article.author.name} ·{" "}
+            <span className="text-[11px] font-semibold text-muted-foreground group-hover/author:text-primary transition-colors">
+              {article.author.name} <span className="text-muted-foreground">·{" "}
               {article.viewedAt
                 ? `Viewed ${formatDistanceToNow(new Date(article.viewedAt), { addSuffix: true })}`
                 : article.readAt
@@ -230,9 +257,9 @@ export function ArticleCardHorizontal({ article }: { article: Article }) {
                           formatDistanceToNow(new Date(article.createdAt), {
                             addSuffix: true,
                           })) ||
-                        "Just now"}
+                        "Just now"}</span>
             </span>
-          </div>
+          </AuthorProfileButton>
           {isSpecialType && (
             <span className="inline-block mb-1 text-[9px] font-black uppercase text-red-500 tracking-wider">
               {article.type}
@@ -325,7 +352,7 @@ export function ArticleCardVertical({ article }: { article: Article }) {
 
       <div className="flex flex-1 flex-col p-4">
         {/* Author & Date */}
-        <div className="mb-2 flex items-center gap-2">
+        <AuthorProfileButton author={article.author as any} className="mb-2 flex items-center gap-2">
           <div className="h-6 w-6 rounded-full bg-secondary flex items-center justify-center text-[9px] font-bold text-muted-foreground overflow-hidden relative border border-border/50 shrink-0">
             {article.author.picture ? (
               <Image
@@ -340,16 +367,16 @@ export function ArticleCardVertical({ article }: { article: Article }) {
               </span>
             )}
           </div>
-          <span className="text-[10px] font-medium text-muted-foreground line-clamp-1">
-            {article.author.name} ·{" "}
+          <span className="text-[10px] font-medium text-muted-foreground line-clamp-1 group-hover/author:text-primary transition-colors">
+            {article.author.name} <span className="text-muted-foreground">·{" "}
             {article.publishedAt ||
               (article.createdAt &&
                 formatDistanceToNow(new Date(article.createdAt), {
                   addSuffix: true,
                 })) ||
-              "Just now"}
+              "Just now"}</span>
           </span>
-        </div>
+        </AuthorProfileButton>
 
         {/* Content */}
         <div className="flex-1 mb-3">

@@ -1035,7 +1035,7 @@ export default function ArticlePage({
         <div className="mb-5 px-1">
           {/* Author Info */}
           <div className="flex items-center gap-3 mb-3">
-            <div className="h-10 w-10 overflow-hidden rounded-full ring-2 ring-border/50 shrink-0">
+            <Link href={user?.id === article.author?.id ? "/profile" : `/user/${article.author?.id}`} className="block h-10 w-10 overflow-hidden rounded-full ring-2 ring-border/50 shrink-0 hover:opacity-80 transition-opacity">
               {article.author?.picture ? (
                 <img
                   src={article.author.picture}
@@ -1048,14 +1048,16 @@ export default function ArticlePage({
                   {article.author?.name?.charAt(0)}
                 </div>
               )}
-            </div>
+            </Link>
             <div className="flex-1 min-w-0">
               <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-0.5">
                 WRITTEN BY
               </p>
-              <h3 className="font-bold text-foreground text-sm leading-tight">
-                {article.author?.name || "Times Sea Bureau"}
-              </h3>
+              <Link href={user?.id === article.author?.id ? "/profile" : `/user/${article.author?.id}`} className="hover:underline hover:text-primary transition-colors block">
+                <h3 className="font-bold text-foreground text-sm leading-tight inline relative">
+                  {article.author?.name || "Times Sea Bureau"}
+                </h3>
+              </Link>
               <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground mt-0.5">
                 {article.location && (
                   <>

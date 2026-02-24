@@ -15,6 +15,7 @@ import type { Article } from "@/lib/data";
 import { cn } from "@/lib/utils";
 import { useViewTracker } from "@/hooks/use-view-tracker";
 import { CommentsDrawer } from "@/components/comments-drawer";
+import { useAuth } from "@/contexts/AuthContext";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
@@ -57,6 +58,7 @@ export function ReelCard({
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
   const contentRef = useRef<HTMLParagraphElement>(null);
+  const { user } = useAuth();
 
   const keyPoints = extractKeyPoints(article.content);
   // Initialize comment count state - use prop value for instant display, then fetch fresh
@@ -317,7 +319,7 @@ export function ReelCard({
           }}
         >
           {/* Author info */}
-          <div className="flex items-center gap-2 mb-2 sm:mb-3">
+          <Link href={user?.id === article.author.id ? "/profile" : `/user/${article.author.id}`} className="flex items-center gap-2 mb-2 sm:mb-3 group/author hover:opacity-80 transition-opacity z-10 w-fit">
             {article.author.picture ? (
               <Image
                 src={article.author.picture}
@@ -331,10 +333,10 @@ export function ReelCard({
                 {article.author.name.charAt(0)}
               </div>
             )}
-            <span className="text-sm font-semibold text-foreground">
+            <span className="text-sm font-semibold text-foreground group-hover/author:underline group-hover/author:text-primary transition-colors">
               {article.author.name}
             </span>
-          </div>
+          </Link>
 
           {/* Title */}
           <h2 className="text-xl sm:text-2xl font-black leading-tight text-foreground mb-3 sm:mb-4 font-serif">

@@ -232,6 +232,7 @@ export default function ProfilePage() {
       icon: UserCircle,
       label: "Personal Data",
       action: "chevron" as const,
+      href: "/profile/edit",
     },
     {
       icon: Bell,
@@ -510,7 +511,7 @@ export default function ProfilePage() {
         <h3 className="mb-4 text-xs font-bold uppercase tracking-widest text-muted-foreground/70 px-2">
           General
         </h3>
-        <div className="space-y-2">
+        <div className="flex flex-col gap-3">
           {generalItems.map((item, index) => {
             const Wrapper = (item as any).href ? Link : 'div';
             const wrapperProps = (item as any).href ? { href: (item as any).href } : {};
@@ -525,7 +526,7 @@ export default function ProfilePage() {
                 {(item as any).href ? (
                   <Link
                     href={(item as any).href}
-                    className="group flex w-full items-center gap-4 rounded-2xl bg-card p-4 transition-all hover:bg-secondary/50 border border-transparent hover:border-border/50 shadow-sm hover:shadow-md"
+                    className="group flex w-full items-center gap-4 rounded-2xl bg-card p-4 transition-all hover:bg-secondary/20 border border-border/40 shadow-sm hover:shadow-md"
                   >
                     <div className="p-2 rounded-xl bg-secondary group-hover:bg-background transition-colors text-foreground relative">
                       <item.icon className="h-5 w-5" strokeWidth={2} />
@@ -558,7 +559,7 @@ export default function ProfilePage() {
                   </Link>
                 ) : (
                   <div
-                    className="group flex w-full items-center gap-4 rounded-2xl bg-card p-4 transition-all hover:bg-secondary/50 border border-transparent hover:border-border/50 shadow-sm hover:shadow-md cursor-pointer"
+                    className="group flex w-full items-center gap-4 rounded-2xl bg-card p-4 transition-all hover:bg-secondary/20 border border-border/40 shadow-sm hover:shadow-md cursor-pointer"
                   >
                     <div className="p-2 rounded-xl bg-secondary group-hover:bg-background transition-colors text-foreground relative">
                       <item.icon className="h-5 w-5" strokeWidth={2} />

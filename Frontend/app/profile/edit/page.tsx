@@ -118,52 +118,57 @@ export default function EditProfilePage() {
           </button>
         </div>
 
-        <div className="space-y-8 bg-card border border-border/50 rounded-3xl p-6 sm:p-8">
-          
-          {/* Cover Image */}
-          <div className="space-y-4">
-            <label className="text-sm font-bold tracking-wider uppercase text-muted-foreground flex items-center gap-2">
-              <ImageIcon className="w-4 h-4" />
-              Cover Image
-            </label>
-            <div 
-              onClick={() => coverInputRef.current?.click()}
-              className="w-full relative h-32 sm:h-40 rounded-xl overflow-hidden border-2 border-dashed border-border/60 hover:border-primary/50 transition-colors cursor-pointer group bg-secondary/10 flex flex-col items-center justify-center"
-            >
-              {formData.coverImage ? (
-                <>
-                  <img src={formData.coverImage} alt="Cover Preview" className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-background/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
-                    <span className="bg-background text-foreground px-4 py-2 rounded-full text-sm font-bold flex items-center gap-2 shadow-xl">
-                      <Upload className="w-4 h-4" /> Change Cover
-                    </span>
-                  </div>
-                </>
-              ) : (
-                <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                  <Upload className="w-8 h-8 opacity-50" />
-                  <span className="text-sm font-medium">Click to upload cover image</span>
+        <div className="space-y-6">
+          {/* Images Card */}
+          <div className="bg-card border border-border/40 rounded-3xl p-6 sm:p-8 space-y-8 shadow-sm">
+            <div>
+              <h2 className="text-xl font-bold tracking-tight text-foreground mb-1">Profile Images</h2>
+              <p className="text-sm text-muted-foreground mb-6">Update your display picture and cover image.</p>
+              
+              {/* Cover Image */}
+              <div className="space-y-4">
+                <label className="text-xs font-bold tracking-wider uppercase text-muted-foreground flex items-center gap-2">
+                  <ImageIcon className="w-4 h-4" />
+                  Cover Image
+                </label>
+                <div 
+                  onClick={() => coverInputRef.current?.click()}
+                  className="w-full relative h-32 sm:h-40 rounded-xl overflow-hidden border-2 border-dashed border-border/60 hover:border-primary/50 transition-colors cursor-pointer group bg-secondary/10 flex flex-col items-center justify-center"
+                >
+                  {formData.coverImage ? (
+                    <>
+                      <img src={formData.coverImage} alt="Cover Preview" className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-background/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
+                        <span className="bg-background text-foreground px-4 py-2 rounded-full text-sm font-bold flex items-center gap-2 shadow-xl">
+                          <Upload className="w-4 h-4" /> Change Cover
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                      <Upload className="w-8 h-8 opacity-50" />
+                      <span className="text-sm font-medium">Click to upload cover image</span>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              ref={coverInputRef}
-              onChange={(e) => handleImageSelect(e, "coverImage")}
-            />
-            <p className="text-xs text-muted-foreground">For best results, use an image with an aspect ratio of 3:1.</p>
-          </div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  ref={coverInputRef}
+                  onChange={(e) => handleImageSelect(e, "coverImage")}
+                />
+                <p className="text-xs text-muted-foreground">For best results, use an image with an aspect ratio of 3:1.</p>
+              </div>
 
-          <hr className="border-border/30" />
+              <div className="h-px w-full bg-border/40 my-8" />
 
-          {/* Profile Picture */}
-          <div className="space-y-4">
-            <label className="text-sm font-bold tracking-wider uppercase text-muted-foreground flex items-center gap-2">
-              <ImageIcon className="w-4 h-4" />
-              Profile Avatar
-            </label>
+              {/* Profile Picture */}
+              <div className="space-y-4">
+                <label className="text-xs font-bold tracking-wider uppercase text-muted-foreground flex items-center gap-2">
+                  <ImageIcon className="w-4 h-4" />
+                  Profile Avatar
+                </label>
             <div className="flex gap-6 items-center">
               <div 
                 onClick={() => avatarInputRef.current?.click()}
@@ -207,56 +212,65 @@ export default function EditProfilePage() {
                 onChange={(e) => handleImageSelect(e, "picture")}
               />
             </div>
+              </div>
+            </div>
           </div>
 
-          <hr className="border-border/30" />
+          {/* Basic Information Card */}
+          <div className="bg-card border border-border/40 rounded-3xl p-6 sm:p-8 space-y-6 shadow-sm">
+            <div>
+              <h2 className="text-xl font-bold tracking-tight text-foreground mb-1">Basic Information</h2>
+              <p className="text-sm text-muted-foreground mb-6">Manage your name, unique handle, and bio.</p>
 
-          {/* Name */}
-          <div className="space-y-4">
-            <label className="text-sm font-bold tracking-wider uppercase text-muted-foreground">
-              Name
-            </label>
-            <input
-              type="text"
-              name="name"
-              value={formData.name}
-              onChange={handleChange}
-              placeholder="Your full name"
-              className="w-full bg-secondary/30 rounded-xl border border-border/50 px-4 py-3 text-sm text-foreground outline-none focus:border-primary/50 transition-all"
-            />
+              <div className="space-y-6 max-w-xl">
+                {/* Name */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold tracking-wider uppercase text-muted-foreground">
+                    Name
+                  </label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleChange}
+                    placeholder="Your full name"
+                    className="w-full bg-secondary/30 rounded-xl border border-border/50 px-4 py-3 text-sm text-foreground outline-none focus:border-primary/50 focus:bg-background transition-all"
+                  />
+                </div>
+
+                {/* Handle */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold tracking-wider uppercase text-muted-foreground">
+                    Unique Handle
+                  </label>
+                  <input
+                    type="text"
+                    name="handle"
+                    value={formData.handle}
+                    onChange={handleChange}
+                    placeholder="username"
+                    className="w-full bg-secondary/30 rounded-xl border border-border/50 px-4 py-3 text-sm text-foreground outline-none focus:border-primary/50 focus:bg-background transition-all"
+                  />
+                  <p className="text-xs text-muted-foreground">This will be your unique identifier on Times Sea (without @).</p>
+                </div>
+
+                {/* Bio */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold tracking-wider uppercase text-muted-foreground">
+                    Short Bio
+                  </label>
+                  <textarea
+                    name="bio"
+                    value={formData.bio}
+                    onChange={handleChange}
+                    placeholder="Tell us a little bit about yourself..."
+                    rows={4}
+                    className="w-full bg-secondary/30 rounded-xl border border-border/50 px-4 py-3 text-sm text-foreground outline-none focus:border-primary/50 focus:bg-background transition-all resize-none"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
-
-          {/* Handle */}
-          <div className="space-y-4">
-            <label className="text-sm font-bold tracking-wider uppercase text-muted-foreground">
-              Unique Handle
-            </label>
-            <input
-              type="text"
-              name="handle"
-              value={formData.handle}
-              onChange={handleChange}
-              placeholder="username"
-              className="w-full bg-secondary/30 rounded-xl border border-border/50 px-4 py-3 text-sm text-foreground outline-none focus:border-primary/50 transition-all"
-            />
-            <p className="text-xs text-muted-foreground">This will be your unique identifier on Times Sea (without @).</p>
-          </div>
-
-          {/* Bio */}
-          <div className="space-y-4">
-            <label className="text-sm font-bold tracking-wider uppercase text-muted-foreground">
-              Short Bio
-            </label>
-            <textarea
-              name="bio"
-              value={formData.bio}
-              onChange={handleChange}
-              placeholder="Tell us a little bit about yourself..."
-              rows={4}
-              className="w-full bg-secondary/30 rounded-xl border border-border/50 px-4 py-3 text-sm text-foreground outline-none focus:border-primary/50 transition-all resize-none"
-            />
-          </div>
-
         </div>
       </div>
     </AppShell>
