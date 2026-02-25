@@ -11,6 +11,7 @@ import {
   ChevronUp,
   MoreHorizontal,
 } from "lucide-react";
+import { toast } from "react-toastify";
 import type { Article } from "@/lib/data";
 import { cn } from "@/lib/utils";
 import { useViewTracker } from "@/hooks/use-view-tracker";
@@ -29,6 +30,7 @@ interface ReelCardProps {
   onToggleLike: (id: string) => void;
   onToggleSave: (id: string) => void;
   onView: (id: string) => void;
+  onAuthRequired: () => void;
 }
 
 function extractKeyPoints(content: string): string[] {
@@ -52,13 +54,34 @@ export function ReelCard({
   onToggleLike,
   onToggleSave,
   onView,
+  onAuthRequired,
 }: ReelCardProps) {
   /* eslint-disable react-hooks/exhaustive-deps */
   const [showReadMore, setShowReadMore] = useState(false);
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
   const contentRef = useRef<HTMLParagraphElement>(null);
-  const { user } = useAuth();
+  const { user, token } = useAuth();
+  
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [isFollowLoading, setIsFollowLoading] = useState(false);
+
+  // You can fetch initial follow status using the author ID when the reel becomes visible or globally.
+  // We'll leave it as false initially, and it will update.
+  useEffect(() => {
+    if (user && article.author.id) {
+      fetch(`${API_URL}/users/${article.author.id}/profile?currentUserId=${user.id}`, {
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) }
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data && typeof data.isFollowing === 'boolean') {
+          setIsFollowing(data.isFollowing);
+        }
+      })
+      .catch(() => {});
+    }
+  }, [user, article.author.id, token]);
 
   const keyPoints = extractKeyPoints(article.content);
   // Initialize comment count state - use prop value for instant display, then fetch fresh
@@ -318,25 +341,66 @@ export function ReelCard({
             msOverflowStyle: "none",
           }}
         >
-          {/* Author info */}
-          <Link href={user?.id === article.author.id ? "/profile" : `/user/${article.author.id}`} className="flex items-center gap-2 mb-2 sm:mb-3 group/author hover:opacity-80 transition-opacity z-10 w-fit">
-            {article.author.picture ? (
-              <Image
-                src={article.author.picture}
-                alt={article.author.name}
-                width={32}
-                height={32}
-                className="h-8 w-8 rounded-full object-cover ring-2 ring-border"
-              />
-            ) : (
-              <div className="h-8 w-8 rounded-full bg-linear-to-br from-blue-500 to-purple-600 flex items-center justify-center text-sm font-bold text-white ring-2 ring-border">
-                {article.author.name.charAt(0)}
-              </div>
+          <div className="flex items-center gap-3 mb-2 sm:mb-3 z-10 w-fit">
+            <Link href={user?.id === article.author.id ? "/profile" : `/user/${article.author.id}`} className="flex items-center gap-2 group/author hover:opacity-80 transition-opacity">
+              {article.author.picture ? (
+                <Image
+                  src={article.author.picture}
+                  alt={article.author.name}
+                  width={32}
+                  height={32}
+                  className="h-8 w-8 rounded-full object-cover ring-2 ring-border"
+                  unoptimized
+                />
+              ) : (
+                <div className="h-8 w-8 rounded-full bg-linear-to-br from-blue-500 to-purple-600 flex items-center justify-center text-sm font-bold text-white ring-2 ring-border">
+                  {article.author.name.charAt(0)}
+                </div>
+              )}
+              <span className="text-sm font-semibold text-foreground group-hover/author:underline group-hover/author:text-primary transition-colors">
+                {article.author.name}
+              </span>
+            </Link>
+
+            {/* Follow Button */}
+            {user?.id !== article.author.id && (
+              <button
+                type="button"
+                className={cn(
+                  "rounded-full px-3 py-1 text-[11px] font-bold transition-all shrink-0",
+                  isFollowing
+                    ? "bg-secondary text-foreground hover:bg-secondary/80 ring-1 ring-border"
+                    : "text-primary ring-1 ring-primary/30 hover:bg-primary/5",
+                  isFollowLoading && "opacity-50 cursor-not-allowed"
+                )}
+                disabled={isFollowLoading}
+                onClick={async () => {
+                  if (!user) {
+                    onAuthRequired();
+                    return;
+                  }
+                  setIsFollowLoading(true);
+                  try {
+                    const res = await fetch(`${API_URL}/users/${article.author.id}/follow`, {
+                      method: "POST",
+                      headers: { Authorization: `Bearer ${token}` },
+                    });
+                    if (res.ok) {
+                      const data = await res.json();
+                      setIsFollowing(data.following);
+                      toast.success(data.following ? `Following ${article.author.name}` : `Unfollowed ${article.author.name}`);
+                    }
+                  } catch (err) {
+                    console.error("Failed to follow", err);
+                  } finally {
+                    setIsFollowLoading(false);
+                  }
+                }}
+              >
+                {isFollowLoading ? "..." : isFollowing ? "Following" : "Follow"}
+              </button>
             )}
-            <span className="text-sm font-semibold text-foreground group-hover/author:underline group-hover/author:text-primary transition-colors">
-              {article.author.name}
-            </span>
-          </Link>
+          </div>
 
           {/* Title */}
           <h2 className="text-xl sm:text-2xl font-black leading-tight text-foreground mb-3 sm:mb-4 font-serif">
@@ -385,7 +449,13 @@ export function ReelCard({
           {/* Like Button */}
           <button
             type="button"
-            onClick={() => onToggleLike(article.id)}
+            onClick={() => {
+              if (!user) {
+                onAuthRequired();
+                return;
+              }
+              onToggleLike(article.id);
+            }}
             className="flex flex-col items-center gap-1 group"
             aria-label={isLiked ? "Unlike" : "Like"}
           >
@@ -414,7 +484,13 @@ export function ReelCard({
           <button
             type="button"
             className="flex flex-col items-center gap-1 group"
-            onClick={() => setIsCommentsOpen(true)}
+            onClick={() => {
+              if (!user) {
+                onAuthRequired();
+                return;
+              }
+              setIsCommentsOpen(true);
+            }}
           >
             <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-muted/30 text-foreground border border-border/50 flex items-center justify-center shadow-md transition-all transform group-active:scale-90">
               <MessageCircle
@@ -430,7 +506,13 @@ export function ReelCard({
           {/* Bookmark Button */}
           <button
             type="button"
-            onClick={() => onToggleSave(article.id)}
+            onClick={() => {
+              if (!user) {
+                onAuthRequired();
+                return;
+              }
+              onToggleSave(article.id);
+            }}
             className="flex flex-col items-center gap-1 group"
           >
             <div

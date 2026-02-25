@@ -1,66 +1,58 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, use } from "react";
 import { AppShell } from "@/components/app-shell";
-import { useAuth } from "@/contexts/AuthContext";
 import { ArrowLeft, UserCircle } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "react-toastify";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
-type FollowerUser = {
+type FollowingUser = {
   id: string;
   name: string;
   picture: string | null;
   followedAt: string;
 };
 
-export default function FollowersPage() {
-  const { user, token } = useAuth();
-  const router = useRouter();
-  const [followers, setFollowers] = useState<FollowerUser[]>([]);
+export default function UserFollowingPage({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = use(params);
+  const userId = resolvedParams.id;
+  const { user } = useAuth();
+  
+  const [following, setFollowing] = useState<FollowingUser[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) {
-      if (!loading) router.push("/login");
-      return;
-    }
-
-    const fetchFollowers = async () => {
+    const fetchFollowing = async () => {
       try {
-        const res = await fetch(`${API_URL}/users/${user.id}/followers`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        const res = await fetch(`${API_URL}/users/${userId}/following`);
         if (res.ok) {
           const data = await res.json();
-          setFollowers(data);
+          setFollowing(data);
         } else {
-          toast.error("Failed to fetch followers");
+          toast.error("Failed to fetch following users");
         }
       } catch (e) {
-        console.error("Error fetching followers:", e);
+        console.error("Error fetching following:", e);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchFollowers();
-  }, [user, token, router, loading]);
+    fetchFollowing();
+  }, [userId]);
 
   return (
     <AppShell>
       <div className="max-w-2xl mx-auto px-4 py-6">
         <div className="flex items-center gap-4 mb-8">
-          <Link href="/profile" className="p-2 -ml-2 hover:bg-secondary rounded-full transition-colors">
+          <Link href={`/user/${userId}`} className="p-2 -ml-2 hover:bg-secondary rounded-full transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <h1 className="text-2xl font-black tracking-tight text-foreground font-serif">
-            Followers
+            Following
           </h1>
         </div>
 
@@ -76,50 +68,50 @@ export default function FollowersPage() {
               </div>
             ))}
           </div>
-        ) : followers.length === 0 ? (
+        ) : following.length === 0 ? (
           <div className="text-center py-12 rounded-2xl bg-secondary/20 border border-dashed border-border/50">
             <UserCircle className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
             <p className="text-[14px] font-medium text-muted-foreground">
-              You don't have any followers yet.
+              This user isn't following anyone yet.
             </p>
           </div>
         ) : (
           <div className="space-y-3">
-            {followers.map((follower) => (
+            {following.map((followedUser) => (
               <div 
-                key={follower.id}
+                key={followedUser.id}
                 className="flex items-center justify-between p-4 rounded-2xl bg-card hover:bg-secondary/40 border border-transparent hover:border-border/50 transition-all group"
               >
                 <Link 
-                  href={`/user/${follower.id}`}
+                  href={`/user/${followedUser.id}`}
                   className="flex items-center gap-4 flex-1"
                 >
                   <div className="h-12 w-12 overflow-hidden rounded-full ring-2 ring-background shadow-sm shrink-0 bg-secondary flex items-center justify-center">
-                    {follower.picture ? (
+                    {followedUser.picture ? (
                       <img
-                        src={follower.picture}
-                        alt={follower.name}
+                        src={followedUser.picture}
+                        alt={followedUser.name}
                         className="h-full w-full object-cover"
                         referrerPolicy="no-referrer"
                       />
                     ) : (
                       <span className="text-lg font-bold text-muted-foreground">
-                        {follower.name?.charAt(0) || "U"}
+                        {followedUser.name?.charAt(0) || "U"}
                       </span>
                     )}
                   </div>
                   <div>
                     <h3 className="text-[15px] font-bold text-foreground group-hover:text-primary transition-colors">
-                      {follower.name}
+                      {followedUser.name}
                     </h3>
                   </div>
                 </Link>
-                {user?.id !== follower.id && (
+                {user?.id !== followedUser.id && (
                   <Link
-                    href={`/user/${follower.id}`} 
+                    href={`/user/${followedUser.id}`} 
                     className="px-4 py-1.5 bg-secondary hover:bg-secondary/80 text-foreground text-[14px] font-semibold rounded-lg border border-transparent transition-colors ml-4"
                   >
-                    View Profile
+                    Following
                   </Link>
                 )}
               </div>

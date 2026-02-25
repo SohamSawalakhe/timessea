@@ -7,6 +7,8 @@ import { ReelCard } from "@/components/reel-card";
 import { ReelSkeleton } from "@/components/reel-skeleton";
 import type { Article } from "@/lib/data";
 import { useAuth } from "@/contexts/AuthContext";
+import { AuthPromptModal } from "@/components/auth-prompt-modal";
+import { useRouter } from "next/navigation";
 
 // Map specific local paths to Unsplash images
 const imageMap: Record<string, string> = {
@@ -51,7 +53,13 @@ export function ExploreClient({ initialArticles }: ExploreClientProps) {
   const [offset, setOffset] = useState(initialArticles.length);
   const [hasMore, setHasMore] = useState(true);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const router = useRouter();
   const observerTarget = useRef<HTMLDivElement>(null);
+
+  const handleAuthRequired = useCallback(() => {
+    setShowAuthModal(true);
+  }, []);
 
   const fetchArticles = useCallback(
     async (currentOffset: number, shouldReplace = false) => {
@@ -334,6 +342,7 @@ export function ExploreClient({ initialArticles }: ExploreClientProps) {
             onToggleLike={toggleLike}
             onToggleSave={toggleSave}
             onView={handleView}
+            onAuthRequired={handleAuthRequired}
           />
           {/* Trigger load when we reach the 3rd to last item (70% point) */}
           {index === articles.length - 3 && (
@@ -353,6 +362,12 @@ export function ExploreClient({ initialArticles }: ExploreClientProps) {
           <ReelSkeleton />
         </>
       )}
+
+      <AuthPromptModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onLogin={() => router.push(`/login?redirect=/explore`)}
+      />
     </div>
   );
 }

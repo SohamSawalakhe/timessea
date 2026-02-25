@@ -86,34 +86,43 @@ export default function FollowingPage() {
         ) : (
           <div className="space-y-3">
             {following.map((followedUser) => (
-              <Link 
+              <div 
                 key={followedUser.id}
-                href={`/user/${followedUser.id}`}
-                className="flex items-center gap-4 p-4 rounded-2xl bg-card hover:bg-secondary/40 border border-transparent hover:border-border/50 transition-all group"
+                className="flex items-center justify-between p-4 rounded-2xl bg-card hover:bg-secondary/40 border border-transparent hover:border-border/50 transition-all group"
               >
-                <div className="h-12 w-12 overflow-hidden rounded-full ring-2 ring-background shadow-sm shrink-0 bg-secondary flex items-center justify-center">
-                  {followedUser.picture ? (
-                    <img
-                      src={followedUser.picture}
-                      alt={followedUser.name}
-                      className="h-full w-full object-cover"
-                      referrerPolicy="no-referrer"
-                    />
-                  ) : (
-                    <span className="text-lg font-bold text-muted-foreground">
-                      {followedUser.name?.charAt(0) || "U"}
-                    </span>
-                  )}
-                </div>
-                <div>
-                  <h3 className="text-[15px] font-bold text-foreground group-hover:text-primary transition-colors">
-                    {followedUser.name}
-                  </h3>
-                  <p className="text-[12px] text-muted-foreground">
-                    Started following {new Date(followedUser.followedAt).toLocaleDateString()}
-                  </p>
-                </div>
-              </Link>
+                <Link 
+                  href={`/user/${followedUser.id}`}
+                  className="flex items-center gap-4 flex-1"
+                >
+                  <div className="h-12 w-12 overflow-hidden rounded-full ring-2 ring-background shadow-sm shrink-0 bg-secondary flex items-center justify-center">
+                    {followedUser.picture ? (
+                      <img
+                        src={followedUser.picture}
+                        alt={followedUser.name}
+                        className="h-full w-full object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <span className="text-lg font-bold text-muted-foreground">
+                        {followedUser.name?.charAt(0) || "U"}
+                      </span>
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="text-[15px] font-bold text-foreground group-hover:text-primary transition-colors">
+                      {followedUser.name}
+                    </h3>
+                  </div>
+                </Link>
+                {user?.id !== followedUser.id && (
+                  <Link
+                    href={`/user/${followedUser.id}`} 
+                    className="px-4 py-1.5 bg-secondary hover:bg-secondary/80 text-foreground text-[14px] font-semibold rounded-lg border border-transparent transition-colors ml-4"
+                  >
+                    Following
+                  </Link>
+                )}
+              </div>
             ))}
           </div>
         )}

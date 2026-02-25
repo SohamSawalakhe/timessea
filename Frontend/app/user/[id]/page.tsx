@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
 import { use } from "react";
 import { ArticleCardHorizontal } from "@/components/article-card";
-import { Article } from "@/lib/types";
+import type { Article } from "@/lib/data";
 import { cn } from "@/lib/utils";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
@@ -177,12 +177,14 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
                   <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-foreground tracking-tight leading-none mb-1.5 drop-shadow-md whitespace-normal">
                     {profile.name}
                   </h1>
-                  <p className="text-foreground/80 text-sm font-bold drop-shadow-sm whitespace-normal">
-                    {profile.handle ? profile.handle : "No Handle"}
-                  </p>
+                  {profile.handle && (
+                    <p className="text-foreground/80 text-sm font-bold drop-shadow-sm whitespace-normal">
+                      {profile.handle}
+                    </p>
+                  )}
                 </div>
 
-                <div className="flex flex-col items-end gap-3 -mt-12 sm:-mt-16 z-20 shrink-0">
+                <div className="flex flex-col items-center gap-3 -mt-12 sm:-mt-16 z-20 shrink-0">
                   <div className="relative group">
                     <div className="h-24 w-24 sm:h-32 sm:w-32 overflow-hidden rounded-full ring-4 ring-card shadow-xl bg-card">
                       {profile.picture ? (
@@ -211,7 +213,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
                       isFollowLoading && "opacity-50 cursor-not-allowed"
                     )}
                   >
-                    {isFollowLoading ? "..." : isFollowing ? "Following" : "Subscribe"}
+                    {isFollowLoading ? "..." : isFollowing ? "Following" : "Follow"}
                   </button>
                 </div>
               </div>
@@ -231,18 +233,18 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
                   <span className="hidden sm:inline">Articles</span>
 									<span className="sm:hidden text-xs">Articles</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Users className="w-4 h-4 hidden sm:block" />
-                  <span className="font-bold text-foreground text-base">{profile._count.followers}</span>
+                <Link href={`/user/${userId}/followers`} className="flex items-center gap-2 hover:text-foreground transition-colors group cursor-pointer">
+                  <Users className="w-4 h-4 hidden sm:block group-hover:text-primary transition-colors" />
+                  <span className="font-bold text-foreground text-base group-hover:text-primary transition-colors">{profile._count.followers}</span>
                   <span className="hidden sm:inline">Followers</span>
 									<span className="sm:hidden text-xs">Followers</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <UserPlus className="w-4 h-4 hidden sm:block" />
-                  <span className="font-bold text-foreground text-base">{profile._count.following}</span>
+                </Link>
+                <Link href={`/user/${userId}/following`} className="flex items-center gap-2 hover:text-foreground transition-colors group cursor-pointer">
+                  <UserPlus className="w-4 h-4 hidden sm:block group-hover:text-primary transition-colors" />
+                  <span className="font-bold text-foreground text-base group-hover:text-primary transition-colors">{profile._count.following}</span>
                   <span className="hidden sm:inline">Following</span>
 									<span className="sm:hidden text-xs">Following</span>
-                </div>
+                </Link>
               </div>
             </div>
           </div>

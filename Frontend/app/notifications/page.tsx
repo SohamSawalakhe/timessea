@@ -122,7 +122,7 @@ export default function NotificationsPage() {
   const { token, isAuthenticated, isLoading: authLoading } = useAuth()
   const router = useRouter()
 
-  const fetchNotifications = useCallback(async () => {
+  const fetchNotifications = useCallback(async (isInitial = false) => {
     if (!token) return
     try {
       const res = await fetch(`${API_URL}/api/notifications`, {
@@ -132,7 +132,31 @@ export default function NotificationsPage() {
       })
       if (res.ok) {
         const data = await res.json()
-        setNotifications(data)
+        
+        setNotifications((prev) => {
+          if (isInitial) return data
+
+          // If polling, keep existing local 'unread' status so items don't suddenly disappear
+          // from the "Unread" tab just because we auto-marked them on the backend during isInitial.
+          return data.map((newNotif: Notification) => {
+            const existing = prev.find((p) => p.id === newNotif.id)
+            if (existing && !existing.read) {
+              return { ...newNotif, read: false }
+            }
+            return newNotif
+          })
+        })
+
+        // Auto-mark read on backend without changing UI for the current session
+        if (isInitial) {
+          const hasUnread = data.some((n: Notification) => !n.read)
+          if (hasUnread) {
+            fetch(`${API_URL}/api/notifications/read-all`, {
+              method: "POST",
+              headers: { Authorization: `Bearer ${token}` },
+            }).catch((err) => console.error("Auto-read failed:", err))
+          }
+        }
       }
     } catch (err) {
       console.error("Failed to fetch notifications:", err)
@@ -147,8 +171,8 @@ export default function NotificationsPage() {
       router.push("/login?redirect=/notifications")
       return
     }
-    fetchNotifications()
-    const interval = setInterval(fetchNotifications, 30000)
+    fetchNotifications(true)
+    const interval = setInterval(() => fetchNotifications(false), 30000)
     return () => clearInterval(interval)
   }, [token, isAuthenticated, authLoading, router, fetchNotifications])
 

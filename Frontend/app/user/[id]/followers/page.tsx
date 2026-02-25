@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, use } from "react";
 import { AppShell } from "@/components/app-shell";
-import { useAuth } from "@/contexts/AuthContext";
 import { ArrowLeft, UserCircle } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "react-toastify";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
@@ -17,25 +16,18 @@ type FollowerUser = {
   followedAt: string;
 };
 
-export default function FollowersPage() {
-  const { user, token } = useAuth();
-  const router = useRouter();
+export default function UserFollowersPage({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = use(params);
+  const userId = resolvedParams.id;
+  const { user } = useAuth();
+  
   const [followers, setFollowers] = useState<FollowerUser[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) {
-      if (!loading) router.push("/login");
-      return;
-    }
-
     const fetchFollowers = async () => {
       try {
-        const res = await fetch(`${API_URL}/users/${user.id}/followers`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        const res = await fetch(`${API_URL}/users/${userId}/followers`);
         if (res.ok) {
           const data = await res.json();
           setFollowers(data);
@@ -50,13 +42,13 @@ export default function FollowersPage() {
     };
 
     fetchFollowers();
-  }, [user, token, router, loading]);
+  }, [userId]);
 
   return (
     <AppShell>
       <div className="max-w-2xl mx-auto px-4 py-6">
         <div className="flex items-center gap-4 mb-8">
-          <Link href="/profile" className="p-2 -ml-2 hover:bg-secondary rounded-full transition-colors">
+          <Link href={`/user/${userId}`} className="p-2 -ml-2 hover:bg-secondary rounded-full transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <h1 className="text-2xl font-black tracking-tight text-foreground font-serif">
@@ -80,7 +72,7 @@ export default function FollowersPage() {
           <div className="text-center py-12 rounded-2xl bg-secondary/20 border border-dashed border-border/50">
             <UserCircle className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
             <p className="text-[14px] font-medium text-muted-foreground">
-              You don't have any followers yet.
+              This user doesn't have any followers yet.
             </p>
           </div>
         ) : (

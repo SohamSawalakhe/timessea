@@ -1,0 +1,5 @@
+app/user/[id]/page.tsx(12,25): error TS2307: Cannot find module '@/lib/types' or its corresponding type declarations.
+components/reel-card.tsx(378,21): error TS2304: Cannot find name 'onAuthRequired'.
+components/reel-card.tsx(453,17): error TS2304: Cannot find name 'onAuthRequired'.
+components/reel-card.tsx(488,17): error TS2304: Cannot find name 'onAuthRequired'.
+components/reel-card.tsx(510,17): error TS2304: Cannot find name 'onAuthRequired'.
