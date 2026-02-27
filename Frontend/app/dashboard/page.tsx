@@ -22,7 +22,6 @@ import Link from "next/link"
 import {
   ComposedChart,
   Line,
-  Area,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -330,12 +329,6 @@ export default function DashboardPage() {
         <div className="h-72 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={trendData}>
-              <defs>
-                <linearGradient id="colorReads" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#ec4899" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#ec4899" stopOpacity={0}/>
-                </linearGradient>
-              </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.4} />
               <XAxis 
                 dataKey="name" 
@@ -345,17 +338,10 @@ export default function DashboardPage() {
                 dy={10}
               />
               <YAxis 
-                yAxisId="left"
                 axisLine={false} 
                 tickLine={false} 
                 tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10, fontWeight: 600 }} 
-              />
-              <YAxis 
-                yAxisId="right"
-                orientation="right"
-                axisLine={false} 
-                tickLine={false} 
-                tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10, fontWeight: 600 }} 
+                allowDecimals={false}
               />
               <Tooltip 
                 contentStyle={{ 
@@ -372,18 +358,17 @@ export default function DashboardPage() {
                 wrapperStyle={{ paddingTop: '20px' }}
                 iconType="circle"
               />
-              <Area 
-                yAxisId="left"
+              <Line 
                 type="monotone" 
-                dataKey="reads" 
-                stroke="#ec4899" 
+                dataKey="comments" 
+                stroke="#3b82f6" 
                 strokeWidth={3}
-                fill="url(#colorReads)" 
+                dot={{ r: 4, fill: "#3b82f6", strokeWidth: 2, stroke: "#fff" }}
+                activeDot={{ r: 6 }}
                 animationDuration={1500}
-                name="Reads"
+                name="Comments"
               />
               <Line 
-                yAxisId="right"
                 type="monotone" 
                 dataKey="likes" 
                 stroke="#a855f7" 
@@ -394,15 +379,14 @@ export default function DashboardPage() {
                 name="Likes"
               />
               <Line 
-                yAxisId="right"
                 type="monotone" 
-                dataKey="comments" 
-                stroke="#3b82f6" 
+                dataKey="reads" 
+                stroke="#ec4899" 
                 strokeWidth={3}
-                dot={{ r: 4, fill: "#3b82f6", strokeWidth: 2, stroke: "#fff" }}
-                activeDot={{ r: 6 }}
+                dot={{ r: 5, fill: "#ec4899", strokeWidth: 2, stroke: "#fff" }}
+                activeDot={{ r: 7 }}
                 animationDuration={1500}
-                name="Comments"
+                name="Reads"
               />
             </ComposedChart>
           </ResponsiveContainer>

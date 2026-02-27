@@ -614,7 +614,7 @@ export default function ProfilePage() {
 
       {/* Version */}
       <p className="mt-8 mb-4 text-center text-[10px] font-medium text-muted-foreground/50">
-        Blogify V1.2.0 (Build 240)
+        The Aandolan V1.2.0 (Build 240)
       </p>
     </AppShell>
   );

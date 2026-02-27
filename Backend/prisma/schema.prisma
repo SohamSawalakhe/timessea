@@ -15,6 +15,7 @@ model User {
   picture       String?
   coverImage    String?
   bio           String?
+  location      String?
   handle        String?        @unique
   googleId      String?        @unique
   provider      String?        @default("google")

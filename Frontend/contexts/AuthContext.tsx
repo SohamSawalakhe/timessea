@@ -18,6 +18,7 @@ interface User {
   coverImage?: string;
   bio?: string;
   handle?: string;
+  location?: string;
 }
 
 interface AuthContextType {

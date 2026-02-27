@@ -15,9 +15,9 @@ const sourceSerif = Source_Serif_4({
 });
 
 export const metadata: Metadata = {
-  title: "Blogify - Your Stories, Your Platform",
+  title: "The Aandolan - Your Voice, Revolutionized",
   description:
-    "A modern blogging platform for writers and readers. Discover articles, share your thoughts, and connect with a community of curious minds.",
+    "A modern platform for thinkers, writers, and leaders to share their thoughts and start a movement.",
 };
 
 export const viewport: Viewport = {

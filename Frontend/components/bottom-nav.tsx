@@ -44,6 +44,7 @@ export function BottomNav() {
               <Link
                 key={item.href}
                 href={item.href}
+                scroll={false}
                 onClick={(e) => handleNavigation(item.href, e)}
                 className="relative -mt-4 flex flex-col items-center"
                 aria-label={item.label}
@@ -66,6 +67,7 @@ export function BottomNav() {
             <Link
               key={item.href}
               href={item.href}
+              scroll={false}
               onClick={(e) => handleNavigation(item.href, e)}
               className="flex flex-col items-center gap-0.5 py-1.5"
               aria-label={item.label}

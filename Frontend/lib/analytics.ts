@@ -40,6 +40,7 @@ class AnalyticsService {
   private queue: AnalyticsEvent[] = [];
   private isProcessing = false;
   private currentUserId: string | null = null;
+  private currentLocation: string | null = null;
   private BATCH_SIZE = 5;
   private FLUSH_INTERVAL = 3000;
   private timer: NodeJS.Timeout | null = null;
@@ -89,6 +90,20 @@ class AnalyticsService {
   }
 
   /**
+   * Set User Location (called when geolocation detects or user picks a location)
+   */
+  public setLocation(location: string | null) {
+    this.currentLocation = location;
+  }
+
+  /**
+   * Get current location
+   */
+  public getLocation(): string | null {
+    return this.currentLocation;
+  }
+
+  /**
    * Track a single event
    */
   public track(event: AnalyticsEvent) {
@@ -104,6 +119,14 @@ class AnalyticsService {
     }
     if (!event.created_at) {
       event.created_at = new Date();
+    }
+
+    // Attach user location to metadata for geo distribution analytics
+    if (this.currentLocation) {
+      event.metadata = {
+        ...event.metadata,
+        location: this.currentLocation,
+      };
     }
 
     // Push to queue

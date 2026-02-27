@@ -58,7 +58,7 @@ export interface ActiveUserResult {
 }
 
 export interface GeoDistributionResult {
-  location_id: number;
+  location: string;
   count: number;
 }
 
@@ -350,15 +350,22 @@ export class AnalyticsQueryService {
     );
     if (trendTotalViews === 0 && totalViews > 0) {
       // Distribution weights (growing trend)
-      const weights = [0.05, 0.1, 0.15, 0.1, 0.15, 0.2, 0.25];
+      const baseWeights = [0.05, 0.1, 0.15, 0.1, 0.15, 0.2, 0.25];
       // Reuse outer scope totalEngagement, don't re-declare/re-calculate identical value
       // const totalEngagement = totalLikes + prismaCommentCount + totalShares; // accessing outer var instead
 
       formattedTrend.forEach((day, index) => {
-        day.views = Math.ceil(totalViews * weights[index]);
-        day.reads = Math.ceil(totalReads * weights[index]);
-        day.likes = Math.ceil(totalLikes * weights[index]);
-        day.comments = Math.ceil(prismaCommentCount * weights[index]);
+        const wBase = baseWeights[index];
+        // Apply different jitter for each metric to prevent lines from exactly overlapping
+        const wViews = wBase * (0.9 + Math.random() * 0.2);
+        const wReads = wBase * (0.8 + Math.random() * 0.4);
+        const wLikes = wBase * (0.9 + Math.random() * 0.2);
+        const wComments = wBase * (0.7 + Math.random() * 0.6);
+
+        day.views = Math.ceil(totalViews * wViews);
+        day.reads = Math.ceil(totalReads * wReads);
+        day.likes = Math.ceil(totalLikes * wLikes);
+        day.comments = Math.ceil(prismaCommentCount * wComments);
       });
     }
 
@@ -469,6 +476,7 @@ export class AnalyticsQueryService {
 
   /**
    * Get geo distribution for a post
+   * Extracts location from event metadata JSON where the frontend stores it
    */
   async getPostGeoDistribution(postId: string) {
     const isValidUUID =
@@ -479,12 +487,12 @@ export class AnalyticsQueryService {
 
     const query = `
       SELECT
-        location_id,
+        JSONExtractString(metadata, 'location') AS location,
         count() AS count
       FROM analytics.events
       WHERE post_id = {postId:UUID}
-        AND location_id IS NOT NULL
-      GROUP BY location_id
+        AND JSONExtractString(metadata, 'location') != ''
+      GROUP BY location
       ORDER BY count DESC
       LIMIT 20
     `;
@@ -609,14 +617,16 @@ export class AnalyticsQueryService {
         const weightIndex = i % 7;
         const weightBase = weights[weightIndex] || weights[0];
 
-        // Add 30% random jitter
-        const jitter = 0.7 + Math.random() * 0.6;
-        const w = (weightBase * jitter) / 2; // Split over 14 days
+        // Apply independent jitter to prevent lines from exactly overlapping
+        const wViews = (weightBase * (0.7 + Math.random() * 0.6)) / 2;
+        const wReads = (weightBase * (0.6 + Math.random() * 0.8)) / 2;
+        const wLikes = (weightBase * (0.8 + Math.random() * 0.4)) / 2;
+        const wComments = (weightBase * (0.5 + Math.random() * 1.0)) / 2;
 
-        dayStats.views = Math.round((article?.views || 0) * w);
-        dayStats.reads = Math.round((article?.reads || 0) * w);
-        dayStats.likes = Math.round((article?.likes || 0) * w);
-        dayStats.comments = Math.round((commentCount || 0) * w);
+        dayStats.views = Math.round((article?.views || 0) * wViews);
+        dayStats.reads = Math.round((article?.reads || 0) * wReads);
+        dayStats.likes = Math.round((article?.likes || 0) * wLikes);
+        dayStats.comments = Math.round((commentCount || 0) * wComments);
       }
 
       formattedTrend.push(dayStats);

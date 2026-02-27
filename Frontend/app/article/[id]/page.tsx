@@ -1113,11 +1113,11 @@ export default function ArticlePage({
         {/* ── Section 6: COVER IMAGE with Caption ── */}
         {article.image && (
           <figure className="mb-10 -mx-5 bg-secondary/5">
-            <div className="w-full overflow-hidden bg-secondary relative aspect-16/10 sm:aspect-[21/9]">
+            <div className="w-full overflow-hidden bg-black relative aspect-16/10 sm:aspect-[21/9] flex items-center justify-center">
               <img
                 src={article.image}
                 alt={article.imageCaption || article.title}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain"
               />
             </div>
             {/* Image Caption — The Hindu style */}

@@ -127,50 +127,122 @@ export class ArticlesService {
     hasMedia = false,
     userId?: string,
     authorId?: string,
+    location?: string,
+    feed?: string,
   ): Promise<any[]> {
-    const where: Prisma.ArticleWhereInput = {
+    const baseWhere: Prisma.ArticleWhereInput = {
       published: true,
       deletedAt: null,
     };
 
     if (authorId) {
-      where.authorId = authorId;
+      baseWhere.authorId = authorId;
+    }
+
+    // "Following" feed: only articles from authors the user follows
+    if (feed === 'following' && userId) {
+      const follows = await this.prisma.follow.findMany({
+        where: { followerId: userId },
+        select: { followingId: true },
+      });
+      const followedAuthorIds = follows.map((f) => f.followingId);
+      if (followedAuthorIds.length === 0) {
+        return [];
+      }
+      baseWhere.authorId = { in: followedAuthorIds };
     }
 
     if (hasMedia) {
-      where.OR = [
+      baseWhere.OR = [
         { AND: [{ image: { not: null } }, { image: { not: '' } }] },
         { media: { not: Prisma.DbNull } }
       ];
     }
 
-    console.log(`ArticlesService: findAll called with userId: ${userId}`);
+    const includeClause = {
+      author: {
+        select: { id: true, name: true, email: true, picture: true },
+      },
+      likedBy: userId
+        ? { where: { userId }, select: { id: true } }
+        : undefined,
+      bookmarkedBy: userId
+        ? { where: { userId }, select: { id: true } }
+        : undefined,
+    };
+
+    console.log(`ArticlesService: findAll called with userId: ${userId}, location: ${location}, feed: ${feed}`);
+
+    // ---- Hierarchical location filtering ----
+    // Location comes as comma-separated tiers: "Naigaon,Vasai,Maharashtra,India"
+    // We fetch per-tier (most local first) and deduplicate, so local news appears first.
+    if (location && location.trim()) {
+      const locationTerms = location
+        .split(',')
+        .map((t) => t.trim())
+        .filter((t) => t.length > 0);
+
+      if (locationTerms.length > 0) {
+        const collectedIds = new Set<string>();
+        const allArticles: ArticleWithRelations[] = [];
+        let skipped = 0;
+
+        for (const term of locationTerms) {
+          if (allArticles.length >= limit) break;
+
+          const tierWhere: Prisma.ArticleWhereInput = {
+            ...baseWhere,
+            location: { contains: term, mode: 'insensitive' },
+          };
+
+          // Exclude already-collected articles
+          if (collectedIds.size > 0) {
+            tierWhere.id = { notIn: [...collectedIds] };
+          }
+
+          // Count total for this tier to handle offset properly
+          const tierCount = await this.prisma.article.count({
+            where: tierWhere,
+          });
+
+          // Calculate how many to skip in this tier
+          const tierSkip = Math.max(0, offset - skipped);
+          skipped += tierCount;
+
+          if (tierSkip >= tierCount) continue; // This tier is fully before the offset
+
+          const remaining = limit - allArticles.length;
+          const tierArticles = (await this.prisma.article.findMany({
+            where: tierWhere,
+            take: remaining,
+            skip: tierSkip,
+            include: includeClause,
+            orderBy: { createdAt: 'desc' },
+          })) as unknown as ArticleWithRelations[];
+
+          for (const a of tierArticles) {
+            collectedIds.add(a.id);
+            allArticles.push(a);
+          }
+        }
+
+        return allArticles.map((article) => {
+          const { likedBy, bookmarkedBy, ...rest } = article;
+          return {
+            ...rest,
+            liked: !!(likedBy && likedBy.length > 0),
+            bookmarked: !!(bookmarkedBy && bookmarkedBy.length > 0),
+          };
+        });
+      }
+    }
+
+    // Default: no location filter
     const articles = await this.prisma.article.findMany({
-      where,
+      where: baseWhere,
       take: limit,
       skip: offset,
-      include: {
-        author: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            picture: true,
-          },
-        },
-        likedBy: userId
-          ? {
-              where: { userId },
-              select: { id: true },
-            }
-          : undefined,
-        bookmarkedBy: userId
-          ? {
-              where: { userId },
-              select: { id: true },
-            }
-          : undefined,
-      },
+      include: includeClause,
       orderBy: { createdAt: 'desc' },
     });
 
@@ -308,13 +380,12 @@ export class ArticlesService {
   ): Promise<Article[]> {
     const article = await this.prisma.article.findUnique({
       where: { id },
-      select: { location: true, category: true },
+      select: { location: true },
     });
 
     if (!article) return [];
 
     const loc = article.location?.trim() || null;
-    const cat = article.category;
     const results: ArticleWithRelations[] = [];
     const collectedIds = new Set<string>([id]); // Always exclude the current article
 
@@ -334,157 +405,81 @@ export class ArticlesService {
         : undefined,
     };
 
-    // Helper: case-insensitive location match
-    const locEquals = loc
-      ? { equals: loc, mode: 'insensitive' as const }
-      : undefined;
-    const locNotEquals = loc
-      ? { not: loc, mode: 'insensitive' as const }
-      : undefined;
+    let skipped = 0;
 
-    console.log(
-      `[findRelated] Article ${id} | loc="${loc}" | cat="${cat}" | limit=${limit} | offset=${offset} | userId=${userId}`,
-    );
-
-    // --- Tier 1: Same Location + Same Category (Highest Priority) ---
-    let count1 = 0;
+    // ---- Hierarchical location filtering (same as local feed) ----
     if (loc) {
-      count1 = await this.prisma.article.count({
-        where: {
-          location: locEquals,
-          category: cat,
-          id: { not: id },
+      const locationTerms = loc
+        .split(',')
+        .map((t) => t.trim())
+        .filter((t) => t.length > 0);
+
+      for (const term of locationTerms) {
+        if (results.length >= limit) break;
+
+        const tierWhere: Prisma.ArticleWhereInput = {
           published: true,
-        },
-      });
-
-      if (offset < count1) {
-        const take = Math.min(limit, count1 - offset);
-        const res = (await this.prisma.article.findMany({
-          where: {
-            location: locEquals,
-            category: cat,
-            id: { not: id },
-            published: true,
-          },
-          include: authorInclude,
-          take,
-          skip: offset,
-          orderBy: { createdAt: 'desc' },
-        })) as ArticleWithRelations[];
-        for (const a of res) {
-          collectedIds.add(a.id);
-        }
-        results.push(...res);
-      }
-      console.log(
-        `[findRelated] Tier 1 (loc+cat): count=${count1}, collected=${results.length}`,
-      );
-    }
-
-    if (results.length >= limit) return this.mapToWithLiked(results);
-
-    // --- Tier 2: Same Location, Different Category ---
-    let count2 = 0;
-    if (loc) {
-      count2 = await this.prisma.article.count({
-        where: {
-          location: locEquals,
-          category: { not: cat },
+          deletedAt: null,
+          location: { contains: term, mode: 'insensitive' },
           id: { notIn: [...collectedIds] },
-          published: true,
-        },
+        };
+
+        const tierCount = await this.prisma.article.count({
+          where: tierWhere,
+        });
+
+        const tierSkip = Math.max(0, offset - skipped);
+        skipped += tierCount;
+
+        if (tierSkip >= tierCount) continue;
+
+        const remaining = limit - results.length;
+        const tierArticles = (await this.prisma.article.findMany({
+          where: tierWhere,
+          take: remaining,
+          skip: tierSkip,
+          include: authorInclude,
+          orderBy: { createdAt: 'desc' },
+        })) as unknown as ArticleWithRelations[];
+
+        for (const a of tierArticles) {
+          collectedIds.add(a.id);
+          results.push(a);
+        }
+      }
+    }
+
+    // --- Fallback if no location or not enough location articles ---
+    if (results.length < limit) {
+      const fallbackWhere: Prisma.ArticleWhereInput = {
+        published: true,
+        deletedAt: null,
+        id: { notIn: [...collectedIds] },
+      };
+
+      const fallbackCount = await this.prisma.article.count({
+        where: fallbackWhere,
       });
 
-      const effectiveOffset2 = Math.max(0, offset - count1);
-      if (effectiveOffset2 < count2) {
-        const take = Math.min(
-          limit - results.length,
-          count2 - effectiveOffset2,
-        );
-        const res = (await this.prisma.article.findMany({
-          where: {
-            location: locEquals,
-            category: { not: cat },
-            id: { notIn: [...collectedIds] },
-            published: true,
-          },
+      const fallbackSkip = Math.max(0, offset - skipped);
+      skipped += fallbackCount;
+
+      if (fallbackSkip < fallbackCount) {
+        const remaining = limit - results.length;
+        const fallbackArticles = (await this.prisma.article.findMany({
+          where: fallbackWhere,
+          take: remaining,
+          skip: fallbackSkip,
           include: authorInclude,
-          take,
-          skip: effectiveOffset2,
-          orderBy: { createdAt: 'desc' },
-        })) as ArticleWithRelations[];
-        for (const a of res) {
+          orderBy: [{ views: 'desc' }, { createdAt: 'desc' }],
+        })) as unknown as ArticleWithRelations[];
+
+        for (const a of fallbackArticles) {
           collectedIds.add(a.id);
+          results.push(a);
         }
-        results.push(...res);
       }
-      console.log(
-        `[findRelated] Tier 2 (loc only): count=${count2}, collected=${results.length}`,
-      );
     }
-
-    if (results.length >= limit) return this.mapToWithLiked(results);
-
-    // --- Tier 3: Same Category, Different Location ---
-    let count3 = 0;
-    const where3: Prisma.ArticleWhereInput = {
-      category: cat,
-      id: { notIn: [...collectedIds] },
-      published: true,
-    };
-    if (loc) {
-      where3.location = locNotEquals as Prisma.StringFilter;
-    }
-
-    count3 = await this.prisma.article.count({ where: where3 });
-
-    const totalPrev = count1 + count2;
-    const effectiveOffset3 = Math.max(0, offset - totalPrev);
-
-    if (effectiveOffset3 < count3) {
-      const take = Math.min(limit - results.length, count3 - effectiveOffset3);
-      const res = (await this.prisma.article.findMany({
-        where: where3,
-        include: authorInclude,
-        take,
-        skip: effectiveOffset3,
-        orderBy: { createdAt: 'desc' },
-      })) as ArticleWithRelations[];
-      for (const a of res) {
-        collectedIds.add(a.id);
-      }
-      results.push(...res);
-    }
-    console.log(
-      `[findRelated] Tier 3 (cat only): count=${count3}, collected=${results.length}`,
-    );
-
-    if (results.length >= limit) return this.mapToWithLiked(results);
-
-    // --- Tier 4: Fallback (Different location AND different category) ---
-    const where4: Prisma.ArticleWhereInput = {
-      id: { notIn: [...collectedIds] },
-      published: true,
-      category: { not: cat },
-    };
-    if (loc) {
-      where4.location = locNotEquals as Prisma.StringFilter;
-    }
-
-    const totalPrev4 = count1 + count2 + count3;
-    const effectiveOffset4 = Math.max(0, offset - totalPrev4);
-    const take4 = limit - results.length;
-
-    const res4 = (await this.prisma.article.findMany({
-      where: where4,
-      include: authorInclude,
-      take: take4,
-      skip: effectiveOffset4,
-      orderBy: [{ views: 'desc' }, { createdAt: 'desc' }],
-    })) as ArticleWithRelations[];
-    results.push(...res4);
-    console.log(`[findRelated] Tier 4 (fallback): collected=${results.length}`);
 
     return this.mapToWithLiked(results);
   }

@@ -77,6 +77,8 @@ export class ArticlesController {
     @Query('offset') offset?: string,
     @Query('hasMedia') hasMedia?: string,
     @Query('authorId') authorId?: string,
+    @Query('location') location?: string,
+    @Query('feed') feed?: string,
     @Req() req?: Request,
   ) {
     const limitNum = limit ? parseInt(limit, 10) : 20;
@@ -85,7 +87,6 @@ export class ArticlesController {
 
     let userId: string | undefined;
     const authHeader = req?.headers?.authorization;
-    // console.log('Auth Header:', authHeader); // Debug log
 
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.split(' ')[1];
@@ -103,6 +104,8 @@ export class ArticlesController {
       hasMediaBool,
       userId,
       authorId,
+      location,
+      feed,
     );
   }
 

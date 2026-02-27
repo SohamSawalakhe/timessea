@@ -89,7 +89,7 @@ export interface PostAnalytics {
   shares: number;
   engagement_rate: number;
   geo_distribution?: Array<{
-    location_id: number;
+    location: string;
     count: number;
   }>;
 }
