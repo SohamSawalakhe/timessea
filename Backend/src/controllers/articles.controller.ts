@@ -55,20 +55,23 @@ export class ArticlesController {
 
   @Get('drafts')
   @UseGuards(AuthGuard('jwt'))
-  async getDrafts(@Req() req: Request & { user: { id: string } }) {
-    return this.articlesService.findDrafts(req.user.id);
+  async getDrafts(@Req() req: Request) {
+    const userId = (req as any).user?.id || this.getUserIdFromRequest(req);
+    return this.articlesService.findDrafts(userId);
   }
 
   @Get('user/published')
   @UseGuards(AuthGuard('jwt'))
-  async getPublishedArticles(@Req() req: Request & { user: { id: string } }) {
-    return this.articlesService.findPublished(req.user.id);
+  async getPublishedArticles(@Req() req: Request) {
+    const userId = (req as any).user?.id || this.getUserIdFromRequest(req);
+    return this.articlesService.findPublished(userId);
   }
 
   @Get('user/bookmarks')
   @UseGuards(AuthGuard('jwt'))
-  async getUserBookmarks(@Req() req: Request & { user: { id: string } }) {
-    return this.articlesService.findUserBookmarks(req.user.id);
+  async getUserBookmarks(@Req() req: Request) {
+    const userId = (req as any).user?.id || this.getUserIdFromRequest(req);
+    return this.articlesService.findUserBookmarks(userId);
   }
 
   @Get()
@@ -79,6 +82,7 @@ export class ArticlesController {
     @Query('authorId') authorId?: string,
     @Query('location') location?: string,
     @Query('feed') feed?: string,
+    @Query('query') query?: string,
     @Req() req?: Request,
   ) {
     const limitNum = limit ? parseInt(limit, 10) : 20;
@@ -106,6 +110,7 @@ export class ArticlesController {
       authorId,
       location,
       feed,
+      query,
     );
   }
 

@@ -162,13 +162,18 @@ export class AnalyticsController {
 
   /**
    * Get detailed dashboard analytics for the current user
-   * GET /analytics/dashboard
+   * GET /analytics/dashboard?days=7
    */
   @Get('dashboard')
   @UseGuards(AuthGuard('jwt'))
-  async getDashboardAnalytics(@Req() req: AuthenticatedRequest) {
+  async getDashboardAnalytics(
+    @Req() req: AuthenticatedRequest,
+    @Query('days') days?: string,
+  ) {
+    const daysNum = days ? parseInt(days, 10) : 7;
     return await this.analyticsQueryService.getAuthorDashboardStats(
       req.user.id,
+      daysNum,
     );
   }
 

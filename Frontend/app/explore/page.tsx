@@ -1,10 +1,12 @@
 import { ExploreClient } from "./ExploreClient";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:5000";
+
 async function getArticles() {
   try {
     const start = Date.now();
     const res = await fetch(
-      "http://127.0.0.1:5000/api/articles?limit=10&offset=0&hasMedia=true",
+      `${API_URL}/api/articles?limit=10&offset=0&hasMedia=true`,
       {
         next: { revalidate: 0 },
       },

@@ -1,4 +1,3 @@
-
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
@@ -22,14 +21,14 @@ model User {
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   articles      Article[]
-  refreshTokens RefreshToken[]
-  comments      Comment[]
-  commentLikes  CommentLike[]
   articleLikes  ArticleLike[]
   bookmarks     Bookmark[]
+  comments      Comment[]
+  commentLikes  CommentLike[]
+  following     Follow[]       @relation("Following")
+  followers     Follow[]       @relation("Followers")
   notifications Notification[]
-  followers     Follow[] @relation("Followers")
-  following     Follow[] @relation("Following")
+  refreshTokens RefreshToken[]
 }
 
 model RefreshToken {
@@ -45,42 +44,39 @@ model RefreshToken {
 }
 
 model Article {
-  id          String    @id @default(uuid())
-  title       String
-  content     String
-  authorId    String
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  category    String    @default("Technology")
-  excerpt     String?
-  location    String?
-  likes       Int       @default(0)
-  commentCount Int      @default(0)
-  readTime    Int       @default(5)
-  image       String?
-  views       Int       @default(0)
-  reads       Int       @default(0)
-  media       Json?
-  deletedAt   DateTime?
-
-  // Article metadata fields
-  subheadline    String?
-  type           String?   @default("News Article")
-  status         String?   @default("Draft")
-  imageCaption   String?
+  id               String         @id @default(uuid())
+  title            String
+  content          String
+  authorId         String
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  category         String         @default("Technology")
+  excerpt          String?
+  location         String?
+  likes            Int            @default(0)
+  commentCount     Int            @default(0)
+  readTime         Int            @default(5)
+  image            String?
+  views            Int            @default(0)
+  reads            Int            @default(0)
+  media            Json?
+  deletedAt        DateTime?
+  subheadline      String?
+  type             String?        @default("News Article")
+  status           String?        @default("Draft")
+  imageCaption     String?
   imageDescription String?
-  imageCredit    String?
-  seoTitle       String?
-  seoDescription String?
-  factChecked    Boolean   @default(false)
-
-  published   Boolean   @default(true)
-  scheduledAt DateTime?
-  author      User      @relation(fields: [authorId], references: [id])
-  comments    Comment[]
-  likedBy     ArticleLike[]
-  bookmarkedBy Bookmark[]
-  notifications Notification[]
+  imageCredit      String?
+  seoTitle         String?
+  seoDescription   String?
+  factChecked      Boolean        @default(false)
+  published        Boolean        @default(true)
+  scheduledAt      DateTime?
+  author           User           @relation(fields: [authorId], references: [id])
+  likedBy          ArticleLike[]
+  bookmarkedBy     Bookmark[]
+  comments         Comment[]
+  notifications    Notification[]
 
   @@index([authorId])
   @@index([category])
@@ -93,30 +89,28 @@ model ArticleLike {
   userId    String
   articleId String
   createdAt DateTime @default(now())
-
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, articleId])
   @@index([articleId])
 }
 
 model Comment {
-  id        String    @id @default(uuid())
-  content   String
-  articleId String
-  authorId  String
-  parentId  String?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  likes     Int       @default(0)
-  edited    Boolean   @default(false)
-  deletedAt DateTime?
-
-  article   Article   @relation(fields: [articleId], references: [id], onDelete: Cascade)
-  author    User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  parent    Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies   Comment[] @relation("CommentReplies")
+  id           String        @id @default(uuid())
+  content      String
+  articleId    String
+  authorId     String
+  parentId     String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  likes        Int           @default(0)
+  edited       Boolean       @default(false)
+  deletedAt    DateTime?
+  article      Article       @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  author       User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  parent       Comment?      @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies      Comment[]     @relation("CommentReplies")
   commentLikes CommentLike[]
 
   @@index([articleId])
@@ -131,9 +125,8 @@ model CommentLike {
   userId    String
   commentId String
   createdAt DateTime @default(now())
-  
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, commentId])
 }
@@ -143,9 +136,8 @@ model Bookmark {
   userId    String
   articleId String
   createdAt DateTime @default(now())
-
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, articleId])
   @@index([userId])
@@ -153,20 +145,19 @@ model Bookmark {
 }
 
 model Notification {
-  id        String   @id @default(uuid())
-  userId    String
-  type      String   // 'like', 'comment', 'bookmark', 'follow', 'system'
-  title     String
-  message   String
-  read      Boolean  @default(false)
-  articleId String?
-  actorId   String?  // The user who triggered the notification
-  actorName String?
+  id           String   @id @default(uuid())
+  userId       String
+  type         String
+  title        String
+  message      String
+  read         Boolean  @default(false)
+  articleId    String?
+  actorId      String?
+  actorName    String?
   actorPicture String?
-  createdAt DateTime @default(now())
-
-  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  article Article? @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  article      Article? @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([userId, read])
@@ -178,9 +169,8 @@ model Follow {
   followerId  String
   followingId String
   createdAt   DateTime @default(now())
-
-  follower  User @relation("Following", fields: [followerId], references: [id], onDelete: Cascade)
-  following User @relation("Followers", fields: [followingId], references: [id], onDelete: Cascade)
+  follower    User     @relation("Following", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User     @relation("Followers", fields: [followingId], references: [id], onDelete: Cascade)
 
   @@unique([followerId, followingId])
   @@index([followerId])

@@ -163,7 +163,8 @@ class AnalyticsService {
         body: JSON.stringify({ events: batch }),
       });
     } catch (error) {
-      console.error("Analytics flush error:", error);
+      // Use warn to prevent Next.js dev overlay from catching this as an unhandled error
+      console.warn("Analytics flush failed (network error)");
       // Optional: Re-queue failed events (careful of loops)
     } finally {
       this.isProcessing = false;

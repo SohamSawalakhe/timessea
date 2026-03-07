@@ -229,7 +229,7 @@ export default function PublishedArticlesPage() {
                     )}
                   </div>
 
-                  <div className="flex flex-1 flex-col justify-between py-0.5">
+                  <div className="flex flex-1 flex-col justify-between py-0.5 min-w-0">
                     <div>
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full uppercase tracking-wider">

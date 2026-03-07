@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/contexts/AuthContext";
-import { ArrowLeft, UserCircle, Settings, Users, UserPlus } from "lucide-react";
+import { ArrowLeft, UserCircle, Settings, Users, UserPlus, MapPin } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
@@ -22,6 +22,7 @@ type UserProfile = {
   coverImage?: string;
   picture: string | null;
   createdAt: string;
+  location?: string;
   isFollowing: boolean;
   _count: {
     followers: number;
@@ -220,9 +221,15 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
 
               <div className="mt-4 text-left">
                 {profile.bio && (
-                  <p className="text-foreground/90 text-sm sm:text-base max-w-2xl leading-relaxed whitespace-pre-wrap mb-5">
+                  <p className="text-foreground/90 text-sm sm:text-base max-w-2xl leading-relaxed whitespace-pre-wrap mb-3">
                     {profile.bio}
                   </p>
+                )}
+                {profile.location && (
+                  <div className="flex items-center gap-1.5 text-muted-foreground text-sm mb-2">
+                    <MapPin className="w-3.5 h-3.5" />
+                    <span>{profile.location}</span>
+                  </div>
                 )}
               </div>
 

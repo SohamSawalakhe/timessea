@@ -105,6 +105,7 @@ export class UsersService {
         coverImage: true,
         bio: true,
         handle: true,
+        location: true,
         createdAt: true,
         _count: {
           select: {

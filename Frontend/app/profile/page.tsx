@@ -30,6 +30,7 @@ import {
   Activity,
   Users,
   UserPlus,
+  MapPin,
 } from "lucide-react";
 
 import { motion, AnimatePresence } from "framer-motion";
@@ -230,9 +231,9 @@ export default function ProfilePage() {
   const generalItems = [
     {
       icon: UserCircle,
-      label: "Personal Data",
+      label: "User Profile",
       action: "chevron" as const,
-      href: "/profile/edit",
+      href: "/profile/info",
     },
     {
       icon: Bell,
@@ -333,9 +334,15 @@ export default function ProfilePage() {
 
               <div className="mt-4 text-left">
                 {user.bio && (
-                  <p className="text-foreground/90 text-sm sm:text-base max-w-2xl leading-relaxed whitespace-pre-wrap mb-5">
+                  <p className="text-foreground/90 text-sm sm:text-base max-w-2xl leading-relaxed whitespace-pre-wrap mb-3">
                     {user.bio}
                   </p>
+                )}
+                {user.location && (
+                  <div className="flex items-center gap-1.5 text-muted-foreground text-sm mb-2">
+                    <MapPin className="w-3.5 h-3.5" />
+                    <span>{user.location}</span>
+                  </div>
                 )}
               </div>
 

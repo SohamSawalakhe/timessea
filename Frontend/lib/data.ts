@@ -55,11 +55,14 @@ export type Article = {
 
 export const categories = [
   "Trending",
-  "Design",
-  "Tech",
+  "Politics",
   "Business",
+  "Technology",
+  "Sports",
+  "Entertainment",
+  "Health",
   "Science",
-  "Culture",
+  "World",
 ];
 
 export const articles: Article[] = [

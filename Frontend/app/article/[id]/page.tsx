@@ -647,6 +647,13 @@ export default function ArticlePage({
   };
 
   const handleShare = async () => {
+    // Track share in analytics
+    analytics.track({
+      event: AnalyticsEventType.SHARE,
+      post_id: id,
+      user_id: user?.id,
+    });
+
     if (navigator.share) {
       try {
         await navigator.share({

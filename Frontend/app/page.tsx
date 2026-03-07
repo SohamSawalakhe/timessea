@@ -2,12 +2,13 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import {
   ArticleCardFeatured,
   ArticleCardHorizontal,
 } from "@/components/article-card";
-import { Search, Bell, ChevronLeft, ChevronRight, User, MapPin, Check, X } from "lucide-react";
+import { Search, Bell, ChevronLeft, ChevronRight, User, MapPin, Check, X, Loader2, ArrowLeft, TrendingUp } from "lucide-react";
 import { Article, categories } from "@/lib/data";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -25,17 +26,26 @@ interface LocationTier {
 
 export default function HomePage() {
   const { user, token, isAuthenticated } = useAuth();
-  const [activeCategory, setActiveCategory] = useState("Trending");
+  const [activeCategory, setActiveCategory] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [articles, setArticles] = useState<Article[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<FeedTab>("General");
   const [isMounted, setIsMounted] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isNavigatingTo, setIsNavigatingTo] = useState<string | null>(null);
+  const router = useRouter();
 
   // Sync state from sessionStorage *after* initial mount to prevent hydration mismatch
   useEffect(() => {
     setIsMounted(true);
     try {
+      if (typeof window !== "undefined" && window.location.search.includes("search=open")) {
+        setIsSearchOpen(true);
+        window.history.replaceState(null, '', window.location.pathname);
+      }
+
       const saved = sessionStorage.getItem("ts_feed_tab");
       if (saved === "Local" || saved === "Following" || saved === "General") {
         setActiveTab(saved as FeedTab);
@@ -56,6 +66,8 @@ export default function HomePage() {
   const [locationTiersKey, setLocationTiersKey] = useState(""); // serialized key for deps
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [locationInput, setLocationInput] = useState("");
+  const [locationSuggestions, setLocationSuggestions] = useState<any[]>([]);
+  const [isSearchingLocation, setIsSearchingLocation] = useState(false);
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
   const geoDetectedThisSession = useRef(false);
@@ -267,6 +279,37 @@ export default function HomePage() {
     return () => { cancelled = true; };
   }, [activeTab, isManuallySet, updateTiers, userLocation]);
 
+  // Handle location autocomplete search
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      if (!locationInput.trim() || locationInput.length < 3) {
+        setLocationSuggestions([]);
+        return;
+      }
+      setIsSearchingLocation(true);
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+            locationInput,
+          )}&limit=5&addressdetails=1`,
+          {
+            headers: { "User-Agent": "TimesSea/1.0" },
+          },
+        );
+        if (res.ok) {
+          const data = await res.json();
+          setLocationSuggestions(data);
+        }
+      } catch (e) {
+        console.error("Location search failed", e);
+      } finally {
+        setIsSearchingLocation(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [locationInput]);
+
   // ---- Save location to user profile ----
   const saveLocation = async (loc: string) => {
     setIsManuallySet(true); // Lock it for this session
@@ -325,7 +368,8 @@ export default function HomePage() {
 
         const res = await fetch(`${API_URL}/api/articles?${params.toString()}`, { headers });
         if (res.ok && !cancelled) {
-          setArticles(await res.json());
+          const text = await res.text();
+          setArticles(text ? JSON.parse(text) : []);
         }
       } catch (error) {
         console.error("Failed to fetch articles:", error);
@@ -348,7 +392,8 @@ export default function HomePage() {
         const res = await fetch(`${API_URL}/api/articles?${params.toString()}`, { headers });
         let localArticles: Article[] = [];
         if (res.ok) {
-          localArticles = await res.json() as Article[];
+          const text = await res.text();
+          if (text) localArticles = JSON.parse(text) as Article[];
         }
 
         // Also fetch general/international articles as fallback filling
@@ -356,7 +401,8 @@ export default function HomePage() {
         const intlRes = await fetch(`${API_URL}/api/articles?${intlParams.toString()}`, { headers });
         let intlData: Article[] = [];
         if (intlRes.ok) {
-          intlData = await intlRes.json() as Article[];
+          const text = await intlRes.text();
+          if (text) intlData = JSON.parse(text) as Article[];
         }
 
         if (cancelled) return;
@@ -395,7 +441,7 @@ export default function HomePage() {
 
   // ---- Filtering logic ----
   const filteredArticles = articles.filter((a) => {
-    const matchesCategory = activeTab === "Local" || activeCategory === "Trending" || a.category === activeCategory;
+    const matchesCategory = activeTab === "Local" || !activeCategory || activeCategory === "Trending" || a.category === activeCategory;
     const matchesSearch =
       searchQuery === "" ||
       a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -403,8 +449,17 @@ export default function HomePage() {
     return matchesCategory && matchesSearch;
   });
 
-  const featured = filteredArticles.length > 0 ? filteredArticles[0] : null;
-  const rest = filteredArticles.length > 1 ? filteredArticles.slice(1) : [];
+  if (activeCategory === "Trending") {
+    filteredArticles.sort((a, b) => {
+      const scoreA = (a.views || 0) + (a.reads || 0) + (a.likes || 0) * 2;
+      const scoreB = (b.views || 0) + (b.reads || 0) + (b.likes || 0) * 2;
+      return scoreB - scoreA;
+    });
+  }
+
+  const isSearching = searchQuery.trim().length > 0;
+  const featured = !isSearching && filteredArticles.length > 0 ? filteredArticles[0] : null;
+  const rest = isSearching ? filteredArticles : (filteredArticles.length > 1 ? filteredArticles.slice(1) : []);
   const visibleRest = rest.slice(0, visibleCount);
 
   let sectionTitle = "Latest News";
@@ -431,6 +486,13 @@ export default function HomePage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => setIsSearchOpen(!isSearchOpen)}
+            className={cn("p-2 rounded-full transition-colors", isSearchOpen ? "bg-primary/10 text-primary" : "hover:bg-secondary text-foreground")}
+            aria-label="Toggle Search"
+          >
+            <Search className="h-6 w-6" strokeWidth={2} />
+          </button>
           <Link
             href={isAuthenticated ? "/notifications" : "/login?redirect=/notifications"}
             className="relative p-2 rounded-full hover:bg-secondary transition-colors"
@@ -519,58 +581,226 @@ export default function HomePage() {
         )}
       </AnimatePresence>
 
-      {/* ---- Search Bar ---- */}
-      <div className="relative mb-6 group">
-        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-          <Search className="h-5 w-5 text-muted-foreground group-focus-within:text-foreground transition-colors" />
-        </div>
-        <input
-          type="text"
-          placeholder="Search for articles, topics..."
-          className="w-full h-12 rounded-2xl bg-secondary/50 border border-transparent focus:bg-background focus:border-primary/20 hover:bg-secondary/80 pl-11 pr-4 text-sm font-medium transition-all shadow-sm outline-none placeholder:text-muted-foreground/70"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
-      </div>
+      {/* ==================== SEARCH & CATEGORY FULL-SCREEN OVERLAY ==================== */}
+      <AnimatePresence>
+        {isSearchOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 15 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="fixed inset-y-0 left-1/2 -translate-x-1/2 w-full max-w-lg z-[100] bg-background border-x border-border overscroll-contain overflow-y-auto shadow-2xl"
+          >
+            {/* Overlay Header */}
+            <div className="sticky top-0 z-50 bg-background/98 backdrop-blur-xl px-4 py-3 border-b border-border/30 flex items-center gap-3">
+              <button
+                onClick={() => setIsSearchOpen(false)}
+                className="p-2 -ml-2 rounded-full hover:bg-secondary text-foreground transition-colors"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </button>
+              <div className="flex-1 relative group">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Search className="h-4 w-4 text-muted-foreground group-focus-within:text-foreground transition-colors" />
+                </div>
+                <input
+                  type="text"
+                  autoFocus
+                  placeholder="Search articles, authors..."
+                  className="w-full h-10 rounded-full bg-secondary/50 border border-transparent focus:bg-background focus:border-primary/20 hover:bg-secondary/80 pl-9 pr-4 text-sm font-medium transition-all shadow-sm outline-none placeholder:text-muted-foreground/70"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={() => setIsSearchFocused(true)}
+                  onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && searchQuery.trim()) {
+                      window.location.href = `/search?q=${encodeURIComponent(searchQuery.trim())}`;
+                    }
+                  }}
+                />
+              </div>
+            </div>
 
-      {/* ---- Category Tabs (General & Local tab) ---- */}
-      <div className={cn("relative mb-8 group", activeTab === "Following" && "hidden")}>
-        <div
-          className="flex items-center gap-2 overflow-x-auto px-1 py-2 scrollbar-hide snap-x mask-linear-fade"
-          id="category-scroll-container"
-        >
-          {categories.map((category) => (
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              key={category}
-              type="button"
-              onClick={() => setActiveCategory(category)}
-              className={cn(
-                "snap-start shrink-0 rounded-full px-5 py-2.5 text-xs font-bold transition-all shadow-sm border border-transparent whitespace-nowrap",
-                activeCategory === category && activeTab !== "Local"
-                  ? "bg-foreground text-background shadow-md transform scale-105"
-                  : "bg-secondary text-muted-foreground border-border hover:bg-secondary/80 hover:text-foreground",
+            {/* Overlay Categories */}
+            <div className="border-b border-border/10 py-3">
+              <h3 className="px-5 mb-3 text-xs font-black text-muted-foreground uppercase tracking-widest">
+                Discover
+              </h3>
+              <div className="flex items-center gap-2.5 overflow-x-auto px-5 pb-3 pt-1 custom-scrollbar snap-x" style={{ WebkitOverflowScrolling: 'touch' }}>
+                {categories.map((category) => (
+                  <button
+                    key={category}
+                    onClick={() => {
+                      if (isNavigatingTo) return;
+                      setIsNavigatingTo(category);
+                      window.history.replaceState(null, '', '/?search=open');
+                      if (category.toLowerCase() === "trending") {
+                        router.push("/trending");
+                      } else {
+                        router.push(`/search?q=${encodeURIComponent(category)}`);
+                      }
+                    }}
+                    disabled={!!isNavigatingTo}
+                    className="snap-start shrink-0 rounded-full px-4 py-2 text-[13px] font-bold transition-all border bg-secondary/20 text-muted-foreground border-border hover:text-foreground hover:bg-secondary hover:border-border/80 active:scale-95 whitespace-nowrap disabled:opacity-50 disabled:active:scale-100 flex items-center justify-center gap-2"
+                  >
+                    {isNavigatingTo === category && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                    {category}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Overlay Real-time Results */}
+            <div className="p-5 pb-24">
+              {searchQuery.trim().length > 0 ? (
+                (() => {
+                  const query = searchQuery.toLowerCase();
+                  const matchingAuthors = Array.from(
+                    new Map(
+                      articles
+                        .filter((a) => a.author?.name?.toLowerCase().includes(query))
+                        .map((a) => [a.author?.id, a.author])
+                    ).values()
+                  );
+                  const matchingArticles = articles.filter(
+                    (a) =>
+                      a.title?.toLowerCase().includes(query) ||
+                      a.subheadline?.toLowerCase().includes(query)
+                  );
+
+                  if (matchingAuthors.length === 0 && matchingArticles.length === 0) {
+                    return (
+                      <div className="py-12 text-center flex flex-col items-center gap-3">
+                        <div className="h-12 w-12 rounded-full bg-secondary flex items-center justify-center">
+                          <Search className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                        <span className="text-sm font-medium text-muted-foreground">No local matches found.</span>
+                        <Link 
+                          href={`/search?q=${encodeURIComponent(searchQuery)}`}
+                          className="mt-2 text-sm font-bold text-primary hover:underline transition-colors"
+                        >
+                          Search all news for "{searchQuery}" &rarr;
+                        </Link>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="flex flex-col gap-6">
+                      {matchingAuthors.length > 0 && (
+                        <div>
+                          <p className="mb-3 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                            Profiles
+                          </p>
+                          <div className="flex flex-col gap-2">
+                            {matchingAuthors.map((author: any) => (
+                              <Link
+                                href={user?.id === author.id ? `/profile` : `/user/${author.id}`}
+                                key={author.id}
+                                className="flex items-center gap-3 p-2 rounded-xl hover:bg-secondary/50 transition-colors"
+                              >
+                                <div className="h-10 w-10 rounded-full overflow-hidden shrink-0 bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
+                                  {author.picture ? (
+                                    <img src={author.picture} alt="" className="h-full w-full object-cover" />
+                                  ) : (
+                                    author.name.charAt(0)
+                                  )}
+                                </div>
+                                <span className="text-sm font-bold text-foreground">{author.name}</span>
+                              </Link>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {matchingArticles.length > 0 && (
+                        <div>
+                          <p className="mb-3 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                            Articles
+                          </p>
+                          <div className="flex flex-col gap-2">
+                            {matchingArticles.slice(0, 5).map((article) => (
+                              <Link
+                                href={`/article/${article.id}`}
+                                key={article.id}
+                                className="flex items-start gap-3 p-2 rounded-xl hover:bg-secondary/50 transition-colors"
+                              >
+                                {article.image && (
+                                  <div className="h-12 w-12 shrink-0 rounded-lg overflow-hidden bg-secondary">
+                                    <img src={article.image} alt="" className="h-full w-full object-cover" />
+                                  </div>
+                                )}
+                                <div className="flex flex-col justify-center h-12">
+                                  <span className="text-sm font-bold text-foreground line-clamp-1 leading-snug">
+                                    {article.title}
+                                  </span>
+                                  <span className="text-[10px] font-medium text-muted-foreground mt-0.5">
+                                    {article.author.name}
+                                  </span>
+                                </div>
+                              </Link>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      <Link 
+                        href={`/search?q=${encodeURIComponent(searchQuery)}`}
+                        className="mt-4 p-3.5 text-center text-sm font-bold text-primary bg-primary/5 hover:bg-primary/10 rounded-xl transition-colors border border-primary/10"
+                      >
+                        Search all news for "{searchQuery}" &rarr;
+                      </Link>
+                    </div>
+                  );
+                })()
+              ) : (
+                <div className="flex flex-col gap-6 pt-4">
+                  {articles.length > 0 && (
+                    <div className="mt-0">
+                      <h4 className="px-1 mb-3 text-[11px] font-black text-muted-foreground uppercase tracking-widest">
+                        Popular Articles
+                      </h4>
+                      <div className="flex flex-col gap-2">
+                        {[...articles].sort((a, b) => b.views - a.views).slice(0, 5).map(article => (
+                          <Link
+                            href={`/article/${article.id}`}
+                            key={`popular-${article.id}`}
+                            onClick={() => setIsSearchOpen(false)}
+                            className="flex items-start gap-3 p-2 rounded-xl hover:bg-secondary/50 transition-colors"
+                          >
+                            {article.image && (
+                              <div className="h-12 w-12 shrink-0 rounded-lg overflow-hidden bg-secondary">
+                                <img src={article.image} alt="" className="h-full w-full object-cover" />
+                              </div>
+                            )}
+                            <div className="flex flex-col justify-center h-12">
+                              <span className="text-sm font-bold text-foreground line-clamp-1 leading-snug">
+                                {article.title}
+                              </span>
+                              <span className="flex items-center gap-2 text-[10px] font-medium text-muted-foreground mt-0.5">
+                                <span>{article.author.name}</span>
+                                <span>&middot;</span>
+                                <span>{article.views.toLocaleString()} views</span>
+                              </span>
+                            </div>
+                          </Link>
+                        ))}
+                        
+                        <Link 
+                          href="/trending"
+                          onClick={() => setIsSearchOpen(false)}
+                          className="mt-2 p-3.5 text-center text-sm font-bold text-primary bg-primary/5 hover:bg-primary/10 rounded-xl transition-colors border border-primary/10"
+                        >
+                          View all trending news &rarr;
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
-            >
-              {category}
-            </motion.button>
-          ))}
-        </div>
-        <button
-          onClick={() => document.getElementById("category-scroll-container")?.scrollBy({ left: -200, behavior: "smooth" })}
-          className="absolute left-0 top-1/2 -translate-y-1/2 -ml-3 md:-ml-4 h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm border border-border shadow-md hidden md:flex items-center justify-center text-foreground hover:scale-110 transition-all z-10 opacity-0 group-hover:opacity-100 duration-300"
-          aria-label="Scroll left"
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </button>
-        <button
-          onClick={() => document.getElementById("category-scroll-container")?.scrollBy({ left: 200, behavior: "smooth" })}
-          className="absolute right-0 top-1/2 -translate-y-1/2 -mr-3 md:-mr-4 h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm border border-border shadow-md hidden md:flex items-center justify-center text-foreground hover:scale-110 transition-all z-10 opacity-0 group-hover:opacity-100 duration-300"
-          aria-label="Scroll right"
-        >
-          <ChevronRight className="h-4 w-4" />
-        </button>
-      </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ==================== GLOBAL FEED ==================== */}
       {/* Enable Location Interstitial specific to Local tab */}
@@ -749,52 +979,117 @@ export default function HomePage() {
                     className="w-full h-11 rounded-xl bg-secondary focus:bg-background border border-border pl-10 pr-4 text-sm font-medium outline-none focus:ring-2 focus:ring-primary/20 transition-all"
                     autoFocus
                   />
-                </div>
-
-                <div className="flex flex-col gap-1 max-h-52 overflow-y-auto mb-4">
-                  {["Mumbai, India", "Delhi, India", "Bengaluru, India", "Naigaon, Maharashtra", "Pune, India", "New York, USA", "London, UK"].map(
-                    (loc) => (
-                      <button
-                        key={loc}
-                        onClick={() => saveLocation(loc)}
-                        className={cn(
-                          "flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-left transition-colors",
-                          userLocation === loc || userLocation?.includes(loc.split(",")[0]) ? "bg-primary/10 text-primary" : "hover:bg-secondary text-foreground",
-                        )}
-                      >
-                        <span className="flex items-center gap-2">
-                          <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
-                          {loc}
-                        </span>
-                        {(userLocation === loc || userLocation?.includes(loc.split(",")[0])) && <Check className="h-4 w-4 text-primary" />}
-                      </button>
-                    ),
+                  {isSearchingLocation && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    </div>
                   )}
                 </div>
 
-                <button
-                  onClick={() => {
-                    setIsManuallySet(false); // Enable auto-detect again
-                    setUserLocation(null);
-                    updateTiers([]);
-                    setShowLocationModal(false);
-                    setGeoError(null);
-                    geoDetectedThisSession.current = false;
-                    analytics.setLocation(null);
-                    try { sessionStorage.removeItem("ts_geo_cache"); } catch { /* ignore */ }
-                    if (token) {
-                      fetch(`${API_URL}/users/profile/update`, {
-                        method: "POST",
-                        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-                        // Set to empty string so the backend clears the saved profile location
-                        body: JSON.stringify({ location: "" }),
-                      }).catch(() => {});
-                    }
-                  }}
-                  className="w-full rounded-xl py-3 text-sm font-bold text-muted-foreground border border-border hover:bg-secondary/50 transition-colors"
-                >
-                  Reset to Auto-detect
-                </button>
+                <div className="flex flex-col gap-1 max-h-52 overflow-y-auto mb-4 custom-scrollbar">
+                  {locationSuggestions.length > 0 ? (
+                    <>
+                      <div className="px-2 pb-1 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                        Search Results
+                      </div>
+                      {locationSuggestions.map((suggestion) => {
+                        const parts = suggestion.display_name.split(",").map((p: string) => p.trim());
+                        const shortName = parts.length > 2 ? `${parts[0]}, ${parts[parts.length - 1]}` : suggestion.display_name;
+                        
+                        return (
+                          <button
+                            key={suggestion.place_id}
+                            onClick={() => saveLocation(shortName)}
+                            className={cn(
+                              "flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-left transition-colors",
+                              userLocation === shortName ? "bg-primary/10 text-primary" : "hover:bg-secondary text-foreground",
+                            )}
+                          >
+                            <span className="flex items-center gap-2 truncate pr-2">
+                              <MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                              <span className="truncate">{shortName}</span>
+                            </span>
+                            {userLocation === shortName && <Check className="h-4 w-4 text-primary shrink-0" />}
+                          </button>
+                        );
+                      })}
+                    </>
+                  ) : (
+                    <>
+                      <div className="px-2 pb-1 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                        Suggested Locations
+                      </div>
+                      {["Mumbai, India", "Delhi, India", "Bengaluru, India", "Naigaon, Maharashtra", "Pune, India", "New York, USA", "London, UK"].map(
+                        (loc) => (
+                          <button
+                            key={loc}
+                            onClick={() => saveLocation(loc)}
+                            className={cn(
+                              "flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-left transition-colors",
+                              userLocation === loc || userLocation?.includes(loc.split(",")[0]) ? "bg-primary/10 text-primary" : "hover:bg-secondary text-foreground",
+                            )}
+                          >
+                            <span className="flex items-center gap-2">
+                              <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                              {loc}
+                            </span>
+                            {(userLocation === loc || userLocation?.includes(loc.split(",")[0])) && <Check className="h-4 w-4 text-primary shrink-0" />}
+                          </button>
+                        ),
+                      )}
+                    </>
+                  )}
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setIsManuallySet(false); // Enable auto-detect again
+                      setUserLocation(null);
+                      updateTiers([]);
+                      setShowLocationModal(false);
+                      setGeoError(null);
+                      geoDetectedThisSession.current = false;
+                      try { sessionStorage.removeItem("ts_geo_cache"); } catch { /* ignore */ }
+                    }}
+                    disabled={isDetectingLocation}
+                    className="flex-1 rounded-xl py-3 text-sm font-bold bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {isDetectingLocation ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" /> Detecting...
+                      </>
+                    ) : (
+                      <>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+                        Auto-detect
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsManuallySet(true); // Lock it to prevent auto-detection overriding
+                      setUserLocation(null);
+                      updateTiers([]);
+                      setShowLocationModal(false);
+                      setGeoError(null);
+                      analytics.setLocation(null);
+                      if (token) {
+                        fetch(`${API_URL}/users/profile/update`, {
+                          method: "POST",
+                          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+                          body: JSON.stringify({ location: "" }),
+                        }).catch(() => {});
+                      }
+                    }}
+                    className="flex-[0.8] rounded-xl py-3 text-sm font-bold text-muted-foreground border border-border hover:bg-secondary/50 transition-colors"
+                  >
+                    Clear (Global)
+                  </button>
+                </div>
+                {geoError && (
+                  <p className="text-xs text-red-500 font-medium text-center mt-3">{geoError}</p>
+                )}
               </div>
             </motion.div>
           </motion.div>

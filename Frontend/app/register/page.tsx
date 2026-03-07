@@ -8,7 +8,7 @@ import Link from "next/link";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
-function LoginForm() {
+function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login, isAuthenticated, isLoading: authLoading } = useAuth();
@@ -43,7 +43,7 @@ function LoginForm() {
       <div className="flex min-h-screen items-center justify-center bg-black text-white">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-white/70" />
-          <p className="text-sm text-gray-400">Signing you in...</p>
+          <p className="text-sm text-gray-400">Creating your account...</p>
         </div>
       </div>
     );
@@ -60,13 +60,15 @@ function LoginForm() {
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-white/15 to-white/5 backdrop-blur-sm border border-white/10">
             <Newspaper className="h-7 w-7 text-white" />
           </div>
-          <h1 className="text-3xl font-bold tracking-tight">Welcome Back</h1>
+          <h1 className="text-3xl font-bold tracking-tight">
+            Create Your Account
+          </h1>
           <p className="mt-2 text-sm text-gray-400">
-            Sign in to continue to The Aandolan
+            Join The Aandolan and start your journey
           </p>
         </div>
 
-        {/* Google Sign In Button */}
+        {/* Google Sign Up Button */}
         <div className="space-y-4">
           <button
             type="button"
@@ -93,12 +95,19 @@ function LoginForm() {
                 fill="#EA4335"
               />
             </svg>
-            Sign in with Google
+            Sign up with Google
           </button>
 
-          {/* Subtle security note */}
-          <p className="text-center text-xs text-gray-600">
-            Secure authentication powered by Google OAuth
+          {/* Terms */}
+          <p className="text-center text-xs text-gray-600 leading-relaxed">
+            By creating an account, you agree to our{" "}
+            <span className="text-gray-400 underline underline-offset-2 cursor-pointer hover:text-white transition-colors">
+              Terms of Service
+            </span>{" "}
+            and{" "}
+            <span className="text-gray-400 underline underline-offset-2 cursor-pointer hover:text-white transition-colors">
+              Privacy Policy
+            </span>
           </p>
         </div>
 
@@ -109,14 +118,14 @@ function LoginForm() {
           </div>
         </div>
 
-        {/* Register Link */}
+        {/* Login Link */}
         <p className="text-center text-sm text-gray-500">
-          Don&apos;t have an account?{" "}
+          Already have an account?{" "}
           <Link
-            href="/register"
+            href="/login"
             className="font-medium text-white hover:underline underline-offset-2 transition-colors"
           >
-            Sign up
+            Sign in
           </Link>
         </p>
       </div>
@@ -124,7 +133,7 @@ function LoginForm() {
   );
 }
 
-export default function LoginPage() {
+export default function RegisterPage() {
   return (
     <Suspense
       fallback={
@@ -133,7 +142,7 @@ export default function LoginPage() {
         </div>
       }
     >
-      <LoginForm />
+      <RegisterForm />
     </Suspense>
   );
 }

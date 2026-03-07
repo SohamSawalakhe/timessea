@@ -10,6 +10,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { AuthPromptModal } from "@/components/auth-prompt-modal";
 import { useRouter } from "next/navigation";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:5000";
+
 // Map specific local paths to Unsplash images
 const imageMap: Record<string, string> = {
   "/images/reel-web3.jpg":
@@ -74,7 +76,7 @@ export function ExploreClient({ initialArticles }: ExploreClientProps) {
         }
 
         const response = await fetch(
-          `http://127.0.0.1:5000/api/articles?limit=${limit}&offset=${currentOffset}&hasMedia=true`,
+          `${API_URL}/api/articles?limit=${limit}&offset=${currentOffset}&hasMedia=true`,
           { headers },
         );
         if (!response.ok) throw new Error("Failed to fetch articles");
@@ -149,7 +151,7 @@ export function ExploreClient({ initialArticles }: ExploreClientProps) {
   }, []);
 
   useEffect(() => {
-    const socket = io("http://127.0.0.1:5000");
+    const socket = io(API_URL);
 
     socket.on("connect", () => {
       console.log("Connected to WebSocket");
@@ -187,7 +189,7 @@ export function ExploreClient({ initialArticles }: ExploreClientProps) {
 
       try {
         const response = await fetch(
-          `http://127.0.0.1:5000/api/articles/${id}/like`,
+          `${API_URL}/api/articles/${id}/like`,
           {
             method: "POST",
             headers: {
@@ -232,7 +234,7 @@ export function ExploreClient({ initialArticles }: ExploreClientProps) {
 
       try {
         const response = await fetch(
-          `http://127.0.0.1:5000/api/articles/${id}/bookmark`,
+          `${API_URL}/api/articles/${id}/bookmark`,
           {
             method: "POST",
             headers: {
@@ -269,7 +271,7 @@ export function ExploreClient({ initialArticles }: ExploreClientProps) {
     );
 
     try {
-      await fetch(`http://127.0.0.1:5000/api/articles/${id}/view`, {
+      await fetch(`${API_URL}/api/articles/${id}/view`, {
         method: "POST",
       });
     } catch (error) {

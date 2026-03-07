@@ -19,6 +19,7 @@ interface User {
   bio?: string;
   handle?: string;
   location?: string;
+  createdAt?: string;
 }
 
 interface AuthContextType {
@@ -83,7 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return null;
       }
     } catch (error) {
-      console.error("Token refresh failed:", error);
+      console.warn("Token refresh silent fail (network or session).");
       setUser(null);
       setToken(null);
       return null;

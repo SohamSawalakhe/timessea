@@ -177,10 +177,10 @@ export class AnalyticsQueryService {
   /**
    * Get detailed author dashboard stats
    */
-  async getAuthorDashboardStats(authorId: string) {
+  async getAuthorDashboardStats(authorId: string, days: number = 7) {
     // 1. Get author's post IDs and basic stats
     const posts = await this.prismaService.article.findMany({
-      where: { authorId },
+      where: { authorId, deletedAt: null },
       select: {
         id: true,
         title: true,
@@ -193,7 +193,7 @@ export class AnalyticsQueryService {
     });
 
     const allPosts = await this.prismaService.article.findMany({
-      where: { authorId },
+      where: { authorId, deletedAt: null },
       select: { id: true },
     });
 
@@ -241,7 +241,7 @@ export class AnalyticsQueryService {
           countIf(event = 'comment') as comments
         FROM analytics.events
         WHERE post_id IN ({postIds:Array(String)})
-          AND created_at >= today() - 7
+          AND created_at >= today() - {days:UInt32}
         GROUP BY date
         ORDER BY date ASC
       `;
@@ -250,7 +250,7 @@ export class AnalyticsQueryService {
         this.clickhouseService.query<AuthorDashboardOverviewResult>(query, {
           postIds,
         }),
-        this.clickhouseService.query<any>(trendQuery, { postIds }),
+        this.clickhouseService.query<any>(trendQuery, { postIds, days }),
       ]);
     } catch (error) {
       console.error('Failed to query ClickHouse for author dashboard:', error);
@@ -304,8 +304,7 @@ export class AnalyticsQueryService {
         ? Math.round((totalEngagement / clickHouseViews) * 100)
         : 0;
 
-    // Format Trend Data
-    // Ensure we have last 7 days
+    // Format Trend Data — build last 7 days from ClickHouse if available
     const trendMap = new Map<string, TrendResult>();
     if (trendResults) {
       trendResults.forEach((r: TrendResult) => {
@@ -326,47 +325,148 @@ export class AnalyticsQueryService {
       comments: number;
     }[] = [];
     const today = new Date();
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(today);
-      d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().split('T')[0];
-      const data = trendMap.get(dateStr) as TrendResult | undefined;
 
-      formattedTrend.push({
-        name: d.toLocaleDateString('en-US', { weekday: 'short' }),
-        fullDate: dateStr,
-        views: Number(data?.views || 0),
-        reads: Number(data?.reads || 0),
-        likes: Number(data?.likes || 0),
-        comments: Number(data?.comments || 0),
+    // Build date range for the requested period
+    const rangeStart = new Date(today);
+    rangeStart.setDate(rangeStart.getDate() - (days - 1));
+    rangeStart.setHours(0, 0, 0, 0);
+
+    // Date label format: use weekday for <=7 days, short date for longer ranges
+    const useDateLabel = days > 7;
+
+    // Check if ClickHouse had real data
+    const hasCHData = trendMap.size > 0;
+
+    if (hasCHData) {
+      // Use ClickHouse data directly
+      for (let i = days - 1; i >= 0; i--) {
+        const d = new Date(today);
+        d.setDate(d.getDate() - i);
+        const dateStr = d.toISOString().split('T')[0];
+        const data = trendMap.get(dateStr) as TrendResult | undefined;
+
+        formattedTrend.push({
+          name: useDateLabel
+            ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+            : d.toLocaleDateString('en-US', { weekday: 'short' }),
+          fullDate: dateStr,
+          views: Number(data?.views || 0),
+          reads: Number(data?.reads || 0),
+          likes: Number(data?.likes || 0),
+          comments: Number(data?.comments || 0),
+        });
+      }
+    } else {
+      // FALLBACK: Use real Prisma data grouped by actual dates
+      // Query likes per day from the last 7 days (real timestamps from ArticleLike)
+      const [likesPerDay, commentsPerDay, articlesInRange] = await Promise.all([
+        this.prismaService.articleLike.groupBy({
+          by: ['createdAt'],
+          where: {
+            article: { authorId, deletedAt: null },
+            createdAt: { gte: rangeStart },
+          },
+          _count: true,
+        }).then((results) => {
+          // Group by date string
+          const map = new Map<string, number>();
+          results.forEach((r) => {
+            const dateStr = r.createdAt.toISOString().split('T')[0];
+            map.set(dateStr, (map.get(dateStr) || 0) + r._count);
+          });
+          return map;
+        }),
+
+        this.prismaService.comment.groupBy({
+          by: ['createdAt'],
+          where: {
+            article: { authorId },
+            deletedAt: null,
+            createdAt: { gte: rangeStart },
+          },
+          _count: true,
+        }).then((results) => {
+          const map = new Map<string, number>();
+          results.forEach((r) => {
+            const dateStr = r.createdAt.toISOString().split('T')[0];
+            map.set(dateStr, (map.get(dateStr) || 0) + r._count);
+          });
+          return map;
+        }),
+
+        // Articles created in last 7 days (to distribute their views/reads to their creation date)
+        this.prismaService.article.findMany({
+          where: {
+            authorId,
+            deletedAt: null,
+            createdAt: { gte: rangeStart },
+          },
+          select: { createdAt: true, views: true, reads: true },
+        }),
+      ]);
+
+      // Aggregate article views/reads by creation date
+      const viewsByDate = new Map<string, number>();
+      const readsByDate = new Map<string, number>();
+      articlesInRange.forEach((a) => {
+        const dateStr = a.createdAt.toISOString().split('T')[0];
+        viewsByDate.set(dateStr, (viewsByDate.get(dateStr) || 0) + a.views);
+        readsByDate.set(dateStr, (readsByDate.get(dateStr) || 0) + a.reads);
       });
-    }
 
-    // FALLBACK: If analytics DB is empty but main DB has counts (common in dev/manual entry)
-    // Distribute lifetime stats to create a synthetic trend visual
-    const trendTotalViews = formattedTrend.reduce(
-      (sum, item) => sum + item.views,
-      0,
-    );
-    if (trendTotalViews === 0 && totalViews > 0) {
-      // Distribution weights (growing trend)
-      const baseWeights = [0.05, 0.1, 0.15, 0.1, 0.15, 0.2, 0.25];
-      // Reuse outer scope totalEngagement, don't re-declare/re-calculate identical value
-      // const totalEngagement = totalLikes + prismaCommentCount + totalShares; // accessing outer var instead
+      // If no articles in the range, distribute views/reads proportionally to activity
+      const hasRecentArticles = articlesInRange.length > 0;
 
-      formattedTrend.forEach((day, index) => {
-        const wBase = baseWeights[index];
-        // Apply different jitter for each metric to prevent lines from exactly overlapping
-        const wViews = wBase * (0.9 + Math.random() * 0.2);
-        const wReads = wBase * (0.8 + Math.random() * 0.4);
-        const wLikes = wBase * (0.9 + Math.random() * 0.2);
-        const wComments = wBase * (0.7 + Math.random() * 0.6);
+      // First pass: collect per-day activity to distribute views/reads proportionally
+      const dailyActivity: { dateStr: string; d: Date; activity: number }[] = [];
+      let totalActivity = 0;
+      for (let i = days - 1; i >= 0; i--) {
+        const d = new Date(today);
+        d.setDate(d.getDate() - i);
+        const dateStr = d.toISOString().split('T')[0];
+        const dayLikes = likesPerDay.get(dateStr) || 0;
+        const dayComments = commentsPerDay.get(dateStr) || 0;
+        const activity = dayLikes + dayComments;
+        totalActivity += activity;
+        dailyActivity.push({ dateStr, d, activity });
+      }
 
-        day.views = Math.ceil(totalViews * wViews);
-        day.reads = Math.ceil(totalReads * wReads);
-        day.likes = Math.ceil(totalLikes * wLikes);
-        day.comments = Math.ceil(prismaCommentCount * wComments);
-      });
+      // Build the trend data
+      for (const { dateStr, d, activity } of dailyActivity) {
+        let dayViews = viewsByDate.get(dateStr) || 0;
+        let dayReads = readsByDate.get(dateStr) || 0;
+
+        // If no recent articles, distribute views/reads based on actual engagement activity
+        if (!hasRecentArticles && totalViews > 0) {
+          if (totalActivity > 0) {
+            // Proportional: days with more likes/comments get more views attributed
+            const proportion = activity / totalActivity;
+            dayViews = Math.round(totalViews * proportion);
+            dayReads = Math.round(totalReads * proportion);
+          } else {
+            // No activity at all — place all views/reads on today so the chart isn't empty
+            const todayStr = today.toISOString().split('T')[0];
+            if (dateStr === todayStr) {
+              dayViews = totalViews;
+              dayReads = totalReads;
+            } else {
+              dayViews = 0;
+              dayReads = 0;
+            }
+          }
+        }
+
+        formattedTrend.push({
+          name: useDateLabel
+            ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+            : d.toLocaleDateString('en-US', { weekday: 'short' }),
+          fullDate: dateStr,
+          views: dayViews,
+          reads: dayReads,
+          likes: likesPerDay.get(dateStr) || 0,
+          comments: commentsPerDay.get(dateStr) || 0,
+        });
+      }
     }
 
     return {
@@ -613,20 +713,17 @@ export class AnalyticsQueryService {
       };
 
       if (needSynthesis && i < 14) {
-        // Distribute over last 14 days with some "natural" jitter
+        // Distribute over last 14 days with deterministic weights (no randomness)
         const weightIndex = i % 7;
-        const weightBase = weights[weightIndex] || weights[0];
+        const viewsW =  [0.06, 0.09, 0.12, 0.11, 0.16, 0.21, 0.25];
+        const readsW =  [0.04, 0.10, 0.14, 0.10, 0.17, 0.19, 0.26];
+        const likesW =  [0.05, 0.11, 0.13, 0.09, 0.15, 0.22, 0.25];
+        const commW  =  [0.07, 0.08, 0.11, 0.12, 0.18, 0.20, 0.24];
 
-        // Apply independent jitter to prevent lines from exactly overlapping
-        const wViews = (weightBase * (0.7 + Math.random() * 0.6)) / 2;
-        const wReads = (weightBase * (0.6 + Math.random() * 0.8)) / 2;
-        const wLikes = (weightBase * (0.8 + Math.random() * 0.4)) / 2;
-        const wComments = (weightBase * (0.5 + Math.random() * 1.0)) / 2;
-
-        dayStats.views = Math.round((article?.views || 0) * wViews);
-        dayStats.reads = Math.round((article?.reads || 0) * wReads);
-        dayStats.likes = Math.round((article?.likes || 0) * wLikes);
-        dayStats.comments = Math.round((commentCount || 0) * wComments);
+        dayStats.views = Math.round((article?.views || 0) * viewsW[weightIndex] / 2);
+        dayStats.reads = Math.round((article?.reads || 0) * readsW[weightIndex] / 2);
+        dayStats.likes = Math.round((article?.likes || 0) * likesW[weightIndex] / 2);
+        dayStats.comments = Math.round((commentCount || 0) * commW[weightIndex] / 2);
       }
 
       formattedTrend.push(dayStats);

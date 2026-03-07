@@ -129,6 +129,7 @@ export class ArticlesService {
     authorId?: string,
     location?: string,
     feed?: string,
+    query?: string,
   ): Promise<any[]> {
     const baseWhere: Prisma.ArticleWhereInput = {
       published: true,
@@ -152,11 +153,31 @@ export class ArticlesService {
       baseWhere.authorId = { in: followedAuthorIds };
     }
 
+    const andConditions: Prisma.ArticleWhereInput[] = [];
+
+    if (query && query.trim()) {
+      const searchQuery = query.trim();
+      andConditions.push({
+        OR: [
+          { title: { contains: searchQuery, mode: 'insensitive' } },
+          { content: { contains: searchQuery, mode: 'insensitive' } },
+          { excerpt: { contains: searchQuery, mode: 'insensitive' } },
+          { author: { name: { contains: searchQuery, mode: 'insensitive' } } },
+        ],
+      });
+    }
+
     if (hasMedia) {
-      baseWhere.OR = [
-        { AND: [{ image: { not: null } }, { image: { not: '' } }] },
-        { media: { not: Prisma.DbNull } }
-      ];
+      andConditions.push({
+        OR: [
+          { AND: [{ image: { not: null } }, { image: { not: '' } }] },
+          { media: { not: Prisma.DbNull } }
+        ]
+      });
+    }
+
+    if (andConditions.length > 0) {
+      baseWhere.AND = andConditions;
     }
 
     const includeClause = {
@@ -281,6 +302,8 @@ export class ArticlesService {
   }
 
   async findDrafts(authorId?: string): Promise<Article[]> {
+    if (!authorId) return [];
+
     const where: Prisma.ArticleWhereInput = {
       published: false,
       scheduledAt: null,
@@ -307,6 +330,9 @@ export class ArticlesService {
   }
 
   async findPublished(authorId?: string): Promise<Article[]> {
+    console.log('findPublished authorId:', authorId);
+    if (!authorId) return [];
+
     const where: Prisma.ArticleWhereInput = {
       published: true,
       deletedAt: null,

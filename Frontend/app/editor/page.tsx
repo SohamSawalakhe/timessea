@@ -27,6 +27,8 @@ import {
   Trash2,
   Edit,
   MapPin,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { categories, Article } from "@/lib/data";
 import { cn } from "@/lib/utils";
@@ -87,6 +89,12 @@ function EditorContent() {
   // Additional article metadata
   const [subheadline, setSubheadline] = useState("");
   const [location, setLocation] = useState("");
+  const [showLocationModal, setShowLocationModal] = useState(false);
+  const [locationInput, setLocationInput] = useState("");
+  const [locationSuggestions, setLocationSuggestions] = useState<any[]>([]);
+  const [isSearchingLocation, setIsSearchingLocation] = useState(false);
+  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
+  const [geoError, setGeoError] = useState<string | null>(null);
   const [articleType, setArticleType] = useState("News Article");
   const [status, setStatus] = useState("Draft");
   const [imageDescription, setImageDescription] = useState("");
@@ -130,6 +138,106 @@ function EditorContent() {
     document.addEventListener("selectionchange", handler);
     return () => document.removeEventListener("selectionchange", handler);
   }, [updateActiveActions]);
+
+  // Handle location autocomplete search
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      if (!locationInput.trim() || locationInput.length < 3) {
+        setLocationSuggestions([]);
+        return;
+      }
+      setIsSearchingLocation(true);
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+            locationInput,
+          )}&limit=5&addressdetails=1`,
+          {
+            headers: { "User-Agent": "TimesSea/1.0" },
+          },
+        );
+        if (res.ok) {
+          const data = await res.json();
+          setLocationSuggestions(data);
+        }
+      } catch (e) {
+        console.error("Location search failed", e);
+      } finally {
+        setIsSearchingLocation(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [locationInput]);
+
+  // Handle Auto-detect location
+  const handleAutoDetectLocation = () => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setGeoError("Geolocation is not supported by your browser");
+      return;
+    }
+    
+    setIsDetectingLocation(true);
+    setGeoError(null);
+    
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          let detectedLocation = "";
+          let tempVillages: string[] = [];
+          
+          try {
+            const nomRes = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`,
+              { headers: { "User-Agent": "TimesSea/1.0" } }
+            );
+            if (nomRes.ok) {
+              const ndata = await nomRes.json();
+              if (ndata.address) {
+                const village = ndata.address.village || ndata.address.suburb || ndata.address.neighbourhood;
+                const road = ndata.address.road;
+                if (village) tempVillages.push(village);
+                if (road) {
+                  const cleaned = road.split("-")[0].trim();
+                  tempVillages.push(cleaned);
+                }
+              }
+            }
+          } catch { /* ignore nominatim fail */ }
+          
+          const res = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`);
+          if (res.ok) {
+            const data = await res.json();
+            const locality = (data.locality || "").trim();
+            const city = (data.city || "").trim();
+            const state = (data.principalSubdivision || "").trim();
+            const country = (data.countryName || "").trim();
+            
+            let dispTop = tempVillages.length > 0 ? tempVillages[0] : (locality || city || state || country);
+            detectedLocation = state && state !== dispTop ? `${dispTop}, ${state}` : dispTop;
+          }
+          
+          if (detectedLocation) {
+            setLocation(detectedLocation);
+            setShowLocationModal(false);
+          } else {
+            setGeoError("Could not determine location name");
+          }
+        } catch (error) {
+          setGeoError("Failed to fetch location data");
+        } finally {
+          setIsDetectingLocation(false);
+        }
+      },
+      (err) => {
+        setGeoError(err.message || "Location access denied");
+        setIsDetectingLocation(false);
+      },
+      { enableHighAccuracy: false, timeout: 8000 }
+    );
+  };
+
 
   const toolbarButtons = [
     { icon: Bold, label: "Bold", action: "bold" },
@@ -562,7 +670,7 @@ function EditorContent() {
     showConfirmDelete(async () => {
       try {
         const res = await fetch(
-          `http://localhost:5000/api/articles/${postId}`,
+          `${API_URL}/api/articles/${postId}`,
           {
             method: "DELETE",
             headers: {
@@ -1250,13 +1358,16 @@ function EditorContent() {
                       Location
                     </label>
                     <div className="relative">
-                      <input
-                        type="text"
-                        placeholder="City, Country"
-                        value={location}
-                        onChange={(e) => setLocation(e.target.value)}
-                        className="w-full bg-secondary/30 rounded-lg px-3 py-2 text-sm font-medium focus:outline-none focus:ring-1 focus:ring-primary/20"
-                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowLocationModal(true)}
+                        className="w-full bg-secondary/30 rounded-lg px-3 py-2 text-sm font-medium focus:outline-none focus:ring-1 focus:ring-primary/20 text-left flex items-center justify-between group"
+                      >
+                        <span className={location ? "text-foreground" : "text-muted-foreground"}>
+                          {location || "Select Location..."}
+                        </span>
+                        <MapPin className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                      </button>
                     </div>
                   </div>
                   <div className="space-y-1">
@@ -1282,29 +1393,53 @@ function EditorContent() {
                   <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                     <Settings2 className="w-3 h-3" /> Category
                   </label>
-                  <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-2 snap-x">
-                    {categories
-                      .filter((c) => c !== "Trending")
-                      .map((category) => (
-                        <motion.button
-                          whileTap={{ scale: 0.95 }}
-                          key={category}
-                          type="button"
-                          onClick={() =>
-                            setSelectedCategory(
-                              selectedCategory === category ? "" : category,
-                            )
-                          }
-                          className={cn(
-                            "snap-start shrink-0 rounded-full px-4 py-2 text-xs font-bold transition-all shadow-sm border border-transparent",
-                            selectedCategory === category
-                              ? "bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20 ring-offset-2 ring-offset-background"
-                              : "bg-secondary/50 text-muted-foreground border-border hover:bg-secondary hover:text-foreground",
-                          )}
-                        >
-                          {category}
-                        </motion.button>
-                      ))}
+                  <div className="relative group -mx-5 px-5">
+                    <div className="flex gap-2 overflow-x-auto pb-2 snap-x scrollbar-hide mask-linear-fade" id="editor-category-scroll-container">
+                      {categories
+                        .filter((c) => c !== "Trending")
+                        .map((category) => (
+                          <motion.button
+                            whileTap={{ scale: 0.95 }}
+                            key={category}
+                            type="button"
+                            onClick={() =>
+                              setSelectedCategory(
+                                selectedCategory === category ? "" : category,
+                              )
+                            }
+                            className={cn(
+                              "snap-start shrink-0 rounded-full px-4 py-2 text-xs font-bold transition-all shadow-sm border border-transparent whitespace-nowrap",
+                              selectedCategory === category
+                                ? "bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20 ring-offset-2 ring-offset-background"
+                                : "bg-secondary/50 text-muted-foreground border-border hover:bg-secondary hover:text-foreground",
+                            )}
+                          >
+                            {category}
+                          </motion.button>
+                        ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        document.getElementById("editor-category-scroll-container")?.scrollBy({ left: -200, behavior: "smooth" });
+                      }}
+                      className="absolute left-1 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm border border-border shadow-md hidden md:flex items-center justify-center text-foreground hover:scale-110 transition-all z-10 opacity-0 group-hover:opacity-100 duration-300"
+                      aria-label="Scroll left"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        document.getElementById("editor-category-scroll-container")?.scrollBy({ left: 200, behavior: "smooth" });
+                      }}
+                      className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm border border-border shadow-md hidden md:flex items-center justify-center text-foreground hover:scale-110 transition-all z-10 opacity-0 group-hover:opacity-100 duration-300"
+                      aria-label="Scroll right"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
                   </div>
                 </div>
 
@@ -1480,6 +1615,167 @@ function EditorContent() {
           )}
         </AnimatePresence>
       </div>
+
+      {/* ---- Location Picker Modal ---- */}
+      <AnimatePresence>
+        {showLocationModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+            onClick={() => setShowLocationModal(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              transition={{ duration: 0.2 }}
+              className="w-full max-w-sm rounded-3xl bg-card border border-border/50 shadow-2xl overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-5">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                      <MapPin className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-black text-foreground font-serif">Select Location</h3>
+                      <p className="text-xs font-medium text-muted-foreground">Assign a location to your article</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowLocationModal(false)}
+                    className="p-2 text-muted-foreground hover:text-foreground rounded-full hover:bg-secondary/50 transition-colors"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+
+                <div className="relative mb-5">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Type a city or region name..."
+                    value={locationInput}
+                    onChange={(e) => setLocationInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && locationInput.trim()) {
+                        setLocation(locationInput.trim());
+                        setShowLocationModal(false);
+                      }
+                    }}
+                    className="w-full h-11 rounded-xl bg-secondary focus:bg-background border border-border pl-10 pr-4 text-sm font-medium outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                    autoFocus
+                  />
+                  {isSearchingLocation && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-1 max-h-52 overflow-y-auto mb-4 custom-scrollbar">
+                  {locationSuggestions.length > 0 ? (
+                    <>
+                      <div className="px-2 pb-1 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                        Search Results
+                      </div>
+                      {locationSuggestions.map((suggestion) => {
+                        // Keep location strings concise
+                        const parts = suggestion.display_name.split(",").map((p: string) => p.trim());
+                        const shortName = parts.length > 2 ? `${parts[0]}, ${parts[parts.length - 1]}` : suggestion.display_name;
+                        
+                        return (
+                          <button
+                            key={suggestion.place_id}
+                            onClick={() => {
+                              setLocation(shortName);
+                              setShowLocationModal(false);
+                              setLocationInput("");
+                              setLocationSuggestions([]);
+                            }}
+                            className={cn(
+                              "flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-left transition-colors",
+                              location === shortName ? "bg-primary/10 text-primary" : "hover:bg-secondary text-foreground",
+                            )}
+                          >
+                            <span className="flex items-center gap-2 truncate pr-2">
+                              <MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                              <span className="truncate">{shortName}</span>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </>
+                  ) : (
+                    <>
+                      <div className="px-2 pb-1 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                        Suggested Locations
+                      </div>
+                      {["Mumbai, India", "Delhi, India", "Bengaluru, India", "Naigaon, Maharashtra", "Pune, India", "New York, USA", "London, UK"].map(
+                        (loc) => (
+                          <button
+                            key={loc}
+                            onClick={() => {
+                              setLocation(loc);
+                              setShowLocationModal(false);
+                            }}
+                            className={cn(
+                              "flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-left transition-colors",
+                              location === loc || location?.includes(loc.split(",")[0]) ? "bg-primary/10 text-primary" : "hover:bg-secondary text-foreground",
+                            )}
+                          >
+                            <span className="flex items-center gap-2">
+                              <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                              {loc}
+                            </span>
+                            {(location === loc || location?.includes(loc.split(",")[0])) && <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><path d="M20 6 9 17l-5-5"/></svg>}
+                          </button>
+                        ),
+                      )}
+                    </>
+                  )}
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleAutoDetectLocation}
+                    disabled={isDetectingLocation}
+                    className="flex-1 rounded-xl py-3 text-sm font-bold bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {isDetectingLocation ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" /> Detecting...
+                      </>
+                    ) : (
+                      <>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+                        Auto-detect
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setLocation("");
+                      setShowLocationModal(false);
+                    }}
+                    className="flex-[0.8] rounded-xl py-3 text-sm font-bold text-muted-foreground border border-border hover:bg-secondary/50 transition-colors"
+                  >
+                    Clear (Global)
+                  </button>
+                </div>
+                {geoError && (
+                  <p className="text-xs text-red-500 font-medium text-center mt-3">{geoError}</p>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </AppShell>
   );
 }
