@@ -28,4 +28,3 @@ import { AuthModule } from '../auth/auth.module';
   exports: [ArticlesGateway, CommentsService],
 })
 export class ArticlesModule {}
-

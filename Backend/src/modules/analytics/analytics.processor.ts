@@ -25,7 +25,9 @@ export class AnalyticsProcessor extends WorkerHost {
 
       // Validate UUIDs
       const isValidUUID = (id: string) =>
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          id,
+        );
 
       const userId =
         event.user_id && isValidUUID(event.user_id)

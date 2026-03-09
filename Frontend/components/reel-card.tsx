@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, memo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { useViewTracker } from "@/hooks/use-view-tracker";
 import { CommentsDrawer } from "@/components/comments-drawer";
 import { useAuth } from "@/contexts/AuthContext";
+import { globalSocket } from "@/lib/socket";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
@@ -44,7 +45,7 @@ function extractKeyPoints(content: string): string[] {
   return [];
 }
 
-export function ReelCard({
+export const ReelCard = memo(function ReelCard({
   article,
   index,
   totalArticles,
@@ -89,10 +90,23 @@ export function ReelCard({
 
   useEffect(() => {
     // Fetch comment count
-    fetch(`${API_URL}/api/comments/article/${article.id}/count`)
+    fetch(`${API_URL}/api/comments/article/${article.id}/count`, { cache: "no-store" })
       .then((res) => res.json())
       .then((data) => setCommentCount(data.count))
       .catch((err) => console.error("Failed to fetch comment count", err));
+      
+    // Real-time comment count updates
+    const handleCommentCountUpdate = (data: { articleId: string; commentCount: number }) => {
+      if (data.articleId === article.id) {
+        setCommentCount(data.commentCount);
+      }
+    };
+
+    globalSocket.on("commentCountUpdate", handleCommentCountUpdate);
+
+    return () => {
+      globalSocket.off("commentCountUpdate", handleCommentCountUpdate);
+    };
   }, [article.id]);
 
   // Use the new centralized view tracker (10s threshold for articles)
@@ -562,7 +576,7 @@ export function ReelCard({
         commentCount={commentCount}
         onCommentChange={() => {
           // Refetch count
-          fetch(`${API_URL}/api/comments/article/${article.id}/count`)
+          fetch(`${API_URL}/api/comments/article/${article.id}/count`, { cache: "no-store" })
             .then((res) => res.json())
             .then((data) => setCommentCount(data.count))
             .catch((err) => console.error("Failed to fetch comment count", err));
@@ -570,4 +584,4 @@ export function ReelCard({
       />
     </div>
   );
-}
+});

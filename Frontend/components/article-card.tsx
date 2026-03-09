@@ -1,8 +1,10 @@
 "use client";
 
+import { memo } from "react";
+
 import Link from "next/link";
 import Image from "next/image";
-import { Heart, MapPin, Eye, BookOpen } from "lucide-react";
+import { Heart, MapPin, Eye, BookOpen, MessageCircle } from "lucide-react";
 import type { Article } from "@/lib/data";
 import { cn } from "@/lib/utils";
 import { analytics, AnalyticsEventType } from "@/lib/analytics";
@@ -59,7 +61,7 @@ const trackArticleClick = (articleId: string) => {
   });
 };
 
-export function ArticleCardFeatured({ article }: { article: Article }) {
+export const ArticleCardFeatured = memo(function ArticleCardFeatured({ article }: { article: Article }) {
   const isSpecialType =
     article.type && ["Breaking", "Live", "Exclusive"].includes(article.type);
 
@@ -156,17 +158,27 @@ export function ArticleCardFeatured({ article }: { article: Article }) {
                 })) ||
               "Just now"}
           </span>
-          <div className="flex items-center gap-1 text-muted-foreground">
-            <Heart className="h-3 w-3" />
-            <span className="text-[10px] font-bold">{article.likes}</span>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1 text-muted-foreground bg-secondary/30 px-2 py-0.5 rounded-full">
+              <Heart className={cn("h-3 w-3", article.liked && "fill-red-500 text-red-500")} />
+              <span className="text-[10px] font-bold">{article.likes}</span>
+            </div>
+            <div className="flex items-center gap-1 text-muted-foreground bg-secondary/30 px-2 py-0.5 rounded-full">
+              <MessageCircle className="h-3 w-3" />
+              <span className="text-[10px] font-bold">{article.commentCount || 0}</span>
+            </div>
+            <div className="flex items-center gap-1 text-muted-foreground bg-secondary/30 px-2 py-0.5 rounded-full">
+              <Eye className="h-3 w-3" />
+              <span className="text-[10px] font-bold">{article.views}</span>
+            </div>
           </div>
         </div>
       </div>
     </Link>
   );
-}
+});
 
-export function ArticleCardCompact({ article }: { article: Article }) {
+export const ArticleCardCompact = memo(function ArticleCardCompact({ article }: { article: Article }) {
   return (
     <Link
       href={`/article/${article.id}`}
@@ -193,7 +205,7 @@ export function ArticleCardCompact({ article }: { article: Article }) {
             </p>
           </AuthorProfileButton>
         </div>
-        <div className="flex items-center gap-2 mt-2">
+          <div className="flex items-center gap-2 mt-2">
           <span className="text-[10px] font-medium text-muted-foreground/80">
             {article.publishedAt ||
               (article.createdAt &&
@@ -202,22 +214,28 @@ export function ArticleCardCompact({ article }: { article: Article }) {
                 })) ||
               "Just now"}
           </span>
-          <div className="flex items-center gap-1 text-[10px] font-bold text-muted-foreground/80 ml-auto bg-secondary px-1.5 py-0.5 rounded-md">
-            <Heart
-              className={cn(
-                "h-2.5 w-2.5",
-                article.liked && "fill-red-500 text-red-500",
-              )}
-            />
-            <span>{article.likes}</span>
+          <div className="flex items-center gap-2 ml-auto">
+            <div className="flex items-center gap-1 text-[10px] font-bold text-muted-foreground/80 bg-secondary px-1.5 py-0.5 rounded-md">
+              <Heart
+                className={cn(
+                  "h-2.5 w-2.5",
+                  article.liked && "fill-red-500 text-red-500",
+                )}
+              />
+              <span>{article.likes}</span>
+            </div>
+            <div className="flex items-center gap-1 text-[10px] font-bold text-muted-foreground/80 bg-secondary px-1.5 py-0.5 rounded-md">
+              <MessageCircle className="h-2.5 w-2.5" />
+              <span>{article.commentCount || 0}</span>
+            </div>
           </div>
         </div>
       </div>
     </Link>
   );
-}
+});
 
-export function ArticleCardHorizontal({ article }: { article: Article }) {
+export const ArticleCardHorizontal = memo(function ArticleCardHorizontal({ article }: { article: Article }) {
   const isSpecialType =
     article.type && ["Breaking", "Live", "Exclusive"].includes(article.type);
 
@@ -294,12 +312,20 @@ export function ArticleCardHorizontal({ article }: { article: Article }) {
             </span>
           )}
           <div className="ml-auto flex items-center gap-3">
-            <div className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground">
+            <div className="flex items-center gap-1 text-[10px] font-bold text-muted-foreground bg-secondary/50 px-1.5 py-0.5 rounded-md">
+              <Heart className={cn("w-3 h-3", article.liked && "fill-red-500 text-red-500")} />
+              <span>{article.likes}</span>
+            </div>
+            <div className="flex items-center gap-1 text-[10px] font-bold text-muted-foreground bg-secondary/50 px-1.5 py-0.5 rounded-md">
+              <MessageCircle className="w-3 h-3" />
+              <span>{article.commentCount || 0}</span>
+            </div>
+            <div className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground px-1.5 py-0.5 rounded-md">
               <Eye className="w-3 h-3" />
               <span>{article.views}</span>
             </div>
             {article.reads !== undefined && (
-              <div className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground">
+              <div className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground px-1.5 py-0.5 rounded-md">
                 <BookOpen className="w-3 h-3" />
                 <span>{article.reads}</span>
               </div>
@@ -319,9 +345,9 @@ export function ArticleCardHorizontal({ article }: { article: Article }) {
       )}
     </Link>
   );
-}
+});
 
-export function ArticleCardVertical({ article }: { article: Article }) {
+export const ArticleCardVertical = memo(function ArticleCardVertical({ article }: { article: Article }) {
   return (
     <Link
       href={`/article/${article.id}`}
@@ -391,22 +417,28 @@ export function ArticleCardVertical({ article }: { article: Article }) {
         {/* Footer Metadata */}
         <div className="mt-auto flex items-center justify-between border-t border-border/40 pt-2">
           {article.location && (
-            <span className="text-[10px] font-medium text-muted-foreground flex items-center gap-1 truncate max-w-32">
+            <span className="text-[10px] font-medium text-muted-foreground flex items-center gap-1 truncate max-w-24">
               <MapPin className="w-3 h-3 text-primary/70" />
               {article.location}
             </span>
           )}
-          <div className="flex items-center gap-1 text-[10px] font-bold text-muted-foreground bg-secondary/50 px-1.5 py-0.5 rounded-md shrink-0 ml-auto">
-            <Heart
-              className={cn(
-                "w-3 h-3",
-                article.liked && "fill-red-500 text-red-500",
-              )}
-            />
-            <span>{article.likes}</span>
+          <div className="flex items-center gap-2 ml-auto">
+            <div className="flex items-center gap-1 text-[10px] font-bold text-muted-foreground bg-secondary/50 px-1.5 py-0.5 rounded-md shrink-0">
+              <Heart
+                className={cn(
+                  "w-3 h-3",
+                  article.liked && "fill-red-500 text-red-500",
+                )}
+              />
+              <span>{article.likes}</span>
+            </div>
+            <div className="flex items-center gap-1 text-[10px] font-bold text-muted-foreground bg-secondary/50 px-1.5 py-0.5 rounded-md shrink-0">
+              <MessageCircle className="w-3 h-3" />
+              <span>{article.commentCount || 0}</span>
+            </div>
           </div>
         </div>
       </div>
     </Link>
   );
-}
+});

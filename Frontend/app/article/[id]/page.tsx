@@ -34,9 +34,9 @@ import {
   ArticleCardHorizontal,
 } from "@/components/article-card";
 import { analytics, AnalyticsEventType } from "@/lib/analytics";
-import { io } from "socket.io-client";
+import { globalSocket } from "@/lib/socket";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:5000";
 
 // ─── Comment Types ─────────────────────────────────────────────
 interface CommentType {
@@ -323,24 +323,50 @@ export default function ArticlePage({
     return () => document.body.classList.remove("toast-overlay-active");
   }, [deletingCommentId]);
 
+  const [refreshCommentsTrigger, setRefreshCommentsTrigger] = useState(0);
+
   // Real-time updates via Socket.IO
   useEffect(() => {
-    const socket = io(API_URL);
-
-    socket.on("articleLiked", (data: { articleId: string; likes: number }) => {
+    const handleArticleLiked = (data: { articleId: string; likes: number }) => {
       if (data.articleId === id) {
         setArticle((prev) => prev ? { ...prev, likes: data.likes } : null);
       }
-    });
+    };
 
-    socket.on("commentCountUpdate", (data: { articleId: string; commentCount: number }) => {
+    const handleCommentCountUpdate = (data: { articleId: string; commentCount: number }) => {
       if (data.articleId === id) {
         setCommentCount(data.commentCount);
+        setRefreshCommentsTrigger((prev) => prev + 1);
       }
-    });
+    };
+
+    const handleCommentLiked = (data: { commentId: string; likes: number; articleId: string }) => {
+      if (data.articleId === id) {
+        setComments((prevComments) => {
+          const updateComments = (list: CommentType[]): CommentType[] => {
+            return list.map((c) => {
+              if (c.id === data.commentId) {
+                return { ...c, likes: data.likes };
+              }
+              if (c.replies && c.replies.length > 0) {
+                return { ...c, replies: updateComments(c.replies) };
+              }
+              return c;
+            });
+          };
+          return updateComments(prevComments);
+        });
+      }
+    };
+
+    globalSocket.on("articleLiked", handleArticleLiked);
+    globalSocket.on("commentCountUpdate", handleCommentCountUpdate);
+    globalSocket.on("commentLiked", handleCommentLiked);
 
     return () => {
-      socket.disconnect();
+      globalSocket.off("articleLiked", handleArticleLiked);
+      globalSocket.off("commentCountUpdate", handleCommentCountUpdate);
+      globalSocket.off("commentLiked", handleCommentLiked);
     };
   }, [id]);
 
@@ -528,8 +554,9 @@ export default function ArticlePage({
   };
 
   // Fetch comments
-  const fetchComments = useCallback(async () => {
-    setLoadingComments(true);
+  // Fetch comments
+  const fetchComments = useCallback(async (background = false) => {
+    if (!background) setLoadingComments(true);
     try {
       const headers: HeadersInit = {};
       if (token) {
@@ -559,16 +586,22 @@ export default function ArticlePage({
     } catch (err) {
       console.error("Failed to fetch comments", err);
     } finally {
-      setLoadingComments(false);
+      if (!background) setLoadingComments(false);
     }
   }, [id, token]);
 
   // Load comments when section is opened
   useEffect(() => {
     if (showCommentSection) {
-      fetchComments();
+      fetchComments(false);
     }
   }, [showCommentSection, fetchComments]);
+
+  useEffect(() => {
+    if (showCommentSection && refreshCommentsTrigger > 0) {
+      fetchComments(true);
+    }
+  }, [refreshCommentsTrigger, showCommentSection, fetchComments]);
 
   const handleLike = async () => {
     if (!isAuthenticated) {
@@ -694,7 +727,7 @@ export default function ArticlePage({
       });
       if (res.ok) {
         setCommentText("");
-        await fetchComments();
+        await fetchComments(true);
       }
     } catch (e) {
       console.error("Failed to submit comment", e);
@@ -716,7 +749,7 @@ export default function ArticlePage({
         body: JSON.stringify({ content, articleId: id, parentId }),
       });
       if (res.ok) {
-        await fetchComments();
+        await fetchComments(true);
       }
     } catch (e) {
       console.error("Failed to reply", e);

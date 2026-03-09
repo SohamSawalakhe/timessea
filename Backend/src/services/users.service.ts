@@ -21,7 +21,7 @@ export class UsersService {
   }
 
   async update(id: string, data: Prisma.UserUpdateInput): Promise<User> {
-    if (data.handle === "") {
+    if (data.handle === '') {
       data.handle = null;
     }
     return this.prisma.user.update({
@@ -121,7 +121,10 @@ export class UsersService {
 
     let isFollowing = false;
     if (currentUserId) {
-      const followStatus = await this.checkFollowStatus(currentUserId, targetUserId);
+      const followStatus = await this.checkFollowStatus(
+        currentUserId,
+        targetUserId,
+      );
       isFollowing = followStatus.following;
     }
 
@@ -140,7 +143,7 @@ export class UsersService {
             id: true,
             name: true,
             picture: true,
-          }
+          },
         },
         createdAt: true,
       },
@@ -161,7 +164,7 @@ export class UsersService {
             id: true,
             name: true,
             picture: true,
-          }
+          },
         },
         createdAt: true,
       },

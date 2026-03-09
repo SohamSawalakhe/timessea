@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { io } from "socket.io-client";
+import { globalSocket } from "@/lib/socket";
 
 import { ReelCard } from "@/components/reel-card";
 import { ReelSkeleton } from "@/components/reel-skeleton";
@@ -66,7 +66,7 @@ export function ExploreClient({ initialArticles }: ExploreClientProps) {
   const fetchArticles = useCallback(
     async (currentOffset: number, shouldReplace = false) => {
       try {
-        const limit = 10;
+        const limit = 15;
         const headers: HeadersInit = {};
         if (token) {
           console.log("ExploreClient: fetching with token");
@@ -132,8 +132,8 @@ export function ExploreClient({ initialArticles }: ExploreClientProps) {
             fetchArticles(articles.length);
           }
         },
-        // Root margin to trigger slightly before the element fully enters
-        { threshold: 0.1, rootMargin: "100px" },
+        // Massive root margin to trigger prefetching of the next batch 1.5 screens ahead
+        { threshold: 0, rootMargin: "1500px" },
       );
 
       if (node) observer.current.observe(node);
@@ -151,13 +151,11 @@ export function ExploreClient({ initialArticles }: ExploreClientProps) {
   }, []);
 
   useEffect(() => {
-    const socket = io(API_URL);
-
-    socket.on("connect", () => {
+    const handleConnect = () => {
       console.log("Connected to WebSocket");
-    });
+    };
 
-    socket.on("articleViewed", (data: { articleId: string; views: number }) => {
+    const handleArticleViewed = (data: { articleId: string; views: number }) => {
       setArticles((prev) =>
         prev.map((article) =>
           article.id === data.articleId
@@ -165,10 +163,30 @@ export function ExploreClient({ initialArticles }: ExploreClientProps) {
             : article,
         ),
       );
-    });
+    };
+
+    const handleArticleLiked = (data: { articleId: string; likes: number }) => {
+      setArticles((prev) =>
+        prev.map((article) =>
+          article.id === data.articleId
+            ? {
+                ...article,
+                likes: data.likes,
+                // Do not override `liked` bool to prevent jarring toggle state changes for the current user
+              }
+            : article,
+        ),
+      );
+    };
+
+    globalSocket.on("connect", handleConnect);
+    globalSocket.on("articleViewed", handleArticleViewed);
+    globalSocket.on("articleLiked", handleArticleLiked);
 
     return () => {
-      socket.disconnect();
+      globalSocket.off("connect", handleConnect);
+      globalSocket.off("articleViewed", handleArticleViewed);
+      globalSocket.off("articleLiked", handleArticleLiked);
     };
   }, []);
 
@@ -346,8 +364,8 @@ export function ExploreClient({ initialArticles }: ExploreClientProps) {
             onView={handleView}
             onAuthRequired={handleAuthRequired}
           />
-          {/* Trigger load when we reach the 3rd to last item (70% point) */}
-          {index === articles.length - 3 && (
+          {/* Trigger load when we reach the 5th to last item for ultra-smooth preloading */}
+          {index === articles.length - 5 && (
             <div
               ref={lastCardRef}
               className="h-1 w-full pointer-events-none"

@@ -565,7 +565,7 @@ function EditorContent() {
       }
 
       setPublished(true);
-      toast.success("Article published successfully! Redirecting...");
+      toast.success("Article published successfully!");
 
       // If scheduled, switch to Scheduled tab
       if (scheduledAt) {
@@ -574,11 +574,15 @@ function EditorContent() {
           router.push("/drafts");
         }, 1500);
       } else {
-        // If published immediately, go to explore
+        // If published immediately, stay on the page and reset
         setTimeout(() => {
           setPublished(false);
           setEditingDraftId(null);
-          router.push("/explore");
+          setIsPreview(false);
+          setTitle("");
+          setSubheadline("");
+          setImageUrl("");
+          setBlocks([{ id: crypto.randomUUID(), type: "text", content: "" }]);
         }, 1500);
       }
     } catch (error) {
@@ -669,6 +673,7 @@ function EditorContent() {
   const handleDelete = (postId: string) => {
     showConfirmDelete(async () => {
       try {
+        const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
         const res = await fetch(
           `${API_URL}/api/articles/${postId}`,
           {

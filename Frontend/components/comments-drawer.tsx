@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { Drawer } from "vaul";
 import { Send, Heart, MessageCircle, Loader2, X, Trash2 } from "lucide-react";
 import Image from "next/image";
@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "react-toastify";
+import { globalSocket } from "@/lib/socket";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
@@ -109,6 +110,8 @@ const CommentItem = ({
   currentUserId,
   depth = 0,
 }: CommentItemProps) => {
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+
   return (
     <div className={cn(depth > 0 && "mt-3")}>
       <div className="group flex gap-3 items-start">
@@ -159,13 +162,9 @@ const CommentItem = ({
                 {comment.likes} {comment.likes === 1 ? "like" : "likes"}
               </span>
             )}
-            {currentUserId === comment.author.id && (
+            {currentUserId === comment.author.id && !isConfirmingDelete && (
               <button
-                onClick={() => {
-                  if (window.confirm("Are you sure you want to delete this comment and its replies?")) {
-                    onDelete(comment.id);
-                  }
-                }}
+                onClick={() => setIsConfirmingDelete(true)}
                 className="text-xs font-semibold text-muted-foreground/60 hover:text-destructive transition-colors flex items-center gap-1"
               >
                 <Trash2 className="h-4 w-4" />
@@ -173,6 +172,29 @@ const CommentItem = ({
               </button>
             )}
           </div>
+          
+          {isConfirmingDelete && (
+            <div className="mt-2 p-3 bg-destructive/10 border border-destructive/20 rounded-md flex flex-col gap-2">
+              <span className="text-xs font-bold text-destructive">Delete this comment?</span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setIsConfirmingDelete(false)}
+                  className="text-[10px] font-semibold bg-background border border-border px-3 py-1.5 rounded-md hover:bg-muted transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    onDelete(comment.id);
+                    setIsConfirmingDelete(false);
+                  }}
+                  className="text-[10px] font-bold bg-destructive text-destructive-foreground px-3 py-1.5 rounded-md shadow-sm hover:bg-destructive/90 transition-colors"
+                >
+                  Confirm Delete
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         <button onClick={() => onLike(comment.id)} className="shrink-0 pt-1">
@@ -221,20 +243,10 @@ export function CommentsDrawer({
   const [replyingTo, setReplyingTo] = useState<Comment | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (open) {
-      fetchComments();
-    }
-  }, [open, articleId]);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  useEffect(() => {
-    if (replyingTo && inputRef.current) {
-      inputRef.current.focus();
-    }
-  }, [replyingTo]);
-
-  const fetchComments = async () => {
-    setLoading(true);
+  const fetchComments = useCallback(async (background = false) => {
+    if (!background) setLoading(true);
     try {
       const headers: HeadersInit = {};
       if (token) {
@@ -242,7 +254,7 @@ export function CommentsDrawer({
       }
       const res = await fetch(
         `${API_URL}/api/comments/article/${articleId}`,
-        { headers },
+        { headers, cache: "no-store" },
       );
       if (res.ok) {
         const data = await res.json();
@@ -251,9 +263,58 @@ export function CommentsDrawer({
     } catch (error) {
       console.error("Failed to fetch comments", error);
     } finally {
-      setLoading(false);
+      if (!background) setLoading(false);
     }
-  };
+  }, [articleId, token]);
+
+  useEffect(() => {
+    if (open) {
+      fetchComments();
+    }
+  }, [open, articleId]);
+
+  useEffect(() => {
+    if (open && refreshTrigger > 0) {
+      fetchComments(true);
+    }
+  }, [refreshTrigger, open, articleId, fetchComments]);
+
+  useEffect(() => {
+    const handleCommentCountUpdate = (data: { articleId: string; commentCount: number }) => {
+      if (data.articleId === articleId) {
+        setRefreshTrigger((prev) => prev + 1);
+      }
+    };
+
+    const handleCommentLiked = (data: { commentId: string; likes: number; articleId: string }) => {
+      if (data.articleId === articleId) {
+        setComments((prev) =>
+          updateCommentInTree(prev, data.commentId, (c) => ({
+            ...c,
+            likes: data.likes,
+            // If the user liked it themselves from another tab, 
+            // the local "liked" bool might still be stale, but we sync the raw count.
+          }))
+        );
+      }
+    };
+
+    globalSocket.on("commentCountUpdate", handleCommentCountUpdate);
+    globalSocket.on("commentLiked", handleCommentLiked);
+
+    return () => {
+      globalSocket.off("commentCountUpdate", handleCommentCountUpdate);
+      globalSocket.off("commentLiked", handleCommentLiked);
+    };
+  }, [articleId]);
+
+  useEffect(() => {
+    if (replyingTo && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [replyingTo]);
+
+
 
   const handlePostComment = async () => {
     if (!newComment.trim() || !user) return;
@@ -382,7 +443,15 @@ export function CommentsDrawer({
     <Drawer.Root open={open} onOpenChange={onOpenChange}>
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 bg-black/40 z-100" />
-        <Drawer.Content className="fixed bottom-0 left-0 right-0 mx-auto max-w-lg max-h-[85vh] h-[70vh] flex flex-col rounded-t-[20px] bg-background z-100 outline-none shadow-2xl border border-border/50">
+        <Drawer.Content 
+          onPointerDownOutside={(e) => {
+            const tgt = e.target as HTMLElement;
+            if (tgt.closest('.Toastify')) {
+              e.preventDefault();
+            }
+          }}
+          className="fixed bottom-0 left-0 right-0 mx-auto max-w-lg max-h-[85vh] h-[70vh] flex flex-col rounded-t-[20px] bg-background z-100 outline-none shadow-2xl border border-border/50"
+        >
           {/* Handle */}
           <div className="mx-auto w-12 h-1.5 shrink-0 rounded-full bg-muted mt-3 mb-2" />
 

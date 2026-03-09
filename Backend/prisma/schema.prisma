@@ -82,6 +82,8 @@ model Article {
   @@index([category])
   @@index([createdAt])
   @@index([likes])
+  @@index([location])
+  @@index([published, deletedAt, createdAt(sort: Desc)])
 }
 
 model ArticleLike {

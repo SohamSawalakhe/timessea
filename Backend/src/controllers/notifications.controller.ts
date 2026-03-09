@@ -14,9 +14,7 @@ import { NotificationsService } from '../services/notifications.service';
 @Controller('api/notifications')
 @UseGuards(AuthGuard('jwt'))
 export class NotificationsController {
-  constructor(
-    private readonly notificationsService: NotificationsService,
-  ) {}
+  constructor(private readonly notificationsService: NotificationsService) {}
 
   @Get()
   async findAll(@Req() req: Request & { user: { id: string } }) {

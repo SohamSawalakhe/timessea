@@ -6,7 +6,7 @@ async function getArticles() {
   try {
     const start = Date.now();
     const res = await fetch(
-      `${API_URL}/api/articles?limit=10&offset=0&hasMedia=true`,
+      `${API_URL}/api/articles?limit=15&offset=0&hasMedia=true`,
       {
         next: { revalidate: 0 },
       },

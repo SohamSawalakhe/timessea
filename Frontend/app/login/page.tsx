@@ -57,7 +57,7 @@ function LoginForm() {
       <div className="relative w-full max-w-md space-y-8 rounded-2xl bg-[#111] p-8 shadow-2xl border border-white/10">
         {/* Logo / Brand */}
         <div className="text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-white/15 to-white/5 backdrop-blur-sm border border-white/10">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-linear-to-br from-white/15 to-white/5 backdrop-blur-sm border border-white/10">
             <Newspaper className="h-7 w-7 text-white" />
           </div>
           <h1 className="text-3xl font-bold tracking-tight">Welcome Back</h1>

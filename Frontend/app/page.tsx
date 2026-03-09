@@ -14,10 +14,11 @@ import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { analytics } from "@/lib/analytics";
+import { globalSocket } from "@/lib/socket";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
-type FeedTab = "General" | "Local" | "Following";
+type FeedTab = "General" | "For You" | "Local" | "Following";
 
 interface LocationTier {
   term: string;
@@ -47,7 +48,7 @@ export default function HomePage() {
       }
 
       const saved = sessionStorage.getItem("ts_feed_tab");
-      if (saved === "Local" || saved === "Following" || saved === "General") {
+      if (saved === "Local" || saved === "Following" || saved === "General" || saved === "For You") {
         setActiveTab(saved as FeedTab);
       }
     } catch { /* ignore */ }
@@ -366,6 +367,15 @@ export default function HomePage() {
           params.set("feed", "following");
         }
 
+        if (activeTab === "For You") {
+          if (!isAuthenticated) {
+            setArticles([]);
+            setIsLoading(false);
+            return;
+          }
+          params.set("feed", "for-you");
+        }
+
         const res = await fetch(`${API_URL}/api/articles?${params.toString()}`, { headers });
         if (res.ok && !cancelled) {
           const text = await res.text();
@@ -431,8 +441,40 @@ export default function HomePage() {
       fetchStandard();
     }
 
+
     return () => { cancelled = true; };
   }, [activeTab, token, isAuthenticated, locationTiersKey]);
+
+  // ---- Real-time Feed Updates ----
+  useEffect(() => {
+    const handleArticleLiked = (data: { articleId: string; likes: number }) => {
+      setArticles((prev) =>
+        prev.map((article) =>
+          article.id === data.articleId
+            ? { ...article, likes: data.likes }
+            : article
+        )
+      );
+    };
+
+    const handleCommentCountUpdate = (data: { articleId: string; commentCount: number }) => {
+      setArticles((prev) =>
+        prev.map((article) =>
+          article.id === data.articleId
+            ? { ...article, commentCount: data.commentCount }
+            : article
+        )
+      );
+    };
+
+    globalSocket.on("articleLiked", handleArticleLiked);
+    globalSocket.on("commentCountUpdate", handleCommentCountUpdate);
+
+    return () => {
+      globalSocket.off("articleLiked", handleArticleLiked);
+      globalSocket.off("commentCountUpdate", handleCommentCountUpdate);
+    };
+  }, []);
 
   // Reset visible count on tab/filter change
   useEffect(() => {
@@ -441,7 +483,8 @@ export default function HomePage() {
 
   // ---- Filtering logic ----
   const filteredArticles = articles.filter((a) => {
-    const matchesCategory = activeTab === "Local" || !activeCategory || activeCategory === "Trending" || a.category === activeCategory;
+    const isSpecialTab = activeTab === "Local" || activeTab === "Following" || activeTab === "For You";
+    const matchesCategory = isSpecialTab || !activeCategory || activeCategory === "Trending" || a.category === activeCategory;
     const matchesSearch =
       searchQuery === "" ||
       a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -463,6 +506,7 @@ export default function HomePage() {
   const visibleRest = rest.slice(0, visibleCount);
 
   let sectionTitle = "Latest News";
+  if (activeTab === "For You") sectionTitle = "Recommended For You";
   if (activeTab === "Following") sectionTitle = "From Your Network";
   if (activeTab === "Local") sectionTitle = "Local News";
 
@@ -528,7 +572,7 @@ export default function HomePage() {
       {/* ---- Feed Tabs ---- */}
       <div className="border-b border-border/50 mb-5">
         <div className="flex items-center gap-6 px-1">
-          {(["General", "Local", "Following"] as FeedTab[]).map((tab) => (
+          {(["General", "For You", "Local", "Following"] as FeedTab[]).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -861,7 +905,7 @@ export default function HomePage() {
                   <div key={i} className="h-32 w-full bg-secondary animate-pulse rounded-xl" />
                 ))}
               </div>
-            ) : visibleRest.length > 0 ? (
+            ) : filteredArticles.length > 0 ? (
               <>
                 {visibleRest.map((article, index) => (
                   <motion.div
@@ -887,7 +931,9 @@ export default function HomePage() {
             ) : (
               <div className="flex flex-col items-center justify-center py-20 text-center">
                 <div className="bg-secondary/50 p-4 rounded-full mb-4">
-                  {activeTab === "Following" ? (
+                  {activeTab === "For You" ? (
+                    <TrendingUp className="h-8 w-8 text-muted-foreground" />
+                  ) : activeTab === "Following" ? (
                     <User className="h-8 w-8 text-muted-foreground" />
                   ) : activeTab === "Local" ? (
                     <MapPin className="h-8 w-8 text-muted-foreground" />
@@ -896,7 +942,11 @@ export default function HomePage() {
                   )}
                 </div>
                 <p className="text-base font-bold text-foreground">
-                  {activeTab === "Following"
+                  {activeTab === "For You"
+                    ? !isAuthenticated
+                      ? "Sign in for your feed"
+                      : "Not enough data yet"
+                    : activeTab === "Following"
                     ? !isAuthenticated
                       ? "Sign in to see your feed"
                       : "No articles from people you follow"
@@ -905,7 +955,11 @@ export default function HomePage() {
                     : "No articles found"}
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {activeTab === "Following"
+                  {activeTab === "For You"
+                    ? !isAuthenticated
+                      ? "Log in to see articles tailored to your interests"
+                      : "Read, like, and comment on articles to start getting recommendations"
+                    : activeTab === "Following"
                     ? !isAuthenticated
                       ? "Log in and follow authors to see their articles here"
                       : "Follow authors to see their articles here"
@@ -913,7 +967,7 @@ export default function HomePage() {
                     ? "Check back later for updates in your area"
                     : `Try adjusting your search for "${searchQuery}"`}
                 </p>
-                {activeTab === "Following" && !isAuthenticated && (
+                {(activeTab === "Following" || activeTab === "For You") && !isAuthenticated && (
                   <Link
                     href="/login"
                     className="mt-5 px-6 py-2.5 rounded-full bg-primary text-primary-foreground text-sm font-bold hover:opacity-90 transition-opacity"

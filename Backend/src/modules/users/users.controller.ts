@@ -1,4 +1,15 @@
-import { Controller, Post, Get, Param, UseGuards, Req, Delete, BadRequestException, Query, Body } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Param,
+  UseGuards,
+  Req,
+  Delete,
+  BadRequestException,
+  Query,
+  Body,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { UsersService } from '../../services/users.service';
 
@@ -48,7 +59,15 @@ export class UsersController {
   @UseGuards(AuthGuard('jwt'))
   async updateProfile(
     @Req() req: any,
-    @Body() body: { name?: string; bio?: string; handle?: string; picture?: string; coverImage?: string; location?: string; }
+    @Body()
+    body: {
+      name?: string;
+      bio?: string;
+      handle?: string;
+      picture?: string;
+      coverImage?: string;
+      location?: string;
+    },
   ) {
     const userId = req.user?.id || req.user?.userId;
     if (!userId) {

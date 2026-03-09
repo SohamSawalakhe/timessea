@@ -47,8 +47,11 @@ export class CommentsService {
         where: { id: data.articleId },
         data: { commentCount: { increment: 1 } },
       });
-      
-      this.articlesGateway.notifyCommentCountUpdate(data.articleId, updatedArticle.commentCount);
+
+      this.articlesGateway.notifyCommentCountUpdate(
+        data.articleId,
+        updatedArticle.commentCount,
+      );
 
       // Track comment event
       this.analyticsService.track({
@@ -200,8 +203,10 @@ export class CommentsService {
       },
     });
 
+    let updatedComment;
+
     if (existing) {
-      return this.prisma.$transaction(async (tx) => {
+      updatedComment = await this.prisma.$transaction(async (tx) => {
         await tx.commentLike.delete({
           where: { id: existing.id },
         });
@@ -211,7 +216,7 @@ export class CommentsService {
         });
       });
     } else {
-      return this.prisma.$transaction(async (tx) => {
+      updatedComment = await this.prisma.$transaction(async (tx) => {
         await tx.commentLike.create({
           data: { userId, commentId },
         });
@@ -221,6 +226,16 @@ export class CommentsService {
         });
       });
     }
+
+    if (this.articlesGateway) {
+      this.articlesGateway.notifyCommentLiked(
+        updatedComment.id,
+        updatedComment.likes,
+        updatedComment.articleId,
+      );
+    }
+
+    return updatedComment;
   }
 
   /**
@@ -285,7 +300,10 @@ export class CommentsService {
         data: { commentCount: { decrement: allToDelete.length } },
       });
 
-      this.articlesGateway.notifyCommentCountUpdate(comment.articleId, updatedArticle.commentCount);
+      this.articlesGateway.notifyCommentCountUpdate(
+        comment.articleId,
+        updatedArticle.commentCount,
+      );
 
       return comment;
     });

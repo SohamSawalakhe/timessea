@@ -80,6 +80,34 @@ export interface AuthorDashboardOverviewResult {
   total_shares: string | number;
 }
 
+export interface DashboardStatsResult {
+  stats: {
+    total_views: number;
+    active_users: number;
+    total_likes: number;
+    total_comments: number;
+    total_engagement: number;
+    total_shares: number;
+    total_reads: number;
+    completion_rate: number;
+    engagement_rate: number;
+  };
+  trend: {
+    name: string;
+    fullDate: string;
+    views: number;
+    reads: number;
+    likes: number;
+    comments: number;
+  }[];
+  top_posts: {
+    id: string;
+    title: string;
+    views: number;
+    createdAt: Date;
+  }[];
+}
+
 /**
  * Analytics Query Service
  * Provides methods to query analytics data from ClickHouse and Redis
@@ -95,9 +123,13 @@ export class AnalyticsQueryService {
   /**
    * Get author stats for profile overview
    */
-  async getAuthorStats(
-    authorId: string,
-  ): Promise<AuthorStats & { totalComments: number; totalFollowers: number; totalFollowing: number }> {
+  async getAuthorStats(authorId: string): Promise<
+    AuthorStats & {
+      totalComments: number;
+      totalFollowers: number;
+      totalFollowing: number;
+    }
+  > {
     const [
       publishedCount,
       scheduledCount,
@@ -177,7 +209,20 @@ export class AnalyticsQueryService {
   /**
    * Get detailed author dashboard stats
    */
-  async getAuthorDashboardStats(authorId: string, days: number = 7) {
+  async getAuthorDashboardStats(
+    authorId: string,
+    days: number = 7,
+  ): Promise<DashboardStatsResult> {
+    const cacheKey = `dashboard_stats:${authorId}:${days}`;
+    try {
+      const cached = await this.redisService.getClient().get(cacheKey);
+      if (cached) {
+        return JSON.parse(cached) as unknown as DashboardStatsResult;
+      }
+    } catch (e) {
+      console.warn('Dashboard cache read error', e);
+    }
+
     // 1. Get author's post IDs and basic stats
     const posts = await this.prismaService.article.findMany({
       where: { authorId, deletedAt: null },
@@ -200,14 +245,43 @@ export class AnalyticsQueryService {
     const postIds = allPosts.map((p) => p.id);
 
     if (postIds.length === 0) {
+      const emptyTrend: {
+        name: string;
+        fullDate: string;
+        views: number;
+        reads: number;
+        likes: number;
+        comments: number;
+      }[] = [];
+      const today = new Date();
+      for (let i = days - 1; i >= 0; i--) {
+        const d = new Date(today);
+        d.setDate(d.getDate() - i);
+        const name = d.toLocaleDateString('en-US', { weekday: 'short' });
+        const fullDate = d.toISOString().split('T')[0];
+        emptyTrend.push({
+          name,
+          fullDate,
+          views: 0,
+          reads: 0,
+          likes: 0,
+          comments: 0,
+        });
+      }
+
       return {
         stats: {
           total_views: 0,
           active_users: 0,
+          total_likes: 0,
+          total_comments: 0,
           total_engagement: 0,
           total_shares: 0,
+          total_reads: 0,
+          completion_rate: 0,
+          engagement_rate: 0,
         },
-        trend: [],
+        trend: emptyTrend,
         top_posts: [],
       };
     }
@@ -343,7 +417,7 @@ export class AnalyticsQueryService {
         const d = new Date(today);
         d.setDate(d.getDate() - i);
         const dateStr = d.toISOString().split('T')[0];
-        const data = trendMap.get(dateStr) as TrendResult | undefined;
+        const data = trendMap.get(dateStr);
 
         formattedTrend.push({
           name: useDateLabel
@@ -360,39 +434,43 @@ export class AnalyticsQueryService {
       // FALLBACK: Use real Prisma data grouped by actual dates
       // Query likes per day from the last 7 days (real timestamps from ArticleLike)
       const [likesPerDay, commentsPerDay, articlesInRange] = await Promise.all([
-        this.prismaService.articleLike.groupBy({
-          by: ['createdAt'],
-          where: {
-            article: { authorId, deletedAt: null },
-            createdAt: { gte: rangeStart },
-          },
-          _count: true,
-        }).then((results) => {
-          // Group by date string
-          const map = new Map<string, number>();
-          results.forEach((r) => {
-            const dateStr = r.createdAt.toISOString().split('T')[0];
-            map.set(dateStr, (map.get(dateStr) || 0) + r._count);
-          });
-          return map;
-        }),
+        this.prismaService.articleLike
+          .groupBy({
+            by: ['createdAt'],
+            where: {
+              article: { authorId, deletedAt: null },
+              createdAt: { gte: rangeStart },
+            },
+            _count: true,
+          })
+          .then((results) => {
+            // Group by date string
+            const map = new Map<string, number>();
+            results.forEach((r) => {
+              const dateStr = r.createdAt.toISOString().split('T')[0];
+              map.set(dateStr, (map.get(dateStr) || 0) + r._count);
+            });
+            return map;
+          }),
 
-        this.prismaService.comment.groupBy({
-          by: ['createdAt'],
-          where: {
-            article: { authorId },
-            deletedAt: null,
-            createdAt: { gte: rangeStart },
-          },
-          _count: true,
-        }).then((results) => {
-          const map = new Map<string, number>();
-          results.forEach((r) => {
-            const dateStr = r.createdAt.toISOString().split('T')[0];
-            map.set(dateStr, (map.get(dateStr) || 0) + r._count);
-          });
-          return map;
-        }),
+        this.prismaService.comment
+          .groupBy({
+            by: ['createdAt'],
+            where: {
+              article: { authorId },
+              deletedAt: null,
+              createdAt: { gte: rangeStart },
+            },
+            _count: true,
+          })
+          .then((results) => {
+            const map = new Map<string, number>();
+            results.forEach((r) => {
+              const dateStr = r.createdAt.toISOString().split('T')[0];
+              map.set(dateStr, (map.get(dateStr) || 0) + r._count);
+            });
+            return map;
+          }),
 
         // Articles created in last 7 days (to distribute their views/reads to their creation date)
         this.prismaService.article.findMany({
@@ -418,7 +496,8 @@ export class AnalyticsQueryService {
       const hasRecentArticles = articlesInRange.length > 0;
 
       // First pass: collect per-day activity to distribute views/reads proportionally
-      const dailyActivity: { dateStr: string; d: Date; activity: number }[] = [];
+      const dailyActivity: { dateStr: string; d: Date; activity: number }[] =
+        [];
       let totalActivity = 0;
       for (let i = days - 1; i >= 0; i--) {
         const d = new Date(today);
@@ -469,7 +548,7 @@ export class AnalyticsQueryService {
       }
     }
 
-    return {
+    const finalPayload = {
       stats: {
         total_views: totalViews,
         active_users: Number(overview.unique_viewers) || 0,
@@ -489,12 +568,31 @@ export class AnalyticsQueryService {
         createdAt: p.createdAt,
       })),
     };
+
+    try {
+      // Cache the dashboard data for 5 minutes
+      await this.redisService
+        .getClient()
+        .set(cacheKey, JSON.stringify(finalPayload), 'EX', 300);
+    } catch (e) {
+      console.warn('Dashboard cache write error', e);
+    }
+
+    return finalPayload;
   }
 
   /**
    * Get post-level analytics
    */
   async getPostAnalytics(postId: string): Promise<PostAnalytics> {
+    const cacheKey = `post_analytics_data:${postId}`;
+    try {
+      const cached = await this.redisService.getClient().get(cacheKey);
+      if (cached) return JSON.parse(cached) as unknown as PostAnalytics;
+    } catch (e) {
+      console.warn('Post overview cache read error', e);
+    }
+
     const isValidUUID =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
         postId,
@@ -562,7 +660,7 @@ export class AnalyticsQueryService {
     const engagement_rate =
       views > 0 ? ((likes + comments + shares) / views) * 100 : 0;
 
-    return {
+    const finalPayload = {
       post_id: postId,
       views,
       unique_views,
@@ -572,13 +670,28 @@ export class AnalyticsQueryService {
       shares,
       engagement_rate: Math.round(engagement_rate * 100) / 100,
     };
+
+    try {
+      await this.redisService
+        .getClient()
+        .set(
+          `post_analytics_data:${postId}`,
+          JSON.stringify(finalPayload),
+          'EX',
+          120,
+        );
+    } catch (e) {
+      console.warn('Post overview cache write error', e);
+    }
+
+    return finalPayload;
   }
 
   /**
    * Get geo distribution for a post
    * Extracts location from event metadata JSON where the frontend stores it
    */
-  async getPostGeoDistribution(postId: string) {
+  async getPostGeoDistribution(postId: string): Promise<GeoDistributionResult[]> {
     const isValidUUID =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
         postId,
@@ -605,7 +718,15 @@ export class AnalyticsQueryService {
   /**
    * Get trend analytics for a specific post
    */
-  async getPostTrend(postId: string) {
+  async getPostTrend(postId: string): Promise<TrendResult[]> {
+    const cacheKey = `post_analytics_trend:${postId}`;
+    try {
+      const cached = await this.redisService.getClient().get(cacheKey);
+      if (cached) return JSON.parse(cached) as unknown as TrendResult[];
+    } catch (e) {
+      console.warn('Post trend cache read error', e);
+    }
+
     const isValidUUID =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
         postId,
@@ -695,7 +816,7 @@ export class AnalyticsQueryService {
     const needSynthesis = chTotalViews === 0 && article && article.views > 0;
 
     // Synthesis weights (mostly growing trend)
-    const weights = [0.05, 0.12, 0.08, 0.15, 0.2, 0.18, 0.22];
+
 
     for (let i = 29; i >= 0; i--) {
       const d = new Date(today);
@@ -715,15 +836,23 @@ export class AnalyticsQueryService {
       if (needSynthesis && i < 14) {
         // Distribute over last 14 days with deterministic weights (no randomness)
         const weightIndex = i % 7;
-        const viewsW =  [0.06, 0.09, 0.12, 0.11, 0.16, 0.21, 0.25];
-        const readsW =  [0.04, 0.10, 0.14, 0.10, 0.17, 0.19, 0.26];
-        const likesW =  [0.05, 0.11, 0.13, 0.09, 0.15, 0.22, 0.25];
-        const commW  =  [0.07, 0.08, 0.11, 0.12, 0.18, 0.20, 0.24];
+        const viewsW = [0.06, 0.09, 0.12, 0.11, 0.16, 0.21, 0.25];
+        const readsW = [0.04, 0.1, 0.14, 0.1, 0.17, 0.19, 0.26];
+        const likesW = [0.05, 0.11, 0.13, 0.09, 0.15, 0.22, 0.25];
+        const commW = [0.07, 0.08, 0.11, 0.12, 0.18, 0.2, 0.24];
 
-        dayStats.views = Math.round((article?.views || 0) * viewsW[weightIndex] / 2);
-        dayStats.reads = Math.round((article?.reads || 0) * readsW[weightIndex] / 2);
-        dayStats.likes = Math.round((article?.likes || 0) * likesW[weightIndex] / 2);
-        dayStats.comments = Math.round((commentCount || 0) * commW[weightIndex] / 2);
+        dayStats.views = Math.round(
+          ((article?.views || 0) * viewsW[weightIndex]) / 2,
+        );
+        dayStats.reads = Math.round(
+          ((article?.reads || 0) * readsW[weightIndex]) / 2,
+        );
+        dayStats.likes = Math.round(
+          ((article?.likes || 0) * likesW[weightIndex]) / 2,
+        );
+        dayStats.comments = Math.round(
+          ((commentCount || 0) * commW[weightIndex]) / 2,
+        );
       }
 
       formattedTrend.push(dayStats);
@@ -749,6 +878,14 @@ export class AnalyticsQueryService {
         formattedTrend[formattedTrend.length - 1].comments += cDiff;
     }
 
+    try {
+      await this.redisService
+        .getClient()
+        .set(cacheKey, JSON.stringify(formattedTrend), 'EX', 120);
+    } catch (e) {
+      console.warn('Post trend cache write error', e);
+    }
+
     return formattedTrend;
   }
 
@@ -756,6 +893,14 @@ export class AnalyticsQueryService {
    * Get platform-wide analytics for admin dashboard
    */
   async getPlatformAnalytics(): Promise<PlatformAnalytics> {
+    const cacheKey = 'admin:platform_analytics';
+    try {
+      const cached = await this.redisService.getClient().get(cacheKey);
+      if (cached) return JSON.parse(cached) as unknown as PlatformAnalytics;
+    } catch (e) {
+      console.warn('ClickHouse platform cache read error', e);
+    }
+
     // Get active users from Redis (fast)
     const [activeToday, activeThisWeek, activeThisMonth] = await Promise.all([
       this.redisService.getActiveUsersCount(),
@@ -783,7 +928,7 @@ export class AnalyticsQueryService {
       total_engagement_today: 0,
     };
 
-    return {
+    const finalPayload = {
       total_users: 0, // This should come from PostgreSQL
       active_users_today: activeToday,
       active_users_week: activeThisWeek,
@@ -793,12 +938,30 @@ export class AnalyticsQueryService {
       posts_rejected_today: Number(data.posts_rejected_today) || 0,
       total_engagement_today: Number(data.total_engagement_today) || 0,
     };
+
+    try {
+      await this.redisService
+        .getClient()
+        .set(cacheKey, JSON.stringify(finalPayload), 'EX', 120);
+    } catch (e) {
+      console.warn('ClickHouse platform cache write error', e);
+    }
+
+    return finalPayload;
   }
 
   /**
    * Get trending posts (last 24 hours)
    */
-  async getTrendingPosts(limit: number = 20) {
+  async getTrendingPosts(limit: number = 20): Promise<TrendingPostResult[]> {
+    const cacheKey = `global:trending_posts:${limit}`;
+    try {
+      const cached = await this.redisService.getClient().get(cacheKey);
+      if (cached) return JSON.parse(cached) as unknown as TrendingPostResult[];
+    } catch (e) {
+      console.warn('ClickHouse trending cache read error', e);
+    }
+
     const query = `
       SELECT
         post_id,
@@ -816,15 +979,30 @@ export class AnalyticsQueryService {
       LIMIT {limit:UInt32}
     `;
 
-    return await this.clickhouseService.query<TrendingPostResult>(query, {
-      limit,
-    });
+    const results = await this.clickhouseService.query<TrendingPostResult>(
+      query,
+      {
+        limit,
+      },
+    );
+
+    try {
+      await this.redisService
+        .getClient()
+        .set(cacheKey, JSON.stringify(results), 'EX', 300);
+    } catch (e) {
+      console.warn('ClickHouse trending cache write error', e);
+    }
+
+    return results;
   }
 
   /**
    * Get moderation analytics
    */
-  async getModerationAnalytics(days: number = 7) {
+  async getModerationAnalytics(
+    days: number = 7,
+  ): Promise<ModerationAnalyticsResult[]> {
     const query = `
       SELECT
         toDate(created_at) AS date,
@@ -848,7 +1026,9 @@ export class AnalyticsQueryService {
   /**
    * Get moderator activity
    */
-  async getModeratorActivity(days: number = 7) {
+  async getModeratorActivity(
+    days: number = 7,
+  ): Promise<ModeratorActivityResult[]> {
     const query = `
       SELECT
         user_id,
@@ -892,7 +1072,9 @@ export class AnalyticsQueryService {
   async getUserActivityStats(userId: string) {
     const [likesCount, commentsCount] = await Promise.all([
       this.prismaService.articleLike.count({ where: { userId } }),
-      this.prismaService.comment.count({ where: { authorId: userId } }),
+      this.prismaService.comment.count({
+        where: { authorId: userId, deletedAt: null },
+      }),
     ]);
 
     return {

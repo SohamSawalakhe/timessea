@@ -153,6 +153,173 @@ export class ArticlesService {
       baseWhere.authorId = { in: followedAuthorIds };
     }
 
+    const includeClause = {
+      author: {
+        select: { id: true, name: true, email: true, picture: true },
+      },
+      likedBy: userId ? { where: { userId }, select: { id: true } } : undefined,
+      bookmarkedBy: userId
+        ? { where: { userId }, select: { id: true } }
+        : undefined,
+    };
+
+    // "For You" feed: personalized based on user engagement (likes, comments, bookmarks, views, reads)
+    // Cached seamlessly in Redis to prevent spamming ClickHouse and Postgres
+    if (feed === 'for-you' && userId) {
+      const cacheKey = `user_foryou_prefs:${userId}`;
+      let categoryScoresRecord: Record<string, number> = {};
+      let interactedIdsMap: Record<string, boolean> = {};
+
+      try {
+        const cachedPrefs = await this.redisService.getClient().get(cacheKey);
+        if (cachedPrefs) {
+          const parsed = JSON.parse(cachedPrefs) as unknown as {
+            categoryScoresRecord?: Record<string, number>;
+            interactedIds?: Record<string, boolean>;
+          };
+          categoryScoresRecord = parsed.categoryScoresRecord || {};
+          interactedIdsMap = parsed.interactedIds || {};
+        }
+      } catch (err) {
+        console.warn('Redis for-you cache error:', err);
+      }
+
+      // If no valid cache, compute preferences
+      if (Object.keys(categoryScoresRecord).length === 0) {
+        // 1. Prisma: Explicit engagements (weight: 3)
+        const [likedArticles, commentedArticles, bookmarkedArticles] =
+          await Promise.all([
+            this.prisma.articleLike.findMany({
+              where: { userId },
+              include: { article: { select: { category: true } } },
+              orderBy: { createdAt: 'desc' },
+              take: 50,
+            }),
+            this.prisma.comment.findMany({
+              where: { authorId: userId, deletedAt: null },
+              include: { article: { select: { category: true } } },
+              orderBy: { createdAt: 'desc' },
+              take: 50,
+            }),
+            this.prisma.bookmark.findMany({
+              where: { userId },
+              include: { article: { select: { category: true } } },
+              orderBy: { createdAt: 'desc' },
+              take: 50,
+            }),
+          ]);
+
+        // 2. ClickHouse: Implicit engagements (Views weight: 1, Reads weight: 2)
+        const [viewHistory, readHistory] = await Promise.all([
+          this.analyticsQueryService.getUserViewHistory(
+            userId,
+            50,
+          ) as Promise<{ category?: string; id: string }[]>,
+          this.analyticsQueryService.getUserReadHistory(
+            userId,
+            30,
+          ) as Promise<{ category?: string; id: string }[]>,
+        ]);
+
+        const addScore = (cat: string | undefined | null, weight: number) => {
+          if (cat) {
+            categoryScoresRecord[cat] =
+              (categoryScoresRecord[cat] || 0) + weight;
+          }
+        };
+
+        for (const like of likedArticles) {
+          addScore(like.article?.category, 3);
+          interactedIdsMap[like.articleId] = true;
+        }
+        for (const comment of commentedArticles) {
+          addScore(comment.article?.category, 3);
+          interactedIdsMap[comment.articleId] = true;
+        }
+        for (const bookmark of bookmarkedArticles) {
+          addScore(bookmark.article?.category, 3);
+          interactedIdsMap[bookmark.articleId] = true;
+        }
+        for (const view of viewHistory) {
+          if (view) {
+            addScore(view.category, 1);
+            interactedIdsMap[view.id] = true;
+          }
+        }
+        for (const read of readHistory) {
+          if (read) {
+            addScore(read.category, 2);
+            interactedIdsMap[read.id] = true;
+          }
+        }
+
+        // Cache for 15 minutes (900s)
+        try {
+          await this.redisService.getClient().set(
+            cacheKey,
+            JSON.stringify({
+              categoryScoresRecord,
+              interactedIds: interactedIdsMap,
+            }),
+            'EX',
+            900,
+          );
+        } catch (err) {
+          console.warn('Failed to cache for-you prefs:', err);
+        }
+      }
+
+      // 6. Fetch a broader pool of candidates
+      const candidates = await this.prisma.article.findMany({
+        where: { published: true, deletedAt: null },
+        take: 100, // Look at the 100 most recent/popular candidates
+        include: includeClause,
+        orderBy: [{ views: 'desc' }, { createdAt: 'desc' }], // General popularity baseline
+      });
+
+      const typedCandidates = candidates as unknown as ArticleWithRelations[];
+
+      // 7. Score and sort candidates precisely based on user behavior
+      const scoredArticles = typedCandidates.map((article) => {
+        let score = 0;
+
+        // Base Popularity
+        score += (article.views || 0) * 0.1;
+        score += (article.likes || 0) * 2;
+        score += (article.reads || 0) * 0.5;
+
+        // Algorithmic Recency Decay (penalty based on hours old)
+        const hoursOld =
+          (Date.now() - new Date(article.createdAt).getTime()) /
+          (1000 * 60 * 60);
+        score -= hoursOld * 0.1;
+
+        // Core Criterion: Category Preference matching
+        if (article.category && categoryScoresRecord[article.category]) {
+          score += categoryScoresRecord[article.category] * 20; // Massive boost for preferred categories
+        }
+
+        return { article, score };
+      });
+
+      // Sort by final algorithmic score descending
+      scoredArticles.sort((a, b) => b.score - a.score);
+
+      // Slicing for pagination
+      const finalArticles = scoredArticles
+        .slice(offset, offset + limit)
+        .map((scored) => scored.article);
+
+      return finalArticles.map((article) => {
+        const { likedBy, bookmarkedBy, ...rest } = article;
+        return {
+          ...rest,
+          liked: !!(likedBy && likedBy.length > 0),
+          bookmarked: !!(bookmarkedBy && bookmarkedBy.length > 0),
+        };
+      });
+    }
+
     const andConditions: Prisma.ArticleWhereInput[] = [];
 
     if (query && query.trim()) {
@@ -171,8 +338,8 @@ export class ArticlesService {
       andConditions.push({
         OR: [
           { AND: [{ image: { not: null } }, { image: { not: '' } }] },
-          { media: { not: Prisma.DbNull } }
-        ]
+          { media: { not: Prisma.DbNull } },
+        ],
       });
     }
 
@@ -180,19 +347,9 @@ export class ArticlesService {
       baseWhere.AND = andConditions;
     }
 
-    const includeClause = {
-      author: {
-        select: { id: true, name: true, email: true, picture: true },
-      },
-      likedBy: userId
-        ? { where: { userId }, select: { id: true } }
-        : undefined,
-      bookmarkedBy: userId
-        ? { where: { userId }, select: { id: true } }
-        : undefined,
-    };
-
-    console.log(`ArticlesService: findAll called with userId: ${userId}, location: ${location}, feed: ${feed}`);
+    console.log(
+      `ArticlesService: findAll called with userId: ${userId}, location: ${location}, feed: ${feed}`,
+    );
 
     // ---- Hierarchical location filtering ----
     // Location comes as comma-separated tiers: "Naigaon,Vasai,Maharashtra,India"
@@ -258,31 +415,87 @@ export class ArticlesService {
       }
     }
 
-    // Default: no location filter
-    const articles = await this.prisma.article.findMany({
-      where: baseWhere,
-      take: limit,
-      skip: offset,
-      include: includeClause,
-      orderBy: { createdAt: 'desc' },
-    });
+    // Default: no location filter (Cacheable global feed)
+    const isCacheable = !query && !authorId && !hasMedia && !feed;
+    const cacheKey = `feed_global:${limit}:${offset}`;
 
-    const typedArticles = articles as unknown as ArticleWithRelations[];
+    let rawArticles: ArticleWithRelations[] = [];
+    let cacheHit = false;
 
-    return typedArticles.map((article) => {
-      const { likedBy, bookmarkedBy, ...rest } = article;
-      return {
-        ...rest,
-        liked: !!(likedBy && likedBy.length > 0),
-        bookmarked: !!(bookmarkedBy && bookmarkedBy.length > 0),
-      };
-    });
+    if (isCacheable) {
+      try {
+        const cachedStr = await this.redisService.getClient().get(cacheKey);
+        if (cachedStr) {
+          rawArticles = JSON.parse(cachedStr) as unknown as ArticleWithRelations[];
+          cacheHit = true;
+        }
+      } catch (err) {
+        console.warn('Global feed cache read failed:', err);
+      }
+    }
+
+    if (!cacheHit) {
+      // Fetch globally without user-specific include clauses so it can be cached for everyone
+      rawArticles = await this.prisma.article.findMany({
+        where: baseWhere,
+        take: limit,
+        skip: offset,
+        include: {
+          author: {
+            select: { id: true, name: true, email: true, picture: true },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      if (isCacheable) {
+        try {
+          // Cache the global feed for 30 seconds
+          await this.redisService
+            .getClient()
+            .set(cacheKey, JSON.stringify(rawArticles), 'EX', 30);
+        } catch (err) {
+          console.warn('Global feed cache write failed:', err);
+        }
+      }
+    }
+
+    // Now, efficiently map user-specific interactions if a user is logged in
+    if (userId && rawArticles.length > 0) {
+      const articleIds = rawArticles.map((a) => a.id);
+      const [userLikes, userBookmarks] = await Promise.all([
+        this.prisma.articleLike.findMany({
+          where: { userId, articleId: { in: articleIds } },
+          select: { articleId: true },
+        }),
+        this.prisma.bookmark.findMany({
+          where: { userId, articleId: { in: articleIds } },
+          select: { articleId: true },
+        }),
+      ]);
+
+      const likedSet = new Set(userLikes.map((l) => l.articleId));
+      const bookmarkedSet = new Set(userBookmarks.map((b) => b.articleId));
+
+      return rawArticles.map((article) => ({
+        ...article,
+        liked: likedSet.has(article.id),
+        bookmarked: bookmarkedSet.has(article.id),
+      }));
+    }
+
+    return rawArticles.map((article) => ({
+      ...article,
+      liked: false,
+      bookmarked: false,
+    }));
   }
 
   async findScheduled(): Promise<Article[]> {
     return this.prisma.article.findMany({
       where: {
         published: false,
+        deletedAt: null,
         scheduledAt: {
           not: null,
         },
@@ -306,6 +519,7 @@ export class ArticlesService {
 
     const where: Prisma.ArticleWhereInput = {
       published: false,
+      deletedAt: null,
       scheduledAt: null,
     };
 
@@ -552,7 +766,9 @@ export class ArticlesService {
         await this.analyticsQueryService.getTrendingPosts(fetchLimit);
 
       if (trendingData && trendingData.length > 0) {
-        let trendingIds = trendingData.map((t) => t.post_id);
+        let trendingIds = (trendingData as { post_id: string }[]).map(
+          (t) => t.post_id,
+        );
 
         if (excludeId) {
           trendingIds = trendingIds.filter((id) => id !== excludeId);
@@ -671,7 +887,7 @@ export class ArticlesService {
       ]);
 
       // Track unlike event
-      this.analyticsService.track({
+      void this.analyticsService.track({
         event: AnalyticsEventType.UNLIKE,
         post_id: id,
         user_id: this.ensureValidUUID(userId),
@@ -696,7 +912,7 @@ export class ArticlesService {
       ]);
 
       // Track like event
-      this.analyticsService.track({
+      void this.analyticsService.track({
         event: AnalyticsEventType.LIKE,
         post_id: id,
         user_id: this.ensureValidUUID(userId),
@@ -722,17 +938,20 @@ export class ArticlesService {
       }
     }
 
-    const updatedArticle = await this.prisma.article.findUnique({
+    const updatedArticle = (await this.prisma.article.findUnique({
       where: { id },
       include: { author: true },
-    }) as unknown as Article;
+    })) as unknown as Article;
 
     this.articlesGateway.notifyArticleLiked(id, updatedArticle.likes);
 
     return updatedArticle;
   }
 
-  async toggleBookmark(id: string, userId: string): Promise<{ bookmarked: boolean }> {
+  async toggleBookmark(
+    id: string,
+    userId: string,
+  ): Promise<{ bookmarked: boolean }> {
     const article = await this.prisma.article.findUnique({ where: { id } });
     if (!article) {
       throw new Error('Article not found');
@@ -814,8 +1033,8 @@ export class ArticlesService {
     });
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
-    return bookmarks.map((b: any) => ({
-      ...b.article,
+    return bookmarks.map((b) => ({
+      ...((b as unknown as { article: ArticleWithRelations }).article),
       bookmarked: true,
       liked: false, // Could be enhanced to check if user liked
     }));
