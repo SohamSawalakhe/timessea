@@ -691,7 +691,9 @@ export class AnalyticsQueryService {
    * Get geo distribution for a post
    * Extracts location from event metadata JSON where the frontend stores it
    */
-  async getPostGeoDistribution(postId: string): Promise<GeoDistributionResult[]> {
+  async getPostGeoDistribution(
+    postId: string,
+  ): Promise<GeoDistributionResult[]> {
     const isValidUUID =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
         postId,
@@ -816,7 +818,6 @@ export class AnalyticsQueryService {
     const needSynthesis = chTotalViews === 0 && article && article.views > 0;
 
     // Synthesis weights (mostly growing trend)
-
 
     for (let i = 29; i >= 0; i--) {
       const d = new Date(today);

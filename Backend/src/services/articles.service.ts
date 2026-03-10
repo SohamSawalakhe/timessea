@@ -211,14 +211,12 @@ export class ArticlesService {
 
         // 2. ClickHouse: Implicit engagements (Views weight: 1, Reads weight: 2)
         const [viewHistory, readHistory] = await Promise.all([
-          this.analyticsQueryService.getUserViewHistory(
-            userId,
-            50,
-          ) as Promise<{ category?: string; id: string }[]>,
-          this.analyticsQueryService.getUserReadHistory(
-            userId,
-            30,
-          ) as Promise<{ category?: string; id: string }[]>,
+          this.analyticsQueryService.getUserViewHistory(userId, 50) as Promise<
+            { category?: string; id: string }[]
+          >,
+          this.analyticsQueryService.getUserReadHistory(userId, 30) as Promise<
+            { category?: string; id: string }[]
+          >,
         ]);
 
         const addScore = (cat: string | undefined | null, weight: number) => {
@@ -426,7 +424,9 @@ export class ArticlesService {
       try {
         const cachedStr = await this.redisService.getClient().get(cacheKey);
         if (cachedStr) {
-          rawArticles = JSON.parse(cachedStr) as unknown as ArticleWithRelations[];
+          rawArticles = JSON.parse(
+            cachedStr,
+          ) as unknown as ArticleWithRelations[];
           cacheHit = true;
         }
       } catch (err) {
@@ -1034,7 +1034,7 @@ export class ArticlesService {
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
     return bookmarks.map((b) => ({
-      ...((b as unknown as { article: ArticleWithRelations }).article),
+      ...(b as unknown as { article: ArticleWithRelations }).article,
       bookmarked: true,
       liked: false, // Could be enhanced to check if user liked
     }));

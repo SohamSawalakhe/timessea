@@ -5,13 +5,20 @@ import {
   Param,
   UseGuards,
   Req,
-  Delete,
   BadRequestException,
   Query,
   Body,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import { UsersService } from '../../services/users.service';
+
+interface RequestWithUser extends Request {
+  user?: {
+    id: string;
+    userId?: string;
+  };
+}
 
 @Controller('users')
 export class UsersController {
@@ -19,7 +26,7 @@ export class UsersController {
 
   @Post(':id/follow')
   @UseGuards(AuthGuard('jwt'))
-  async toggleFollow(@Param('id') id: string, @Req() req: any) {
+  async toggleFollow(@Param('id') id: string, @Req() req: RequestWithUser) {
     const userId = req.user?.id || req.user?.userId;
     if (!userId) {
       throw new BadRequestException('User ID not found in token');
@@ -29,7 +36,10 @@ export class UsersController {
 
   @Get(':id/follow-status')
   @UseGuards(AuthGuard('jwt'))
-  async checkFollowStatus(@Param('id') id: string, @Req() req: any) {
+  async checkFollowStatus(
+    @Param('id') id: string,
+    @Req() req: RequestWithUser,
+  ) {
     const userId = req.user?.id || req.user?.userId;
     if (!userId) {
       throw new BadRequestException('User ID not found in token');
@@ -58,7 +68,7 @@ export class UsersController {
   @Post('profile/update')
   @UseGuards(AuthGuard('jwt'))
   async updateProfile(
-    @Req() req: any,
+    @Req() req: RequestWithUser,
     @Body()
     body: {
       name?: string;
