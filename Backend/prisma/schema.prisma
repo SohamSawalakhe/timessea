@@ -7,28 +7,40 @@ datasource db {
   provider = "postgresql"
 }
 
+enum Role {
+  USER
+  EDITOR
+  ADMIN
+  SUPERADMIN
+}
+
 model User {
-  id            String         @id @default(uuid())
-  email         String         @unique
+  id            String          @id @default(uuid())
+  email         String          @unique
   name          String?
   picture       String?
   coverImage    String?
   bio           String?
   location      String?
-  handle        String?        @unique
-  googleId      String?        @unique
-  provider      String?        @default("google")
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  handle        String?         @unique
+  googleId      String?         @unique
+  provider      String?         @default("google")
+  role          Role            @default(USER)
+  banned        Boolean         @default(false)
+  warnings      Int             @default(0)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
   articles      Article[]
   articleLikes  ArticleLike[]
   bookmarks     Bookmark[]
   comments      Comment[]
   commentLikes  CommentLike[]
-  following     Follow[]       @relation("Following")
-  followers     Follow[]       @relation("Followers")
+  following     Follow[]        @relation("Following")
+  followers     Follow[]        @relation("Followers")
   notifications Notification[]
   refreshTokens RefreshToken[]
+  reviews       ArticleReview[]
+  topicFollows  TopicFollow[]
 }
 
 model RefreshToken {
@@ -44,46 +56,63 @@ model RefreshToken {
 }
 
 model Article {
-  id               String         @id @default(uuid())
+  id               String          @id @default(uuid())
   title            String
   content          String
   authorId         String
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
-  category         String         @default("Technology")
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  category         String          @default("Technology")
   excerpt          String?
   location         String?
-  likes            Int            @default(0)
-  commentCount     Int            @default(0)
-  readTime         Int            @default(5)
+  likes            Int             @default(0)
+  commentCount     Int             @default(0)
+  readTime         Int             @default(5)
   image            String?
-  views            Int            @default(0)
-  reads            Int            @default(0)
+  views            Int             @default(0)
+  reads            Int             @default(0)
   media            Json?
   deletedAt        DateTime?
   subheadline      String?
-  type             String?        @default("News Article")
-  status           String?        @default("Draft")
+  type             String?         @default("News Article")
+  status           String?         @default("Draft")
   imageCaption     String?
   imageDescription String?
   imageCredit      String?
   seoTitle         String?
   seoDescription   String?
-  factChecked      Boolean        @default(false)
-  published        Boolean        @default(true)
+  factChecked      Boolean         @default(false)
+  published        Boolean         @default(false)
   scheduledAt      DateTime?
-  author           User           @relation(fields: [authorId], references: [id])
+  author           User            @relation(fields: [authorId], references: [id])
   likedBy          ArticleLike[]
   bookmarkedBy     Bookmark[]
   comments         Comment[]
   notifications    Notification[]
+  reviews          ArticleReview[]
 
   @@index([authorId])
   @@index([category])
   @@index([createdAt])
   @@index([likes])
   @@index([location])
+  @@index([status])
   @@index([published, deletedAt, createdAt(sort: Desc)])
+}
+
+model ArticleReview {
+  id        String   @id @default(uuid())
+  articleId String
+  reviewerId String
+  status    String   // Approved, Rejected, NeedsCorrection
+  feedback  String?
+  createdAt DateTime @default(now())
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  reviewer  User     @relation(fields: [reviewerId], references: [id], onDelete: Cascade)
+
+  @@index([articleId])
+  @@index([reviewerId])
+  @@index([createdAt])
 }
 
 model ArticleLike {
@@ -177,4 +206,16 @@ model Follow {
   @@unique([followerId, followingId])
   @@index([followerId])
   @@index([followingId])
+}
+
+model TopicFollow {
+  id        String   @id @default(uuid())
+  userId    String
+  category  String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, category])
+  @@index([userId])
+  @@index([category])
 }

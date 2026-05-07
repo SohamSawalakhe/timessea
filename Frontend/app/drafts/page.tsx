@@ -13,23 +13,81 @@ import {
   FileText,
   Trash2,
   Edit,
-  Send,
   Loader2,
   Calendar,
   Eye,
-  MoreVertical,
+  Clock,
+  AlertTriangle,
+  XCircle,
+  CheckCircle2,
+  MessageSquare,
+  RotateCcw,
+  Send,
+  Lock,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Article } from "@/lib/data";
 import { cn } from "@/lib/utils";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
+interface DraftArticle extends Article {
+  reviews?: {
+    status: string;
+    feedback?: string | null;
+    createdAt: string;
+    reviewer: { id: string; name: string | null; picture: string | null };
+  }[];
+}
+
+function getStatusConfig(status?: string) {
+  switch (status) {
+    case "Pending Review":
+      return {
+        label: "Pending Review",
+        icon: Clock,
+        className: "bg-amber-500/10 text-amber-600 ring-amber-500/20",
+        canEdit: false,
+      };
+    case "In Review":
+      return {
+        label: "In Review",
+        icon: Eye,
+        className: "bg-blue-500/10 text-blue-600 ring-blue-500/20",
+        canEdit: false,
+      };
+    case "Needs Correction":
+      return {
+        label: "Needs Correction",
+        icon: AlertTriangle,
+        className: "bg-orange-500/10 text-orange-600 ring-orange-500/20",
+        canEdit: true,
+      };
+    case "Rejected":
+      return {
+        label: "Rejected",
+        icon: XCircle,
+        className: "bg-red-500/10 text-red-600 ring-red-500/20",
+        canEdit: false,
+      };
+    default:
+      return {
+        label: "Draft",
+        icon: FileText,
+        className: "bg-secondary text-muted-foreground ring-border",
+        canEdit: true,
+      };
+  }
+}
+
 export default function DraftsPage() {
   const router = useRouter();
   const { user, token, isAuthenticated, isLoading } = useAuth();
-  const [drafts, setDrafts] = useState<Article[]>([]);
+  const [drafts, setDrafts] = useState<DraftArticle[]>([]);
   const [scheduledPosts, setScheduledPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [resubmittingId, setResubmittingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -45,8 +103,6 @@ export default function DraftsPage() {
 
   const fetchScheduled = async () => {
     try {
-      const API_URL =
-        process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
       const response = await fetch(`${API_URL}/api/articles/scheduled`);
       if (response.ok) {
         const data = await response.json();
@@ -59,49 +115,61 @@ export default function DraftsPage() {
 
   const fetchDrafts = async () => {
     try {
-      const API_URL =
-        process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
       const response = await fetch(`${API_URL}/api/articles/drafts`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
-      console.log("Drafts response status:", response.status);
-
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Failed to fetch drafts:", response.status, errorText);
         throw new Error(`Failed to fetch drafts: ${response.status}`);
       }
 
       const data = await response.json();
-      console.log("Fetched drafts:", data);
       setDrafts(data);
     } catch (error) {
       console.error("Error fetching drafts:", error);
-      setDrafts([]); // Set to empty array on error
+      setDrafts([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResubmit = async (articleId: string) => {
+    setResubmittingId(articleId);
+    try {
+      const res = await fetch(
+        `${API_URL}/api/articles/${articleId}/submit-review`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+      if (res.ok) {
+        toast.success("Article re-submitted for review!");
+        fetchDrafts();
+      } else {
+        toast.error("Failed to re-submit article");
+      }
+    } catch {
+      toast.error("An error occurred");
+    } finally {
+      setResubmittingId(null);
     }
   };
 
   const handleScheduledDelete = (id: string) => {
     showConfirmDelete(async () => {
       try {
-        const API_URL =
-          process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
         const res = await fetch(`${API_URL}/api/articles/${id}`, {
           method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
         });
         if (res.ok) {
           setScheduledPosts((prev) => prev.filter((p) => p.id !== id));
           toast.success("Scheduled post deleted successfully");
         } else {
-          console.error("Failed to delete post");
           toast.error("Failed to delete scheduled post");
         }
       } catch (error) {
@@ -115,13 +183,9 @@ export default function DraftsPage() {
     showConfirmDelete(async () => {
       setDeletingId(id);
       try {
-        const API_URL =
-          process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
         const response = await fetch(`${API_URL}/api/articles/${id}`, {
           method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
         });
 
         if (!response.ok) throw new Error("Failed to delete draft");
@@ -154,6 +218,27 @@ export default function DraftsPage() {
     );
   }
 
+  // Segment drafts by status
+  const actionNeeded = drafts.filter(
+    (d) => d.status === "Needs Correction"
+  );
+  const rejectedDrafts = drafts.filter(
+    (d) => d.status === "Rejected",
+  );
+  const pendingReview = drafts.filter(
+    (d) => d.status === "Pending Review" || d.status === "In Review",
+  );
+  const pureDrafts = drafts.filter(
+    (d) =>
+      !d.status ||
+      d.status === "Draft" ||
+      (!["Pending Review", "In Review", "Needs Correction", "Rejected"].includes(
+        d.status || "",
+      )),
+  );
+
+  const totalCount = drafts.length;
+
   return (
     <AppShell>
       {/* Header */}
@@ -174,29 +259,29 @@ export default function DraftsPage() {
           </motion.button>
           <div>
             <h1 className="text-2xl font-black tracking-tight text-foreground font-serif">
-              Draft Articles
+              My Articles
             </h1>
             <p className="text-xs text-muted-foreground font-medium">
-              {drafts.length} {drafts.length === 1 ? "draft" : "drafts"}
+              {totalCount} {totalCount === 1 ? "article" : "articles"}
             </p>
           </div>
         </div>
       </header>
 
-      {/* Content */}
       <AnimatePresence mode="wait">
+        {/* Scheduled Posts */}
         {scheduledPosts.length > 0 && (
           <motion.div
             key="scheduled"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mb-8"
+            className="mb-6"
           >
-            <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-primary" />
+            <h2 className="text-sm font-bold mb-3 flex items-center gap-2 text-muted-foreground uppercase tracking-wider">
+              <Calendar className="w-4 h-4 text-primary" />
               Scheduled for Later
             </h2>
-            <div className="grid gap-4">
+            <div className="grid gap-3">
               {scheduledPosts.map((post) => (
                 <ScheduledPostCard
                   key={post.id}
@@ -208,7 +293,7 @@ export default function DraftsPage() {
           </motion.div>
         )}
 
-        {drafts.length === 0 && scheduledPosts.length === 0 ? (
+        {totalCount === 0 && scheduledPosts.length === 0 ? (
           <motion.div
             key="empty"
             initial={{ opacity: 0, y: 20 }}
@@ -223,7 +308,7 @@ export default function DraftsPage() {
               />
             </div>
             <h3 className="text-xl font-black text-foreground font-serif tracking-tight">
-              No drafts yet
+              No articles yet
             </h3>
             <p className="text-sm text-muted-foreground max-w-xs mt-3 leading-relaxed">
               Start writing your story and save it as a draft to continue later.
@@ -242,102 +327,312 @@ export default function DraftsPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="grid gap-4 pb-8"
+            className="space-y-6 pb-8"
           >
-            {drafts.map((draft, index) => (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.05 }}
-                key={draft.id}
-                className="group relative bg-card/50 backdrop-blur-sm border border-border/50 rounded-3xl p-4 flex gap-4 shadow-sm hover:shadow-md hover:border-primary/20 transition-all duration-300"
-              >
-                {/* Thumbnail */}
-                <div className="h-32 w-32 shrink-0 rounded-2xl bg-secondary overflow-hidden relative">
-                  {draft.image ? (
-                    <img
-                      src={draft.image}
-                      alt={draft.title}
-                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+            {/* ─── SECTION: Action Needed (Corrections / Rejected) ─── */}
+            {actionNeeded.length > 0 && (
+              <div>
+                <h2 className="text-xs font-bold mb-3 flex items-center gap-2 text-orange-600 uppercase tracking-wider">
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  Action Needed ({actionNeeded.length})
+                </h2>
+                <div className="grid gap-3">
+                  {actionNeeded.map((draft, index) => (
+                    <DraftCard
+                      key={draft.id}
+                      draft={draft}
+                      index={index}
+                      formatDate={formatDate}
+                      deletingId={deletingId}
+                      resubmittingId={resubmittingId}
+                      onDelete={handleDelete}
+                      onResubmit={handleResubmit}
                     />
-                  ) : (
-                    <div className="h-full w-full flex items-center justify-center bg-linear-to-br from-secondary to-muted">
-                      <span className="text-5xl font-black text-foreground/5 font-serif">
-                        {draft.title?.charAt(0) || "D"}
-                      </span>
-                    </div>
-                  )}
-                  <div className="absolute inset-0 bg-black/5 group-hover:bg-transparent transition-colors" />
+                  ))}
                 </div>
+              </div>
+            )}
 
-                {/* Content */}
-                <div className="flex flex-col justify-between py-1 pr-2 flex-1 min-w-0">
-                  <div>
-                    <div className="flex items-start justify-between mb-2 gap-2">
-                      <div className="flex-1 min-w-0">
-                        <span className="inline-flex items-center rounded-full bg-secondary px-2 py-0.5 text-[10px] font-bold text-muted-foreground mb-1.5">
-                          {draft.category || "General"}
-                        </span>
-                        <h4 className="font-bold text-foreground text-lg leading-tight line-clamp-2 font-serif group-hover:text-primary transition-colors">
-                          {draft.title || "Untitled Draft"}
-                        </h4>
-                      </div>
-                    </div>
-                    <p className="text-xs text-muted-foreground/80 mt-1.5 line-clamp-2">
-                      {draft.excerpt ||
-                        draft.content?.substring(0, 100) ||
-                        "No content"}
-                    </p>
-                  </div>
-
-                  {/* Footer */}
-                  <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/30">
-                    <div className="flex items-center gap-3 text-[10px] text-muted-foreground font-medium">
-                      <span className="flex items-center gap-1">
-                        <Calendar className="w-3 h-3" />
-                        {draft.createdAt
-                          ? formatDate(draft.createdAt)
-                          : "Just now"}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Eye className="w-3 h-3" />
-                        {draft.readTime || 1} min
-                      </span>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex items-center gap-2">
-                      <Link
-                        href={`/editor?draft=${draft.id}`}
-                        className="text-xs font-bold text-foreground hover:text-primary transition-colors flex items-center gap-1 px-3 py-1.5 rounded-full hover:bg-secondary/50"
-                      >
-                        <Edit className="w-3.5 h-3.5" />
-                        <span className="hidden sm:inline">Edit</span>
-                      </Link>
-                      <button
-                        onClick={() => handleDelete(draft.id)}
-                        disabled={deletingId === draft.id}
-                        className="text-xs font-bold text-muted-foreground hover:text-red-500 transition-colors flex items-center gap-1 px-3 py-1.5 rounded-full hover:bg-red-500/10 disabled:opacity-50"
-                        title="Delete"
-                      >
-                        {deletingId === draft.id ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <Trash2 className="w-3.5 h-3.5" />
-                        )}
-                        <span className="hidden sm:inline">Delete</span>
-                      </button>
-                    </div>
-                  </div>
+            {/* ─── SECTION: Rejected ─── */}
+            {rejectedDrafts.length > 0 && (
+              <div>
+                <h2 className="text-xs font-bold mb-3 flex items-center gap-2 text-red-600 uppercase tracking-wider">
+                  <XCircle className="w-3.5 h-3.5" />
+                  Rejected ({rejectedDrafts.length})
+                </h2>
+                <div className="grid gap-3">
+                  {rejectedDrafts.map((draft, index) => (
+                    <DraftCard
+                      key={draft.id}
+                      draft={draft}
+                      index={index}
+                      formatDate={formatDate}
+                      deletingId={deletingId}
+                      resubmittingId={resubmittingId}
+                      onDelete={handleDelete}
+                      onResubmit={handleResubmit}
+                    />
+                  ))}
                 </div>
-              </motion.div>
-            ))}
+              </div>
+            )}
+
+            {/* ─── SECTION: Under Review ─── */}
+            {pendingReview.length > 0 && (
+              <div>
+                <h2 className="text-xs font-bold mb-3 flex items-center gap-2 text-amber-600 uppercase tracking-wider">
+                  <Clock className="w-3.5 h-3.5" />
+                  Under Review ({pendingReview.length})
+                </h2>
+                <div className="grid gap-3">
+                  {pendingReview.map((draft, index) => (
+                    <DraftCard
+                      key={draft.id}
+                      draft={draft}
+                      index={index}
+                      formatDate={formatDate}
+                      deletingId={deletingId}
+                      resubmittingId={resubmittingId}
+                      onDelete={handleDelete}
+                      onResubmit={handleResubmit}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ─── SECTION: Drafts ─── */}
+            {pureDrafts.length > 0 && (
+              <div>
+                <h2 className="text-xs font-bold mb-3 flex items-center gap-2 text-muted-foreground uppercase tracking-wider">
+                  <FileText className="w-3.5 h-3.5" />
+                  Drafts ({pureDrafts.length})
+                </h2>
+                <div className="grid gap-3">
+                  {pureDrafts.map((draft, index) => (
+                    <DraftCard
+                      key={draft.id}
+                      draft={draft}
+                      index={index}
+                      formatDate={formatDate}
+                      deletingId={deletingId}
+                      resubmittingId={resubmittingId}
+                      onDelete={handleDelete}
+                      onResubmit={handleResubmit}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
     </AppShell>
   );
 }
+
+/* ─── DRAFT CARD COMPONENT ─── */
+
+function DraftCard({
+  draft,
+  index,
+  formatDate,
+  deletingId,
+  resubmittingId,
+  onDelete,
+  onResubmit,
+}: {
+  draft: DraftArticle;
+  index: number;
+  formatDate: (d: string) => string;
+  deletingId: string | null;
+  resubmittingId: string | null;
+  onDelete: (id: string) => void;
+  onResubmit: (id: string) => void;
+}) {
+  const statusConfig = getStatusConfig(draft.status);
+  const StatusIcon = statusConfig.icon;
+  const latestReview = draft.reviews?.[0];
+  const isLocked = !statusConfig.canEdit; // Can't edit while in review
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.04 }}
+      className={cn(
+        "group relative bg-card/50 backdrop-blur-sm border rounded-3xl p-4 shadow-sm transition-all duration-300",
+        isLocked
+          ? "border-amber-500/20 bg-amber-500/[0.02]"
+          : draft.status === "Needs Correction"
+            ? "border-orange-500/20 hover:border-orange-500/40"
+            : draft.status === "Rejected"
+              ? "border-red-500/20 hover:border-red-500/40"
+              : "border-border/50 hover:shadow-md hover:border-primary/20",
+      )}
+    >
+      <div className="flex gap-3">
+        {/* Thumbnail */}
+        <div className="h-24 w-24 sm:h-28 sm:w-28 shrink-0 rounded-2xl bg-secondary overflow-hidden relative">
+          {draft.image ? (
+            <img
+              src={draft.image}
+              alt={draft.title}
+              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+            />
+          ) : (
+            <div className="h-full w-full flex items-center justify-center bg-linear-to-br from-secondary to-muted">
+              <span className="text-4xl font-black text-foreground/5 font-serif">
+                {draft.title?.charAt(0) || "D"}
+              </span>
+            </div>
+          )}
+          {/* Lock overlay */}
+          {isLocked && (
+            <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+              <Lock className="w-5 h-5 text-white/70" />
+            </div>
+          )}
+        </div>
+
+        {/* Content */}
+        <div className="flex flex-col justify-between py-0.5 flex-1 min-w-0">
+          <div>
+            {/* Status Badge */}
+            <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ring-1",
+                  statusConfig.className,
+                )}
+              >
+                <StatusIcon className="w-3 h-3" />
+                {statusConfig.label}
+              </span>
+              <span className="inline-flex items-center rounded-full bg-secondary px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
+                {draft.category || "General"}
+              </span>
+            </div>
+            <h4 className="font-bold text-foreground text-sm sm:text-base leading-tight line-clamp-2 font-serif group-hover:text-primary transition-colors">
+              {draft.title || "Untitled Draft"}
+            </h4>
+            {!isLocked && (
+              <p className="text-[11px] text-muted-foreground/80 mt-1 line-clamp-1 hidden sm:block">
+                {draft.excerpt ||
+                  draft.content?.substring(0, 80) ||
+                  "No content"}
+              </p>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/20">
+            <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-medium">
+              <span className="flex items-center gap-1">
+                <Calendar className="w-3 h-3" />
+                {draft.createdAt ? formatDate(draft.createdAt) : "Now"}
+              </span>
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center gap-1.5">
+              {/* Re-submit for corrected articles */}
+              {draft.status === "Needs Correction" && (
+                <button
+                  onClick={() => onResubmit(draft.id)}
+                  disabled={resubmittingId === draft.id}
+                  className="text-[11px] font-bold text-primary flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-primary/10 hover:bg-primary/15 transition-colors disabled:opacity-50"
+                >
+                  {resubmittingId === draft.id ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <RotateCcw className="w-3 h-3" />
+                  )}
+                  Re-submit
+                </button>
+              )}
+
+              {/* Edit — disabled for in-review */}
+              {isLocked ? (
+                <span className="text-[11px] text-muted-foreground/50 flex items-center gap-1 px-2.5 py-1.5 cursor-not-allowed">
+                  <Lock className="w-3 h-3" />
+                  Locked
+                </span>
+              ) : (
+                <Link
+                  href={`/editor?draft=${draft.id}`}
+                  className="text-[11px] font-bold text-foreground hover:text-primary transition-colors flex items-center gap-1 px-2.5 py-1.5 rounded-full hover:bg-secondary/50"
+                >
+                  <Edit className="w-3 h-3" />
+                  Edit
+                </Link>
+              )}
+
+              {/* Delete */}
+              <button
+                onClick={() => onDelete(draft.id)}
+                disabled={deletingId === draft.id}
+                className="text-[11px] text-muted-foreground hover:text-red-500 transition-colors flex items-center gap-1 px-2 py-1.5 rounded-full hover:bg-red-500/10 disabled:opacity-50"
+                title="Delete"
+              >
+                {deletingId === draft.id ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <Trash2 className="w-3 h-3" />
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Review Feedback Banner */}
+      {latestReview && latestReview.feedback && (
+        <div
+          className={cn(
+            "mt-3 rounded-xl p-3 border",
+            latestReview.status === "NeedsCorrection"
+              ? "bg-orange-500/5 border-orange-500/20"
+              : latestReview.status === "Rejected"
+                ? "bg-red-500/5 border-red-500/20"
+                : "bg-blue-500/5 border-blue-500/20",
+          )}
+        >
+          <div className="flex items-center gap-2 mb-1">
+            <MessageSquare className="w-3 h-3 text-muted-foreground" />
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+              Editorial Feedback
+            </span>
+          </div>
+          <p className="text-xs text-foreground/80 leading-relaxed">
+            {latestReview.feedback}
+          </p>
+        </div>
+      )}
+
+      {/* In-review info bar */}
+      {isLocked && draft.status !== "Rejected" && (
+        <div className="mt-3 rounded-xl bg-amber-500/5 border border-amber-500/15 px-3 py-2 flex items-center gap-2">
+          <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+          <p className="text-[11px] text-amber-600/80 leading-tight">
+            This article is under review and cannot be edited. You'll receive a
+            notification once an admin reviews it.
+          </p>
+        </div>
+      )}
+      {draft.status === "Rejected" && (
+        <div className="mt-3 rounded-xl bg-red-500/5 border border-red-500/15 px-3 py-2 flex items-center gap-2">
+          <XCircle className="w-3.5 h-3.5 text-red-600 shrink-0" />
+          <p className="text-[11px] text-red-600/80 leading-tight">
+            This article has been permanently rejected and cannot be edited or resubmitted.
+          </p>
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
+/* ─── SCHEDULED POST CARD ─── */
 
 function ScheduledPostCard({
   post,
@@ -352,7 +647,7 @@ function ScheduledPostCard({
       animate={{ opacity: 1, y: 0 }}
       className="group relative bg-card/50 backdrop-blur-sm border border-border/50 rounded-3xl p-3 flex gap-4 shadow-sm hover:shadow-md hover:border-primary/20 transition-all duration-300"
     >
-      <div className="h-28 w-28 shrink-0 rounded-2xl bg-secondary overflow-hidden relative">
+      <div className="h-24 w-24 shrink-0 rounded-2xl bg-secondary overflow-hidden relative">
         {post.image ? (
           <img
             src={post.image}
@@ -366,51 +661,43 @@ function ScheduledPostCard({
             </span>
           </div>
         )}
-        <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors" />
       </div>
 
       <div className="flex flex-col justify-between py-1 pr-2 flex-1 min-w-0">
         <div>
-          <div className="flex items-center justify-between mb-1">
-            <span className="inline-flex items-center rounded-full bg-secondary px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
-              {post.category || "General"}
-            </span>
-          </div>
-          <h4 className="font-bold text-foreground text-lg leading-tight line-clamp-2 font-serif group-hover:text-primary transition-colors">
+          <span className="inline-flex items-center rounded-full bg-secondary px-2 py-0.5 text-[10px] font-bold text-muted-foreground mb-1">
+            {post.category || "General"}
+          </span>
+          <h4 className="font-bold text-foreground text-sm leading-tight line-clamp-2 font-serif group-hover:text-primary transition-colors">
             {post.title}
           </h4>
-          <p className="text-xs text-muted-foreground/80 mt-1.5 line-clamp-2 md:line-clamp-1">
-            {post.excerpt}
-          </p>
         </div>
 
-        <div className="flex items-center justify-between mt-3">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 bg-orange-500/10 text-orange-600 dark:text-orange-400 px-2.5 py-1 rounded-full text-[10px] font-bold ring-1 ring-orange-500/20">
-              <Calendar className="w-3 h-3" />
-              {new Date(post.scheduledAt).toLocaleDateString(undefined, {
-                month: "short",
-                day: "numeric",
-              })}{" "}
-              •{" "}
-              {new Date(post.scheduledAt).toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </span>
-          </div>
+        <div className="flex items-center justify-between mt-2">
+          <span className="inline-flex items-center gap-1.5 bg-orange-500/10 text-orange-600 dark:text-orange-400 px-2 py-0.5 rounded-full text-[10px] font-bold ring-1 ring-orange-500/20">
+            <Calendar className="w-3 h-3" />
+            {new Date(post.scheduledAt).toLocaleDateString(undefined, {
+              month: "short",
+              day: "numeric",
+            })}{" "}
+            ·{" "}
+            {new Date(post.scheduledAt).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </span>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <button
               onClick={() => onDelete(post.id)}
               className="text-muted-foreground hover:text-red-500 transition-colors"
               title="Delete"
             >
-              <Trash2 className="w-4 h-4" />
+              <Trash2 className="w-3.5 h-3.5" />
             </button>
             <Link
               href={`/editor?draft=${post.id}`}
-              className="text-xs font-bold text-foreground hover:underline decoration-primary decoration-2 underline-offset-4"
+              className="text-[11px] font-bold text-foreground hover:text-primary"
             >
               Edit
             </Link>

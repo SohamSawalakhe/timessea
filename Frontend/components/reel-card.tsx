@@ -10,7 +10,9 @@ import {
   Bookmark,
   ChevronUp,
   MoreHorizontal,
+  BookOpen,
 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "react-toastify";
 import type { Article } from "@/lib/data";
 import { cn } from "@/lib/utils";
@@ -19,7 +21,7 @@ import { CommentsDrawer } from "@/components/comments-drawer";
 import { useAuth } from "@/contexts/AuthContext";
 import { globalSocket } from "@/lib/socket";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 interface ReelCardProps {
   article: Article;
@@ -58,7 +60,7 @@ export const ReelCard = memo(function ReelCard({
   onAuthRequired,
 }: ReelCardProps) {
   /* eslint-disable react-hooks/exhaustive-deps */
-  const [showReadMore, setShowReadMore] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
   const contentRef = useRef<HTMLParagraphElement>(null);
@@ -66,6 +68,8 @@ export const ReelCard = memo(function ReelCard({
   
   const [isFollowing, setIsFollowing] = useState(false);
   const [isFollowLoading, setIsFollowLoading] = useState(false);
+  const [showHeartAnim, setShowHeartAnim] = useState(false);
+  const lastTap = useRef<number>(0);
 
   // You can fetch initial follow status using the author ID when the reel becomes visible or globally.
   // We'll leave it as false initially, and it will update.
@@ -108,6 +112,64 @@ export const ReelCard = memo(function ReelCard({
       globalSocket.off("commentCountUpdate", handleCommentCountUpdate);
     };
   }, [article.id]);
+
+  const handleFollowToggle = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!token) {
+      onAuthRequired();
+      return;
+    }
+    if (user?.id === article.author.id) {
+      toast.error("You cannot follow yourself");
+      return;
+    }
+
+    setIsFollowLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/users/${article.author.id}/follow`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setIsFollowing(data.following);
+        toast.success(data.following ? `Following ${article.author.name}` : `Unfollowed ${article.author.name}`, {
+          position: "bottom-center",
+          autoClose: 2000,
+        });
+      } else {
+        toast.error("Failed to update follow status");
+      }
+    } catch (e) {
+      toast.error("Failed to update follow status");
+    } finally {
+      setIsFollowLoading(false);
+    }
+  };
+  
+  const handleDoubleTap = (e: React.MouseEvent | React.TouchEvent) => {
+    const now = Date.now();
+    const DOUBLE_TAP_DELAY = 300;
+    
+    if (now - lastTap.current < DOUBLE_TAP_DELAY) {
+      // Double tap detected
+      if (!user) {
+        onAuthRequired();
+        return;
+      }
+      
+      if (!isLiked) {
+        onToggleLike(article.id);
+      }
+      
+      setShowHeartAnim(true);
+      setTimeout(() => setShowHeartAnim(false), 1000);
+    }
+    lastTap.current = now;
+  };
 
   // Use the new centralized view tracker (10s threshold for articles)
   const { elementRef } = useViewTracker({
@@ -211,24 +273,28 @@ export const ReelCard = memo(function ReelCard({
     }
   };
 
-  // Check if content overflows (is clamped)
-  useEffect(() => {
-    if (contentRef.current) {
-      const element = contentRef.current;
-      // Check if the content is truncated by comparing scrollHeight with clientHeight
-      setShowReadMore(element.scrollHeight > element.clientHeight);
-    }
-  }, [article.content]);
+  // Expansion logic is now handled by checking content presence
 
   return (
     <div
       ref={elementRef}
-      className="relative h-dvh w-full snap-start snap-always flex flex-col bg-background overflow-hidden"
+      className="relative h-dvh w-full snap-start snap-always flex flex-col bg-black overflow-hidden select-none"
     >
-      {/* Top section: Large image - shrinks when content expands */}
-      <div className="relative h-[55vh] sm:h-[60vh] w-full shrink-0 overflow-hidden bg-background transition-all duration-500 ease-in-out group/media">
+      {/* Global Background (Blurred) - Moved to bottom layer */}
+      <div className="absolute inset-0 z-[-10] overflow-hidden">
+        {combinedMedia[0] && (
+          <img
+            src={combinedMedia[0].url}
+            alt=""
+            className="w-full h-full object-cover blur-[100px] opacity-30 scale-125"
+          />
+        )}
+        <div className="absolute inset-0 bg-black/10" />
+      </div>
+      {/* ─── MEDIA SECTION (Full Screen) ─── */}
+      <div className="absolute inset-0 z-0 bg-black">
         {combinedMedia.length > 0 ? (
-          <>
+          <div className="relative h-full w-full group/media">
             <div
               className="flex h-full w-full transition-transform duration-500 ease-out"
               style={{ transform: `translateX(-${currentSlide * 100}%)` }}
@@ -236,43 +302,56 @@ export const ReelCard = memo(function ReelCard({
               {combinedMedia.map((item, i) => (
                 <div
                   key={i}
-                  className="relative h-full w-full shrink-0 flex items-center justify-center bg-background"
+                  className="relative h-full w-full shrink-0 flex items-center justify-center bg-black"
+                  onClick={handleDoubleTap}
                 >
                   {item.type === "video" ? (
                     <video
                       src={item.url}
                       poster={item.poster}
-                      className="w-full h-auto max-h-full object-contain"
+                      className="w-full h-full object-contain relative z-10"
                       loop
                       muted
                       playsInline
                       autoPlay
                     />
                   ) : (
-                    <img
-                      src={item.url}
-                      alt={item.caption || article.title}
-                      className="w-full h-auto max-h-full object-contain"
-                    />
+                    <div className="relative w-full h-full flex items-center justify-center bg-black">
+                      {/* Vibrant Blurred background fitting */}
+                      <img
+                        src={item.url}
+                        alt=""
+                        className="absolute inset-0 w-full h-full object-cover blur-[80px] opacity-60 scale-150 transition-opacity duration-1000"
+                      />
+                      {/* Glass effect layer to blend background */}
+                      <div className="absolute inset-0 bg-black/5 backdrop-blur-sm" />
+                      
+                      <img
+                        src={item.url}
+                        alt={item.caption || article.title}
+                        className="relative z-10 w-full h-auto max-h-full object-contain drop-shadow-2xl transition-transform duration-500"
+                      />
+                    </div>
                   )}
-                  {/* Gradient overlay for better text readability */}
-                  <div className="absolute inset-0 bg-linear-to-b from-black/15 via-transparent to-black/40 pointer-events-none" />
-
-                  {/* Caption Overlay */}
-                  {item.caption &&
-                    item.caption !== article.title &&
-                    item.caption !== "Image" && (
-                      <div className="absolute bottom-0 left-0 right-0 z-20 pointer-events-none bg-black/10 dark:bg-white/10 backdrop-blur-md border-t border-black/5 dark:border-white/10 px-4 py-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                        <p className="text-white dark:text-white text-sm font-medium text-center leading-relaxed dark:drop-shadow-md">
-                          {item.caption}
-                        </p>
-                      </div>
+                  
+                  {/* Floating Heart Animation */}
+                  <AnimatePresence>
+                    {showHeartAnim && (
+                      <motion.div
+                        initial={{ scale: 0, opacity: 0 }}
+                        animate={{ scale: [0, 1.2, 1], opacity: [0, 1, 0] }}
+                        transition={{ duration: 0.8, times: [0, 0.3, 1] }}
+                        className="absolute z-50 pointer-events-none"
+                      >
+                        <Heart className="h-32 w-32 text-white fill-white drop-shadow-[0_0_20px_rgba(255,255,255,0.5)]" />
+                      </motion.div>
                     )}
+                  </AnimatePresence>
                 </div>
               ))}
             </div>
 
-            {/* Navigation Arrows */}
+            {/* Side Navigation (Arrows) */}
             {combinedMedia.length > 1 && (
               <>
                 <button
@@ -280,8 +359,7 @@ export const ReelCard = memo(function ReelCard({
                     e.stopPropagation();
                     prevSlide();
                   }}
-                  className="absolute left-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/30 backdrop-blur-sm text-white opacity-0 group-hover/media:opacity-100 transition-opacity hover:bg-black/50 z-20"
-                  aria-label="Previous slide"
+                  className="absolute left-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/20 backdrop-blur-md text-white opacity-0 group-hover/media:opacity-100 transition-opacity hover:bg-black/40 z-20"
                 >
                   <ChevronUp className="h-6 w-6 -rotate-90" />
                 </button>
@@ -290,126 +368,155 @@ export const ReelCard = memo(function ReelCard({
                     e.stopPropagation();
                     nextSlide();
                   }}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/30 backdrop-blur-sm text-white opacity-0 group-hover/media:opacity-100 transition-opacity hover:bg-black/50 z-20"
-                  aria-label="Next slide"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/20 backdrop-blur-md text-white opacity-0 group-hover/media:opacity-100 transition-opacity hover:bg-black/40 z-20"
                 >
                   <ChevronUp className="h-6 w-6 rotate-90" />
                 </button>
-
-                {/* Dots - Enhanced visibility with vibrant colors */}
-                <div className="absolute bottom-20 left-1/2 -translate-x-1/2 flex gap-1.5 z-20">
-                  {combinedMedia.map((_, i) => (
-                    <button
-                      key={i}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setCurrentSlide(i);
-                      }}
-                      className={cn(
-                        "h-2 rounded-full transition-all duration-300 shadow-lg cursor-pointer",
-                        currentSlide === i
-                          ? "w-6"
-                          : "bg-white/70 w-2 hover:bg-white hover:w-3",
-                      )}
-                      style={
-                        currentSlide === i
-                          ? {
-                              backgroundColor: "#00d4ff",
-                              boxShadow: "0 0 10px #00d4ff80",
-                            }
-                          : undefined
-                      }
-                      aria-label={`Go to slide ${i + 1}`}
-                    />
-                  ))}
-                </div>
               </>
             )}
-          </>
+          </div>
         ) : (
-          <div className="h-full w-full flex items-center justify-center bg-background">
-            <p className="text-muted-foreground text-sm">No media available</p>
+          <div className="h-full w-full flex items-center justify-center bg-zinc-900">
+            <p className="text-zinc-500 text-sm">No media available</p>
           </div>
         )}
-
-        {/* Category tag on image - positioned below explore bar */}
-        <div className="absolute top-14 sm:top-16 left-3 sm:left-4 z-10">
-          <span className="rounded-full bg-white/90 px-2.5 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-[11px] font-bold text-black shadow-lg">
-            {article.category}
-          </span>
-        </div>
       </div>
 
-      {/* Bottom section: Title and Content (30-40% of screen) - Expandable like Instagram */}
-      <div
-        className={cn(
-          "flex flex-row bg-background transition-all duration-500 ease-in-out",
-          "h-auto",
-        )}
-      >
-        {/* Scrollable Text Content */}
-        <div
-          className="flex-1 flex flex-col px-4 sm:px-5 pt-4 sm:pt-5 pb-20 sm:pb-24 overflow-y-auto scrollbar-hide"
-          style={{
-            scrollbarWidth: "none",
-            msOverflowStyle: "none",
-          }}
-        >
-          <div className="flex items-center gap-3 mb-2 sm:mb-3 z-10 w-fit">
-            <Link href={user?.id === article.author.id ? "/profile" : `/user/${article.author.id}`} className="flex items-center gap-2 group/author hover:opacity-80 transition-opacity">
-              {article.author.picture ? (
-                <Image
-                  src={article.author.picture}
-                  alt={article.author.name}
-                  width={32}
-                  height={32}
-                  className="h-8 w-8 rounded-full object-cover ring-2 ring-border"
-                  unoptimized
-                />
-              ) : (
-                <div className="h-8 w-8 rounded-full bg-linear-to-br from-blue-500 to-purple-600 flex items-center justify-center text-sm font-bold text-white ring-2 ring-border">
-                  {article.author.name.charAt(0)}
-                </div>
-              )}
-              <span className="text-sm font-semibold text-foreground group-hover/author:underline group-hover/author:text-primary transition-colors">
-                {article.author.name}
-              </span>
-            </Link>
 
-            {/* Follow Button */}
+
+      {/* Pagination Dots (Top Right) */}
+      <div className="absolute top-6 right-6 z-40 pointer-events-none">
+        {combinedMedia.length > 1 && (
+          <div className="flex gap-1.5 pointer-events-auto bg-black/20 backdrop-blur-md px-2 py-1 rounded-full border border-white/10">
+            {combinedMedia.map((_, i) => (
+              <div
+                key={i}
+                className={cn(
+                  "h-1 rounded-full transition-all duration-300",
+                  currentSlide === i ? "w-4 bg-white" : "w-1 bg-white/40"
+                )}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ─── RIGHT ACTION BUTTONS (Floating) ─── */}
+      <div className="absolute right-4 bottom-24 sm:bottom-28 z-40 flex flex-col items-center gap-5 sm:gap-6 animate-in fade-in slide-in-from-right-4 duration-500">
+        {/* Profile Action - Circular avatar with plus icon */}
+        <div className="relative mb-2">
+           <Link href={user?.id === article.author.id ? "/profile" : `/user/${article.author.id}`}>
+            <div className="h-12 w-12 rounded-full border-2 border-white overflow-hidden shadow-xl hover:scale-105 transition-transform">
+               {article.author.picture ? (
+                  <img src={article.author.picture} className="h-full w-full object-cover" alt={article.author.name} />
+               ) : (
+                  <div className="h-full w-full bg-zinc-800 flex items-center justify-center font-bold text-white uppercase">
+                    {article.author.name.charAt(0)}
+                  </div>
+               )}
+            </div>
+           </Link>
+           {user?.id !== article.author.id && !isFollowing && (
+             <button 
+               onClick={async (e) => {
+                 e.preventDefault();
+                 if (!user) { onAuthRequired(); return; }
+                 setIsFollowLoading(true);
+                 try {
+                   const res = await fetch(`${API_URL}/users/${article.author.id}/follow`, {
+                     method: "POST",
+                     headers: { Authorization: `Bearer ${token}` },
+                   });
+                   if (res.ok) {
+                     const data = await res.json();
+                     setIsFollowing(data.following);
+                   }
+                 } catch (err) { console.error(err); } finally { setIsFollowLoading(false); }
+               }}
+               className="absolute -bottom-2 left-1/2 -translate-x-1/2 h-5 w-5 rounded-full bg-red-500 flex items-center justify-center text-white border-2 border-white shadow-md active:scale-90 transition-transform"
+             >
+               <span className="text-xs font-black">+</span>
+             </button>
+           )}
+        </div>
+
+        {/* Like */}
+        <button
+          onClick={() => { if (!user) { onAuthRequired(); return; } onToggleLike(article.id); }}
+          className="flex flex-col items-center gap-1 group"
+        >
+          <div className={cn(
+            "h-12 w-12 rounded-full flex items-center justify-center transition-all duration-300 transform active:scale-90 group-hover:scale-110 bg-black/15 backdrop-blur-md border border-white/10",
+            isLiked ? "text-red-500" : "text-white"
+          )}>
+            <Heart className={cn("h-7 w-7 sm:h-8 sm:w-8 drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]", isLiked && "fill-current")} strokeWidth={2.5} />
+          </div>
+          <span className="text-[12px] font-black text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] tracking-tight">
+            {(article.likes + (isLiked && !article.liked ? 1 : 0)).toLocaleString()}
+          </span>
+        </button>
+
+        {/* Comment */}
+        <button
+          onClick={() => { if (!user) { onAuthRequired(); return; } setIsCommentsOpen(true); }}
+          className="flex flex-col items-center gap-1 group"
+        >
+          <div className="h-12 w-12 rounded-full flex items-center justify-center text-white transition-all transform active:scale-90 group-hover:scale-110 bg-black/15 backdrop-blur-md border border-white/10">
+            <MessageCircle className="h-7 w-7 sm:h-8 sm:w-8 drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]" strokeWidth={2.5} />
+          </div>
+          <span className="text-[12px] font-black text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] tracking-tight">
+            {commentCount.toLocaleString()}
+          </span>
+        </button>
+
+        {/* Bookmark */}
+        <button
+          onClick={() => { if (!user) { onAuthRequired(); return; } onToggleSave(article.id); }}
+          className="flex flex-col items-center group"
+        >
+          <div className={cn(
+            "h-12 w-12 rounded-full flex items-center justify-center transition-all transform active:scale-90 group-hover:scale-110 bg-black/15 backdrop-blur-md border border-white/10",
+            isSaved ? "text-amber-400" : "text-white"
+          )}>
+            <Bookmark className={cn("h-7 w-7 sm:h-8 sm:w-8 drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]", isSaved && "fill-current")} strokeWidth={2.5} />
+          </div>
+        </button>
+
+        {/* Share */}
+        <button className="h-12 w-12 rounded-full flex items-center justify-center text-white transition-all transform active:scale-90 hover:scale-110 bg-black/15 backdrop-blur-md border border-white/10">
+          <Send className="h-7 w-7 sm:h-8 sm:w-8 drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)] ml-0.5" strokeWidth={2.5} />
+        </button>
+      </div>
+
+      {/* ─── BOTTOM INFO OVERLAY (Instagram Reels Style) ─── */}
+      {/* ─── INFO SECTION (Anchored Overlay) ─── */}
+      <div className={cn(
+        "absolute bottom-0 left-0 right-0 z-30 px-6 pb-20 transition-all duration-500 bg-linear-to-t from-black/80 via-transparent to-transparent",
+        isExpanded ? "backdrop-blur-[2px] pt-12 bg-black/10" : "pt-32"
+      )}>
+        <div className="transition-all duration-500 flex flex-col">
+          {/* Category Badge - Positioned Top Left of overlay */}
+          <div className="mb-2">
+            <span className="inline-block text-[9px] font-black tracking-[0.2em] text-white/90 border-b border-white/30 pb-0.5 uppercase">
+              {article.category || "NEWS"}
+            </span>
+          </div>
+
+          {/* Author Name & Follow Action */}
+          <div className="flex items-center gap-3 mb-3">
+            <span className="text-sm font-black text-white drop-shadow-md tracking-tight">
+              @{article.author.name.toLowerCase().replace(/\s+/g, "")}
+            </span>
             {user?.id !== article.author.id && (
               <button
-                type="button"
-                className={cn(
-                  "rounded-full px-3 py-1 text-[11px] font-bold transition-all shrink-0",
-                  isFollowing
-                    ? "bg-secondary text-foreground hover:bg-secondary/80 ring-1 ring-border"
-                    : "text-primary ring-1 ring-primary/30 hover:bg-primary/5",
-                  isFollowLoading && "opacity-50 cursor-not-allowed"
-                )}
+                onClick={handleFollowToggle}
                 disabled={isFollowLoading}
-                onClick={async () => {
-                  if (!user) {
-                    onAuthRequired();
-                    return;
-                  }
-                  setIsFollowLoading(true);
-                  try {
-                    const res = await fetch(`${API_URL}/users/${article.author.id}/follow`, {
-                      method: "POST",
-                      headers: { Authorization: `Bearer ${token}` },
-                    });
-                    if (res.ok) {
-                      const data = await res.json();
-                      setIsFollowing(data.following);
-                      toast.success(data.following ? `Following ${article.author.name}` : `Unfollowed ${article.author.name}`);
-                    }
-                  } catch (err) {
-                    console.error("Failed to follow", err);
-                  } finally {
-                    setIsFollowLoading(false);
-                  }
-                }}
+                className={cn(
+                  "px-3 py-0.5 rounded-full text-[10px] font-black transition-all border shrink-0 uppercase tracking-wider",
+                  isFollowing
+                    ? "bg-white/10 text-white border-white/20"
+                    : "bg-white text-black border-white hover:bg-zinc-200"
+                )}
               >
                 {isFollowLoading ? "..." : isFollowing ? "Following" : "Follow"}
               </button>
@@ -417,169 +524,88 @@ export const ReelCard = memo(function ReelCard({
           </div>
 
           {/* Title */}
-          <h2 className="text-xl sm:text-2xl font-black leading-tight text-foreground mb-3 sm:mb-4 font-serif">
+          <h2 className={cn(
+            "font-black text-white leading-[1.1] mb-2.5 drop-shadow-2xl font-serif italic tracking-tighter transition-all duration-500",
+            isExpanded ? "text-xl sm:text-2xl" : "text-lg sm:text-xl"
+          )}>
             {article.title}
           </h2>
 
-          {/* Expandable Content - Instagram Style */}
+          {/* Expandable Caption / Description */}
           <div className="relative">
-            <div className="text-xs sm:text-sm leading-relaxed text-muted-foreground">
-              <p
-                ref={contentRef}
-                className={cn("whitespace-pre-wrap", "line-clamp-5")}
-              >
+            <div 
+              className={cn(
+                "text-xs sm:text-sm leading-relaxed text-white transition-all duration-700",
+                !isExpanded ? "line-clamp-2 blur-[4px] opacity-30 select-none cursor-pointer" : "max-h-[15vh] overflow-y-auto pr-4 custom-scrollbar"
+              )}
+              onClick={() => !isExpanded && setIsExpanded(true)}
+            >
+              <p ref={contentRef} className="drop-shadow-md font-medium text-white/90">
                 {((text) => {
                   return text
-                    // 1. Try removing complete markdown image tags first
                     .replace(/!\[[\s\S]*?\]\s*\([\s\S]*?\)/g, "")
-                    // 2. Aggressively remove data URIs (even if truncated/missing closing paren)
-                    .replace(/\(data:image\/[^\s)]*/g, "") // Matches (data:image/... until space or end
-                    .replace(/data:image\/[^\s)]*/g, "") // Matches raw data:image/... until space
-                    // 3. Remove any remaining isolated image syntax
+                    .replace(/\(data:image\/[^\s)]*/g, "")
+                    .replace(/data:image\/[^\s)]*/g, "")
                     .replace(/!\[[\s\S]*?\]/g, "")
-                    // 4. Clean HTML and whitespace
-                    .replace(/<[^>]*>/g, "") // Remove ALL HTML tags
-                    .replace(/&nbsp;/g, " ") // Replace non-breaking spaces
-                    .replace(/\*\*([^*]+)\*\*/g, "$1") // Remove bold syntax
-                    .replace(/\s+/g, " ") // Collapse multiple spaces
+                    .replace(/<[^>]*>/g, "")
+                    .replace(/&nbsp;/g, " ")
+                    .replace(/\*\*([^*]+)\*\*/g, "$1")
+                    .replace(/\s+/g, " ")
                     .trim();
                 })(article.content)}
               </p>
-
-              {showReadMore && (
-                <Link
-                  href={`/article/${article.id}`}
-                  className="inline-flex items-center gap-1 mt-2 text-xs sm:text-sm font-semibold text-foreground hover:text-foreground/80 transition-colors"
-                >
-                  ...Read More
-                </Link>
+              
+              {isExpanded && (
+                <div className="flex flex-col gap-3 mt-4 mb-2">
+                  <Link 
+                    href={`/article/${article.id}`}
+                    className="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg bg-white text-black font-black text-[10px] uppercase tracking-widest hover:bg-zinc-100 transition-all shadow-xl active:scale-95"
+                  >
+                    <BookOpen className="w-3.5 h-3.5" />
+                    Read Full Story
+                  </Link>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setIsExpanded(false); }}
+                    className="text-[9px] font-black text-white/40 hover:text-white transition-colors uppercase tracking-[0.4em] text-center py-1.5"
+                  >
+                    — SHOW LESS —
+                  </button>
+                </div>
               )}
             </div>
+
+            {/* Read More Toggle */}
+            {!isExpanded && article.content && (
+              <button
+                onClick={(e) => { e.stopPropagation(); setIsExpanded(true); }}
+                className="mt-1 text-[10px] font-black text-white/60 hover:text-white transition-colors drop-shadow-lg uppercase tracking-[0.2em] inline-flex items-center gap-1.5"
+              >
+                More <ChevronUp className="w-3 h-3" />
+              </button>
+            )}
           </div>
-        </div>
-
-        {/* Action Buttons Column */}
-        <div className="w-[60px] sm:w-[70px] shrink-0 flex flex-col items-center justify-end pb-24 sm:pb-28 gap-3 sm:gap-4 bg-background z-20">
-          {/* Like Button */}
-          <button
-            type="button"
-            onClick={() => {
-              if (!user) {
-                onAuthRequired();
-                return;
-              }
-              onToggleLike(article.id);
-            }}
-            className="flex flex-col items-center gap-1 group"
-            aria-label={isLiked ? "Unlike" : "Like"}
-          >
-            <div
-              className={cn(
-                "h-10 w-10 sm:h-12 sm:w-12 rounded-full flex items-center justify-center shadow-md transition-all transform group-active:scale-90",
-                isLiked
-                  ? "bg-red-500 text-white shadow-red-200"
-                  : "bg-muted/30 text-foreground border border-border/50",
-              )}
-            >
-              <Heart
-                className={cn(
-                  "h-5 w-5 sm:h-6 sm:w-6 transition-transform",
-                  isLiked && "fill-current",
-                )}
-                strokeWidth={2}
-              />
-            </div>
-            <span className="text-[10px] sm:text-[11px] font-bold text-muted-foreground">
-              {article.likes + (isLiked && !article.liked ? 1 : 0)}
-            </span>
-          </button>
-
-          {/* Comment Button */}
-          <button
-            type="button"
-            className="flex flex-col items-center gap-1 group"
-            onClick={() => {
-              if (!user) {
-                onAuthRequired();
-                return;
-              }
-              setIsCommentsOpen(true);
-            }}
-          >
-            <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-muted/30 text-foreground border border-border/50 flex items-center justify-center shadow-md transition-all transform group-active:scale-90">
-              <MessageCircle
-                className="h-5 w-5 sm:h-6 sm:w-6"
-                strokeWidth={2}
-              />
-            </div>
-            <span className="text-[10px] sm:text-[11px] font-bold text-muted-foreground">
-              {commentCount}
-            </span>
-          </button>
-
-          {/* Bookmark Button */}
-          <button
-            type="button"
-            onClick={() => {
-              if (!user) {
-                onAuthRequired();
-                return;
-              }
-              onToggleSave(article.id);
-            }}
-            className="flex flex-col items-center gap-1 group"
-          >
-            <div
-              className={cn(
-                "h-10 w-10 sm:h-12 sm:w-12 rounded-full flex items-center justify-center shadow-md transition-all transform group-active:scale-90",
-                isSaved
-                  ? "bg-primary text-primary-foreground shadow-blue-200"
-                  : "bg-muted/30 text-foreground border border-border/50",
-              )}
-            >
-              <Bookmark
-                className={cn(
-                  "h-5 w-5 sm:h-6 sm:w-6 transition-transform",
-                  isSaved && "fill-current",
-                )}
-                strokeWidth={2}
-              />
-            </div>
-          </button>
-
-          {/* Share Button */}
-          <button
-            type="button"
-            className="flex flex-col items-center gap-1 group"
-          >
-            <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-muted/30 text-foreground border border-border/50 flex items-center justify-center shadow-md transition-all transform group-active:scale-90">
-              <Send className="h-4 w-4 sm:h-5 sm:w-5 ml-0.5" strokeWidth={2} />
-            </div>
-          </button>
         </div>
       </div>
 
-      {/* Swipe hint on first reel */}
-      {index === 0 && (
-        <div className="absolute bottom-28 sm:bottom-32 left-1/2 -translate-x-1/2 flex animate-bounce flex-col items-center gap-0.5 sm:gap-1 text-white/80 pointer-events-none z-30 drop-shadow-md">
-          <ChevronUp className="h-5 w-5 sm:h-6 sm:w-6" />
-          <span className="text-[10px] sm:text-[11px] font-bold tracking-widest uppercase">
-            Swipe Up
-          </span>
+      {/* Swipe Hint (Center Bottom) */}
+      {index === 0 && !isExpanded && (
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5 text-white/40 pointer-events-none z-40 animate-pulse">
+          <ChevronUp className="h-5 w-5" />
+          <span className="text-[9px] font-black tracking-widest uppercase opacity-50">Swipe Up</span>
         </div>
       )}
 
+      {/* ─── MODALS & DRAWERS ─── */}
       <CommentsDrawer
         articleId={article.id}
         open={isCommentsOpen}
         onOpenChange={setIsCommentsOpen}
         commentCount={commentCount}
         onCommentChange={() => {
-          // Refetch count
           fetch(`${API_URL}/api/comments/article/${article.id}/count`, { cache: "no-store" })
             .then((res) => res.json())
             .then((data) => setCommentCount(data.count))
-            .catch((err) => console.error("Failed to fetch comment count", err));
+            .catch((err) => console.error(err));
         }}
       />
     </div>

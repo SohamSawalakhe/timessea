@@ -31,7 +31,17 @@ import {
   Users,
   UserPlus,
   MapPin,
+  Shield,
+  BadgeCheck,
+  Hash,
+  Plus,
+  Check,
+  Loader2,
+  Bookmark,
+  HelpCircle,
 } from "lucide-react";
+import { TopicFollowButton } from "@/components/topic-follow-button";
+import { useNotifications } from "@/contexts/NotificationContext";
 
 import { motion, AnimatePresence } from "framer-motion";
 import { Skeleton } from "@/components/skeleton";
@@ -73,6 +83,7 @@ export default function ProfilePage() {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const { user, token, logout, isLoading } = useAuth();
+  const { unreadCount } = useNotifications();
   const router = useRouter();
   const [stats, setStats] = useState({
     publishedCount: 0,
@@ -82,12 +93,18 @@ export default function ProfilePage() {
     totalViews: 0,
     totalFollowers: 0,
     totalFollowing: 0,
+    savedCount: 0,
   });
   const [activityStats, setActivityStats] = useState({
     likesCount: 0,
     commentsCount: 0,
+    bookmarksCount: 0,
+    viewsCount: 0,
+    historyCount: 0,
   });
   const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [followedTopics, setFollowedTopics] = useState<string[]>([]);
+  const [loadingTopics, setLoadingTopics] = useState(false);
 
   useEffect(() => {
     let intervalId: NodeJS.Timeout;
@@ -95,7 +112,7 @@ export default function ProfilePage() {
     if (user && token) {
       const fetchStats = () => {
         const API_URL =
-          process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+          process.env.NEXT_PUBLIC_API_URL;
         
         // Fetch Author Stats
         fetch(`${API_URL}/analytics/profile/overview`, {
@@ -120,7 +137,17 @@ export default function ProfilePage() {
               if (res.ok) return res.json();
               throw new Error("Failed to fetch activity stats");
             })
-            .then((data) => setActivityStats(data))
+            .then((data) => {
+              if (data) {
+                setActivityStats({
+                  likesCount: Number(data.likesCount) || 0,
+                  commentsCount: Number(data.commentsCount) || 0,
+                  bookmarksCount: Number(data.bookmarksCount) || 0,
+                  viewsCount: Number(data.viewsCount) || 0,
+                  historyCount: Number(data.historyCount) || 0,
+                });
+              }
+            })
             .catch((err) => console.error("Error fetching activity stats:", err));
 
         // Fetch unread notifications count
@@ -135,6 +162,18 @@ export default function ProfilePage() {
             })
             .then((data) => setUnreadNotifications(data.count || 0))
             .catch((err) => console.error("Error fetching notifications:", err));
+
+        // Fetch followed topics
+        setLoadingTopics(true);
+        fetch(`${API_URL}/users/topics/followed`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
+          .then((res) => (res.ok ? res.json() : []))
+          .then((data) => setFollowedTopics(data))
+          .catch((err) => console.error("Error fetching topics:", err))
+          .finally(() => setLoadingTopics(false));
       };
 
       // Initial fetch
@@ -148,6 +187,17 @@ export default function ProfilePage() {
       if (intervalId) clearInterval(intervalId);
     };
   }, [user, token]);
+
+  const handleTopicToggle = (category: string, following: boolean) => {
+    setFollowedTopics(prev => {
+      if (following) {
+        if (prev.includes(category)) return prev;
+        return [...prev, category];
+      } else {
+        return prev.filter(t => t !== category);
+      }
+    });
+  };
 
   useEffect(() => {
     setMounted(true);
@@ -212,29 +262,29 @@ export default function ProfilePage() {
       icon: FileText,
       label: "Published Articles",
       count: stats.publishedCount.toString(),
+      href: "/published",
     },
     {
-      icon: FileText,
+      icon: Pencil,
       label: "Draft Articles",
-      count: (stats.draftCount + stats.scheduledCount).toString(),
+      count: stats.draftCount.toString(),
+      href: "/drafts",
+    },
+    {
+      icon: Bookmark,
+      label: "Saved Articles",
+      count: (activityStats.bookmarksCount || stats.savedCount || 0).toString(),
+      href: "/bookmarks",
     },
     {
       icon: Activity,
       label: "Your Activity",
-      count: String(
-        (activityStats.likesCount || 0) + (activityStats.commentsCount || 0)
-      ),
+      count: "", // Removed total count as per user request
       href: "/profile/activity",
     },
   ];
 
   const generalItems = [
-    {
-      icon: UserCircle,
-      label: "User Profile",
-      action: "chevron" as const,
-      href: "/profile/info",
-    },
     {
       icon: Bell,
       label: "Notifications",
@@ -243,15 +293,22 @@ export default function ProfilePage() {
       badge: unreadNotifications > 0 ? unreadNotifications : undefined,
     },
     {
-      icon: mounted && theme === "dark" ? Moon : Sun,
+      icon: Moon,
       label: "Dark Mode",
       action: "theme" as const,
     },
     {
       icon: Settings,
-      label: "Settings",
+      label: "Settings & Privacy",
       action: "chevron" as const,
+      href: "/settings",
     },
+    {
+      icon: HelpCircle,
+      label: "Help Center",
+      action: "chevron" as const,
+      href: "/settings/help",
+    }
   ];
 
   if (!mounted) {
@@ -261,10 +318,22 @@ export default function ProfilePage() {
   return (
     <AppShell>
       {/* Header */}
-      <header className="mb-6 px-2">
+      <header className="mb-6 px-2 flex items-center justify-between">
         <h1 className="text-2xl font-black tracking-tight text-foreground font-serif">
-          Settings
+          Profile
         </h1>
+        <Link
+          href="/notifications"
+          className="relative p-2 rounded-full hover:bg-secondary transition-colors"
+          aria-label="Notifications"
+        >
+          <Bell className="h-6 w-6 text-foreground" strokeWidth={2} />
+          {unreadCount > 0 && (
+            <span className="absolute top-1.5 right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white ring-2 ring-background animate-in fade-in zoom-in duration-300">
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </span>
+          )}
+        </Link>
       </header>
 
       {/* Profile Card */}
@@ -295,10 +364,20 @@ export default function ProfilePage() {
             <div className="w-full px-5 sm:px-8 pb-6 relative z-10">
               <div className="flex justify-between items-start mb-4 gap-4">
                 <div className="flex flex-col pt-1 z-10 flex-1 text-left min-w-0">
-                  <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-foreground tracking-tight leading-none mb-1.5 drop-shadow-md whitespace-normal">
-                    {user.name}
-                  </h2>
-                  <p className="text-foreground/80 text-sm font-bold drop-shadow-sm whitespace-normal">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-foreground tracking-tight leading-none drop-shadow-md whitespace-normal">
+                      {user.name}
+                    </h2>
+                    {(user.role === "ADMIN" || user.role === "SUPERADMIN") && (
+                      <span className="inline-flex items-center gap-0.5 rounded-full bg-blue-500/10 px-2 py-0.5 text-blue-500 ring-1 ring-blue-500/20 shrink-0" title={user.role === "SUPERADMIN" ? "Super Admin" : "Admin"}>
+                        <BadgeCheck className="w-3.5 h-3.5" />
+                        <span className="text-[9px] font-bold uppercase tracking-wider">
+                          {user.role === "SUPERADMIN" ? "Super Admin" : "Admin"}
+                        </span>
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-foreground/80 text-sm font-bold drop-shadow-sm whitespace-normal mt-1">
                     {user.handle ? user.handle : user.email}
                   </p>
                 </div>
@@ -319,7 +398,13 @@ export default function ProfilePage() {
                         </div>
                       )}
                     </div>
-                    <div className="absolute bottom-1 right-1 h-5 w-5 sm:h-6 sm:w-6 rounded-full border-4 border-card bg-green-500 shadow-sm" title="Online" />
+                    {(user.role === "ADMIN" || user.role === "SUPERADMIN") ? (
+                      <div className="absolute bottom-1 right-1 h-5 w-5 sm:h-6 sm:w-6 rounded-full border-4 border-card bg-blue-500 shadow-sm flex items-center justify-center" title={user.role === "SUPERADMIN" ? "Super Admin" : "Admin"}>
+                        <Shield className="w-2.5 h-2.5 text-white" />
+                      </div>
+                    ) : (
+                      <div className="absolute bottom-1 right-1 h-5 w-5 sm:h-6 sm:w-6 rounded-full border-4 border-card bg-green-500 shadow-sm" title="Online" />
+                    )}
                   </div>
                   
                   <Link
@@ -368,30 +453,33 @@ export default function ProfilePage() {
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mb-8 flex flex-col items-center gap-4 py-4"
+            className="mb-8 flex flex-col items-center gap-6 py-12 bg-card rounded-[2.5rem] border border-border/40 shadow-sm relative overflow-hidden"
           >
-            <div className="h-24 w-24 rounded-full bg-secondary flex items-center justify-center shadow-inner">
-              <UserCircle className="h-12 w-12 text-muted-foreground/50" />
+            <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-primary/20 via-primary to-primary/20"></div>
+            <div className="h-24 w-24 rounded-full bg-secondary/50 flex items-center justify-center shadow-inner relative">
+              <UserCircle className="h-12 w-12 text-muted-foreground/30" />
+              <div className="absolute -bottom-1 -right-1 h-8 w-8 rounded-full bg-background border-4 border-card flex items-center justify-center">
+                <LogIn className="w-3.5 h-3.5 text-primary" />
+              </div>
             </div>
-            <div className="text-center">
-              <h2 className="text-lg font-bold text-foreground">Guest User</h2>
-              <p className="text-sm text-muted-foreground">
-                Sign in to manage your profile
+            <div className="text-center space-y-1">
+              <h2 className="text-xl font-black text-foreground font-serif">Welcome to The Aandolan</h2>
+              <p className="text-sm text-muted-foreground max-w-[200px] mx-auto leading-relaxed">
+                Sign in to customize your feed and save your favorite stories
               </p>
             </div>
             <Link
               href="/login"
-              className="flex items-center gap-2 rounded-full bg-primary px-8 py-3 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:scale-105 active:scale-95"
+              className="flex items-center gap-2 rounded-full bg-primary px-10 py-3.5 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:scale-105 active:scale-95"
             >
               <LogIn className="h-4 w-4" />
-              Sign In
+              Sign In to Account
             </Link>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Analytics Banner */}
-      <div className="grid grid-cols-2 gap-3 mb-6">
+      <div className="grid grid-cols-2 gap-4 mb-6">
         {[
           {
             label: "Published",
@@ -399,6 +487,7 @@ export default function ProfilePage() {
             icon: FileText,
             color: "text-blue-500",
             bg: "bg-blue-500/10",
+            gradient: "from-blue-500/5 to-transparent",
           },
           {
             label: "Scheduled",
@@ -406,6 +495,7 @@ export default function ProfilePage() {
             icon: Calendar,
             color: "text-orange-500",
             bg: "bg-orange-500/10",
+            gradient: "from-orange-500/5 to-transparent",
           },
           {
             label: "Likes",
@@ -413,29 +503,32 @@ export default function ProfilePage() {
             icon: Heart,
             color: "text-red-500",
             bg: "bg-red-500/10",
+            gradient: "from-red-500/5 to-transparent",
           },
           {
             label: "Views",
             count: stats.totalViews,
             icon: Eye,
-            color: "text-green-500",
-            bg: "bg-green-500/10",
+            color: "text-emerald-500",
+            bg: "bg-emerald-500/10",
+            gradient: "from-emerald-500/5 to-transparent",
           },
         ].map((item, index) => (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.08 }}
+            transition={{ delay: index * 0.08, type: "spring", stiffness: 100 }}
             key={item.label}
-            className="flex flex-col items-center justify-center rounded-2xl bg-card p-3 border border-border/50 shadow-sm"
+            className={`flex flex-col items-center justify-center rounded-3xl bg-card p-4 border border-border/40 shadow-sm relative overflow-hidden group hover:border-primary/20 transition-colors`}
           >
-            <div className={`mb-1.5 rounded-full p-1.5 ${item.bg} ${item.color}`}>
-              <item.icon className="h-4 w-4" />
+            <div className={`absolute inset-0 bg-linear-to-br ${item.gradient} opacity-0 group-hover:opacity-100 transition-opacity`} />
+            <div className={`mb-2 rounded-2xl p-2.5 ${item.bg} ${item.color} relative z-10 group-hover:scale-110 transition-transform`}>
+              <item.icon className="h-5 w-5" />
             </div>
-            <span className="text-xl font-bold text-foreground">
+            <span className="text-2xl font-black text-foreground relative z-10">
               {item.count}
             </span>
-            <span className="text-[10px] font-medium text-muted-foreground">
+            <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider relative z-10 opacity-70">
               {item.label}
             </span>
           </motion.div>
@@ -446,23 +539,25 @@ export default function ProfilePage() {
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          whileHover={{ scale: 1.02 }}
+          whileHover={{ scale: 1.01 }}
+          whileTap={{ scale: 0.99 }}
           onClick={() => router.push("/dashboard")}
-          className="mb-6 flex cursor-pointer items-center gap-4 rounded-3xl bg-card p-5 border border-border/50 shadow-sm hover:shadow-md transition-all group"
+          className="mb-8 flex cursor-pointer items-center gap-4 rounded-[2rem] bg-linear-to-r from-primary/5 via-primary/10 to-primary/5 p-6 border border-primary/20 shadow-sm hover:shadow-md transition-all group overflow-hidden relative"
         >
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary group-hover:scale-110 transition-transform">
-            <BarChart2 className="h-6 w-6" />
+          <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+          <div className="flex h-14 w-14 items-center justify-center rounded-[1.25rem] bg-primary text-primary-foreground group-hover:scale-110 transition-transform shadow-lg shadow-primary/20 relative z-10">
+            <BarChart2 className="h-7 w-7" />
           </div>
-          <div className="flex-1">
-            <p className="text-base font-bold text-foreground">
-              Analytics Dashboard
+          <div className="flex-1 relative z-10">
+            <p className="text-lg font-black text-foreground font-serif leading-tight">
+              Article Analytics
             </p>
-            <p className="text-xs font-medium text-muted-foreground">
-              View your content performance
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider opacity-70">
+              Performance & Insights
             </p>
           </div>
-          <div className="rounded-full bg-secondary p-2 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-            <ChevronRight className="h-4 w-4" />
+          <div className="rounded-full bg-background/50 backdrop-blur-sm p-2 text-primary group-hover:translate-x-1 transition-all relative z-10">
+            <ChevronRight className="h-5 w-5" />
           </div>
         </motion.div>
       )}
@@ -477,13 +572,7 @@ export default function ProfilePage() {
           {activityItems.map((item, index) => {
             const isDrafts = item.label === "Draft Articles";
             const isPublished = item.label === "Published Articles";
-            const href = (item as any).href
-              ? (item as any).href
-              : item.label === "Draft Articles"
-                ? "/drafts"
-                : item.label === "Published Articles"
-                  ? "/published"
-                  : "#";
+            const href = (item as any).href || "#";
 
             return (
               <motion.div
@@ -502,14 +591,80 @@ export default function ProfilePage() {
                   <span className="flex-1 text-left text-sm font-bold text-foreground">
                     {item.label}
                   </span>
-                  <span className="text-xs font-bold text-muted-foreground bg-secondary px-2.5 py-1 rounded-md group-hover:bg-background transition-colors">
-                    {item.count}
-                  </span>
+                  {item.count !== "" && item.count !== undefined && (
+                    <span className="text-xs font-bold text-muted-foreground bg-secondary px-2.5 py-1 rounded-md group-hover:bg-background transition-colors">
+                      {item.count}
+                    </span>
+                  )}
                   <ChevronRight className="h-4 w-4 text-muted-foreground/50 group-hover:text-foreground transition-colors" />
                 </Link>
               </motion.div>
             );
           })}
+        </div>
+      </div>
+
+      {/* Topics & Interests Section */}
+      <div className="mb-12">
+        <h3 className="mb-4 text-xs font-bold uppercase tracking-widest text-muted-foreground/70 px-2 flex items-center justify-between">
+          <span>Topics You Follow</span>
+          {followedTopics.length > 0 && (
+             <span className="text-[10px] font-black text-primary bg-primary/10 px-2.5 py-1 rounded-full border border-primary/20">
+               {followedTopics.length} Followed
+             </span>
+          )}
+        </h3>
+        
+        <div className="bg-card/50 rounded-3xl p-6 border border-border/40 shadow-sm mb-6">
+          {followedTopics.length > 0 ? (
+            <div className="flex flex-wrap gap-2.5">
+              {followedTopics.map((topic) => (
+                <TopicFollowButton 
+                  key={topic} 
+                  category={topic} 
+                  variant="pill"
+                  onToggle={handleTopicToggle}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="py-4 text-center">
+              <Hash className="w-10 h-10 text-muted-foreground/20 mx-auto mb-3" />
+              <p className="text-sm font-bold text-muted-foreground">
+                You aren't following any topics yet.
+              </p>
+              <p className="text-xs text-muted-foreground/60 mt-1">
+                Follow topics to personalize your news feed.
+              </p>
+            </div>
+          )}
+        </div>
+
+        <h3 className="mb-4 text-xs font-bold uppercase tracking-widest text-muted-foreground/70 px-2">
+          Suggested for You
+        </h3>
+        <div className="bg-card/50 rounded-3xl p-6 border border-border/40 shadow-sm">
+          <div className="flex flex-wrap gap-2.5 mb-6">
+            {["Politics", "Technology", "Business", "Sports", "Health", "Science", "Entertainment", "World", "Culture", "Design"]
+              .filter(cat => !followedTopics.includes(cat))
+              .slice(0, 8)
+              .map((cat) => (
+                <TopicFollowButton 
+                  key={cat} 
+                  category={cat} 
+                  variant="pill"
+                  onToggle={handleTopicToggle}
+                />
+              ))}
+          </div>
+          
+          <Link 
+            href="/?search=open" 
+            className="flex items-center justify-center gap-2 w-full py-3.5 rounded-2xl bg-secondary/80 text-sm font-bold text-foreground hover:bg-secondary transition-all border border-border/50 shadow-sm"
+          >
+            <Plus className="w-4 h-4" />
+            Explore More Categories
+          </Link>
         </div>
       </div>
 

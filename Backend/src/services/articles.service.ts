@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
 import { UsersService } from './users.service';
-import { Article, Prisma } from '../generated/prisma/client';
+import { Article, Prisma, Role } from '../generated/prisma/client';
 import { CreateArticleDto } from '../modules/articles/dto/create-article.dto';
 
 import { RedisService } from './redis.service';
@@ -48,6 +48,7 @@ export class ArticlesService {
     const dueArticles = await this.prisma.article.findMany({
       where: {
         published: false,
+        status: 'Scheduled',
         scheduledAt: {
           lte: now,
           not: null,
@@ -68,6 +69,7 @@ export class ArticlesService {
         },
         data: {
           published: true,
+          status: 'Published',
           scheduledAt: null,
         },
       });
@@ -90,8 +92,7 @@ export class ArticlesService {
       });
     }
 
-    // Create article with authorId
-    return this.prisma.article.create({
+    const article = await this.prisma.article.create({
       data: {
         title: dto.title,
         content: dto.content,
@@ -103,7 +104,9 @@ export class ArticlesService {
         readTime: dto.readTime,
         authorId: author.id,
         scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,
-        published: dto.published !== undefined ? dto.published : true,
+        published:
+          author?.role === 'SUPERADMIN' || author?.role === 'ADMIN' ? (dto.published ?? false) : false,
+        status: dto.status || 'Draft',
         imageDescription: dto.imageDescription,
         imageCaption: dto.imageCaption,
         imageCredit: dto.imageCredit,
@@ -115,6 +118,12 @@ export class ArticlesService {
       },
       include: { author: true },
     });
+
+    if (article.published) {
+      this.articlesGateway.notifyArticlePublished(article);
+    }
+
+    return article;
   }
 
   create(data: Prisma.ArticleCreateInput): Promise<Article> {
@@ -169,6 +178,7 @@ export class ArticlesService {
       const cacheKey = `user_foryou_prefs:${userId}`;
       let categoryScoresRecord: Record<string, number> = {};
       let interactedIdsMap: Record<string, boolean> = {};
+      let followedTopics: string[] = [];
 
       try {
         const cachedPrefs = await this.redisService.getClient().get(cacheKey);
@@ -176,9 +186,11 @@ export class ArticlesService {
           const parsed = JSON.parse(cachedPrefs) as unknown as {
             categoryScoresRecord?: Record<string, number>;
             interactedIds?: Record<string, boolean>;
+            followedTopics?: string[];
           };
           categoryScoresRecord = parsed.categoryScoresRecord || {};
           interactedIdsMap = parsed.interactedIds || {};
+          followedTopics = parsed.followedTopics || [];
         }
       } catch (err) {
         console.warn('Redis for-you cache error:', err);
@@ -209,7 +221,9 @@ export class ArticlesService {
             }),
           ]);
 
-        // 2. ClickHouse: Implicit engagements (Views weight: 1, Reads weight: 2)
+        // 3. Prisma: Followed Topics (Massive weight: 50)
+        followedTopics = await this.usersService.getFollowedTopics(userId);
+
         const [viewHistory, readHistory] = await Promise.all([
           this.analyticsQueryService.getUserViewHistory(userId, 50) as Promise<
             { category?: string; id: string }[]
@@ -250,6 +264,9 @@ export class ArticlesService {
             interactedIdsMap[read.id] = true;
           }
         }
+        for (const topic of followedTopics) {
+          addScore(topic, 50);
+        }
 
         // Cache for 15 minutes (900s)
         try {
@@ -258,6 +275,7 @@ export class ArticlesService {
             JSON.stringify({
               categoryScoresRecord,
               interactedIds: interactedIdsMap,
+              followedTopics,
             }),
             'EX',
             900,
@@ -294,7 +312,12 @@ export class ArticlesService {
 
         // Core Criterion: Category Preference matching
         if (article.category && categoryScoresRecord[article.category]) {
-          score += categoryScoresRecord[article.category] * 20; // Massive boost for preferred categories
+          score += categoryScoresRecord[article.category] * 20; // Massive boost for preferred/followed categories
+        }
+
+        // Extra boost for explicitly followed topics
+        if (article.category && followedTopics.includes(article.category)) {
+          score += 1000; // Priority over everything else
         }
 
         return { article, score };
@@ -327,6 +350,7 @@ export class ArticlesService {
           { title: { contains: searchQuery, mode: 'insensitive' } },
           { content: { contains: searchQuery, mode: 'insensitive' } },
           { excerpt: { contains: searchQuery, mode: 'insensitive' } },
+          { category: { contains: searchQuery, mode: 'insensitive' } },
           { author: { name: { contains: searchQuery, mode: 'insensitive' } } },
         ],
       });
@@ -517,15 +541,26 @@ export class ArticlesService {
   async findDrafts(authorId?: string): Promise<Article[]> {
     if (!authorId) return [];
 
+    // Return drafts + articles in editorial workflow (Pending Review, Needs Correction, Rejected, In Review)
     const where: Prisma.ArticleWhereInput = {
-      published: false,
+      authorId,
       deletedAt: null,
       scheduledAt: null,
+      OR: [
+        { published: false },
+        {
+          status: {
+            in: [
+              'Draft',
+              'Pending Review',
+              'In Review',
+              'Needs Correction',
+              'Rejected',
+            ],
+          },
+        },
+      ],
     };
-
-    if (authorId) {
-      where.authorId = authorId;
-    }
 
     return this.prisma.article.findMany({
       where,
@@ -536,6 +571,15 @@ export class ArticlesService {
             name: true,
             email: true,
             picture: true,
+          },
+        },
+        reviews: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          include: {
+            reviewer: {
+              select: { id: true, name: true, picture: true },
+            },
           },
         },
       },
@@ -620,12 +664,13 @@ export class ArticlesService {
   ): Promise<Article[]> {
     const article = await this.prisma.article.findUnique({
       where: { id },
-      select: { location: true },
+      select: { location: true, category: true },
     });
 
     if (!article) return [];
 
     const loc = article.location?.trim() || null;
+    const cat = article.category?.trim() || null;
     const results: ArticleWithRelations[] = [];
     const collectedIds = new Set<string>([id]); // Always exclude the current article
 
@@ -647,7 +692,59 @@ export class ArticlesService {
 
     let skipped = 0;
 
-    // ---- Hierarchical location filtering (same as local feed) ----
+    const fetchTier = async (whereClause: Prisma.ArticleWhereInput, orderBy: Prisma.ArticleOrderByWithRelationInput | Prisma.ArticleOrderByWithRelationInput[] = { createdAt: 'desc' }) => {
+      if (results.length >= limit) return;
+
+      const tierCount = await this.prisma.article.count({ where: whereClause });
+      const tierSkip = Math.max(0, offset - skipped);
+      skipped += tierCount;
+
+      if (tierSkip >= tierCount) return;
+
+      const remaining = limit - results.length;
+      const tierArticles = (await this.prisma.article.findMany({
+        where: whereClause,
+        take: remaining,
+        skip: tierSkip,
+        include: authorInclude,
+        orderBy,
+      })) as unknown as ArticleWithRelations[];
+
+      for (const a of tierArticles) {
+        collectedIds.add(a.id);
+        results.push(a);
+      }
+    };
+
+    // Tier 1: Same Topic AND Local Hierarchy
+    if (cat && loc) {
+      const locationTerms = loc
+        .split(',')
+        .map((t) => t.trim())
+        .filter((t) => t.length > 0);
+
+      for (const term of locationTerms) {
+        await fetchTier({
+          published: true,
+          deletedAt: null,
+          category: cat,
+          location: { contains: term, mode: 'insensitive' },
+          id: { notIn: [...collectedIds] },
+        });
+      }
+    }
+
+    // Tier 2: Same Topic only
+    if (cat) {
+      await fetchTier({
+        published: true,
+        deletedAt: null,
+        category: cat,
+        id: { notIn: [...collectedIds] },
+      });
+    }
+
+    // Tier 3: Same Local Hierarchy only
     if (loc) {
       const locationTerms = loc
         .split(',')
@@ -655,71 +752,21 @@ export class ArticlesService {
         .filter((t) => t.length > 0);
 
       for (const term of locationTerms) {
-        if (results.length >= limit) break;
-
-        const tierWhere: Prisma.ArticleWhereInput = {
+        await fetchTier({
           published: true,
           deletedAt: null,
           location: { contains: term, mode: 'insensitive' },
           id: { notIn: [...collectedIds] },
-        };
-
-        const tierCount = await this.prisma.article.count({
-          where: tierWhere,
         });
-
-        const tierSkip = Math.max(0, offset - skipped);
-        skipped += tierCount;
-
-        if (tierSkip >= tierCount) continue;
-
-        const remaining = limit - results.length;
-        const tierArticles = (await this.prisma.article.findMany({
-          where: tierWhere,
-          take: remaining,
-          skip: tierSkip,
-          include: authorInclude,
-          orderBy: { createdAt: 'desc' },
-        })) as unknown as ArticleWithRelations[];
-
-        for (const a of tierArticles) {
-          collectedIds.add(a.id);
-          results.push(a);
-        }
       }
     }
 
-    // --- Fallback if no location or not enough location articles ---
-    if (results.length < limit) {
-      const fallbackWhere: Prisma.ArticleWhereInput = {
-        published: true,
-        deletedAt: null,
-        id: { notIn: [...collectedIds] },
-      };
-
-      const fallbackCount = await this.prisma.article.count({
-        where: fallbackWhere,
-      });
-
-      const fallbackSkip = Math.max(0, offset - skipped);
-      skipped += fallbackCount;
-
-      if (fallbackSkip < fallbackCount) {
-        const remaining = limit - results.length;
-        const fallbackArticles = (await this.prisma.article.findMany({
-          where: fallbackWhere,
-          take: remaining,
-          skip: fallbackSkip,
-          include: authorInclude,
-          orderBy: [{ views: 'desc' }, { createdAt: 'desc' }],
-        })) as unknown as ArticleWithRelations[];
-
-        for (const a of fallbackArticles) {
-          collectedIds.add(a.id);
-          results.push(a);
-        }
-      }
-    }
+    // Tier 4: Fallback to general articles
+    await fetchTier({
+      published: true,
+      deletedAt: null,
+      id: { notIn: [...collectedIds] },
+    }, [{ views: 'desc' }, { createdAt: 'desc' }]);
 
     return this.mapToWithLiked(results);
   }
@@ -968,7 +1015,6 @@ export class ArticlesService {
     });
 
     if (existingBookmark) {
-      // Remove bookmark
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
       await (this.prisma as any).bookmark.delete({
         where: {
@@ -978,6 +1024,15 @@ export class ArticlesService {
           },
         },
       });
+
+      // Track unbookmark event
+      void this.analyticsService.track({
+        event: AnalyticsEventType.UNSAVE,
+        post_id: id,
+        user_id: this.ensureValidUUID(userId),
+        created_at: new Date(),
+      });
+
       return { bookmarked: false };
     } else {
       // Add bookmark
@@ -987,6 +1042,14 @@ export class ArticlesService {
           userId,
           articleId: id,
         },
+      });
+
+      // Track bookmark event
+      void this.analyticsService.track({
+        event: AnalyticsEventType.SAVE,
+        post_id: id,
+        user_id: this.ensureValidUUID(userId),
+        created_at: new Date(),
       });
 
       // Create notification for article author (if not self)
@@ -1150,5 +1213,401 @@ export class ArticlesService {
     }
     console.log(`Backfilled comment counts for ${updated} articles.`);
     return { count: updated };
+  }
+
+  // ==================== EDITORIAL REVIEW WORKFLOW ====================
+
+  async submitForReview(articleId: string, userId: string) {
+    const article = await this.prisma.article.findUnique({
+      where: { id: articleId },
+      select: { authorId: true, status: true, title: true },
+    });
+
+    if (!article) {
+      throw new Error('Article not found');
+    }
+
+    if (article.authorId !== userId) {
+      throw new Error('You are not authorized to submit this article');
+    }
+
+    const updatedArticle = await this.prisma.article.update({
+      where: { id: articleId },
+      data: {
+        status: 'Pending Review',
+        published: false,
+      },
+      include: {
+        author: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            picture: true,
+            role: true,
+          },
+        },
+      },
+    });
+
+    // Determine notification recipients based on author's role
+    const authorRole = (updatedArticle.author as any).role;
+    const targetRoles: Role[] = ['SUPERADMIN'];
+
+    // If author is not ADMIN or SUPERADMIN, notify ADMINs as well
+    if (authorRole !== 'ADMIN' && authorRole !== 'SUPERADMIN') {
+      targetRoles.push('ADMIN');
+    }
+
+    const admins = await this.prisma.user.findMany({
+      where: { role: { in: targetRoles } },
+      select: { id: true },
+    });
+
+    const author = updatedArticle.author;
+
+    for (const admin of admins) {
+      await this.createNotification({
+        userId: admin.id,
+        type: 'review',
+        title: 'New Article for Review',
+        message: `A new article "${article.title}" has been submitted for review.`,
+        articleId,
+        actorId: userId,
+        actorName: 'Anonymous Author',
+        actorPicture: null,
+      });
+    }
+
+    this.articlesGateway.notifyNewSubmission(updatedArticle);
+
+    return updatedArticle;
+  }
+
+  async findPendingReviews(limit = 20, offset = 0, userRole?: string) {
+    const normalizedRole = userRole?.toUpperCase();
+    const where: Prisma.ArticleWhereInput = {
+      status: { in: ['Pending Review', 'In Review'] },
+      deletedAt: null,
+    };
+
+    // If requester is ADMIN, they should NOT see articles from other ADMINs or SUPERADMINs
+    if (normalizedRole === 'ADMIN') {
+      console.log(`[ArticlesService] findPendingReviews: User is ADMIN. Filtering out ADMIN/SUPERADMIN authors.`);
+      where.author = {
+        role: {
+          not: {
+            in: [Role.ADMIN, Role.SUPERADMIN],
+          },
+        },
+      };
+    } else {
+      console.log(`[ArticlesService] findPendingReviews: User role is ${userRole}. Showing all submissions.`);
+    }
+
+    const articles = await this.prisma.article.findMany({
+      where,
+      include: {
+        author: {
+          select: { id: true, name: true, email: true, picture: true, role: true },
+        },
+        reviews: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          include: {
+            reviewer: {
+              select: { id: true, name: true, picture: true },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      skip: offset,
+    });
+
+    console.log(`[ArticlesService] findPendingReviews: Returning ${articles.length} articles.`);
+    return articles;
+  }
+
+  async reviewArticle(
+    articleId: string,
+    reviewerId: string,
+    reviewerRole: string,
+    decision: 'Approved' | 'Rejected' | 'NeedsCorrection',
+    feedback?: string,
+  ) {
+    const article = await this.prisma.article.findUnique({
+      where: { id: articleId },
+      include: {
+        author: {
+          select: { id: true, role: true },
+        },
+      },
+    });
+
+    if (!article) {
+      throw new Error('Article not found');
+    }
+
+    // Permission check: ADMIN cannot review other ADMIN or SUPERADMIN articles
+    if (reviewerRole === 'ADMIN') {
+      const authorRole = (article.author as any)?.role;
+      if (authorRole === 'ADMIN' || authorRole === 'SUPERADMIN') {
+        throw new Error('You do not have permission to review this article');
+      }
+    }
+
+    // Create review record
+    await this.prisma.articleReview.create({
+      data: {
+        articleId,
+        reviewerId,
+        status: decision,
+        feedback: feedback || null,
+      },
+    });
+
+    // Update article status based on decision
+    let newStatus: string;
+    let shouldPublish = false;
+
+    switch (decision) {
+      case 'Approved':
+        if (article.scheduledAt && new Date(article.scheduledAt) > new Date()) {
+          newStatus = 'Scheduled';
+          shouldPublish = false;
+        } else {
+          newStatus = 'Published';
+          shouldPublish = true;
+        }
+        break;
+      case 'Rejected':
+        newStatus = 'Rejected';
+        break;
+      case 'NeedsCorrection':
+        newStatus = 'Needs Correction';
+        break;
+      default:
+        newStatus = 'In Review';
+    }
+
+    const updatedArticle = await this.prisma.article.update({
+      where: { id: articleId },
+      data: {
+        status: newStatus,
+        published: shouldPublish,
+      },
+      include: {
+        author: {
+          select: { id: true, name: true, email: true, picture: true },
+        },
+      },
+    });
+
+    // Notify the author about the review decision
+
+    let notifTitle: string;
+    let notifMessage: string;
+
+    switch (decision) {
+      case 'Approved':
+        if (article.scheduledAt && new Date(article.scheduledAt) > new Date()) {
+          notifTitle = 'Article Scheduled!';
+          notifMessage = `Your article "${article.title}" has been approved by Admin and is scheduled for publication.`;
+        } else {
+          notifTitle = 'Article Published!';
+          notifMessage = `Your article "${article.title}" has been approved by Admin and published.`;
+        }
+        break;
+      case 'Rejected':
+        notifTitle = 'Article Rejected';
+        notifMessage = `Your article "${article.title}" was rejected by Admin. ${feedback ? `Reason: ${feedback}` : ''}`;
+        break;
+      case 'NeedsCorrection':
+        notifTitle = 'Corrections Requested';
+        notifMessage = `Your article "${article.title}" needs corrections requested by Admin. ${feedback ? `Feedback: ${feedback}` : ''}`;
+        break;
+      default:
+        notifTitle = 'Review Update';
+        notifMessage = `Your article "${article.title}" has been reviewed by Admin.`;
+    }
+
+    await this.createNotification({
+      userId: article.authorId,
+      type: 'review',
+      title: notifTitle,
+      message: notifMessage,
+      articleId,
+      actorId: reviewerId,
+      actorName: 'Editorial Team',
+      actorPicture: null,
+    });
+
+    if (shouldPublish) {
+      this.articlesGateway.notifyArticlePublished(updatedArticle);
+    }
+
+    return updatedArticle;
+  }
+
+  async getAdminDashboardStats(adminId: string, userRole?: string) {
+    const normalizedRole = userRole?.toUpperCase();
+    const pendingReviewsWhere: Prisma.ArticleWhereInput = {
+      status: { in: ['Pending Review', 'In Review'] },
+      deletedAt: null,
+    };
+
+    if (normalizedRole === 'ADMIN') {
+      pendingReviewsWhere.author = {
+        role: {
+          notIn: [Role.ADMIN, Role.SUPERADMIN],
+        },
+      };
+    }
+
+    const rejectedReviewsWhere: Prisma.ArticleWhereInput = {
+      status: 'Rejected',
+      deletedAt: null,
+    };
+
+    if (normalizedRole === 'ADMIN') {
+      rejectedReviewsWhere.author = {
+        role: {
+          notIn: [Role.ADMIN, Role.SUPERADMIN],
+        },
+      };
+    }
+
+    const [
+      totalUsers,
+      rejectedArticles,
+      pendingReviews,
+      publishedArticles,
+      personalPublished,
+      totalArticles,
+    ] = await Promise.all([
+      this.prisma.user.count(),
+      this.prisma.article.count({
+        where: rejectedReviewsWhere as any,
+      }),
+      this.prisma.article.count({
+        where: pendingReviewsWhere as any,
+      }),
+      this.prisma.article.count({
+        where: { published: true, deletedAt: null },
+      }),
+      this.prisma.articleReview.count({
+        where: { reviewerId: adminId, status: 'Approved' },
+      }),
+      this.prisma.article.count({
+        where: { deletedAt: null },
+      }),
+    ]);
+
+    return {
+      totalUsers,
+      rejectedArticles,
+      pendingReviews,
+      publishedArticles,
+      personalPublished,
+      totalArticles,
+    };
+  }
+
+  async getAllUsers() {
+    return this.prisma.user.findMany({
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        picture: true,
+        role: true,
+        createdAt: true,
+        _count: {
+          select: { articles: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async findRejectedArticles(limit = 20, offset = 0, userRole?: string) {
+    const normalizedRole = userRole?.toUpperCase();
+    const where: Prisma.ArticleWhereInput = {
+      status: 'Rejected',
+      deletedAt: null,
+    };
+
+    if (normalizedRole === 'ADMIN') {
+      where.author = {
+        role: {
+          notIn: [Role.ADMIN, Role.SUPERADMIN],
+        },
+      };
+    }
+    return this.prisma.article.findMany({
+      where,
+      include: {
+        author: {
+          select: { id: true, name: true, email: true, picture: true, role: true },
+        },
+        reviews: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          include: {
+            reviewer: {
+              select: { id: true, name: true, picture: true },
+            },
+          },
+        },
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: limit,
+      skip: offset,
+    });
+  }
+
+  async findAdminPublished(limit = 20, offset = 0) {
+    return this.prisma.article.findMany({
+      where: {
+        published: true,
+        deletedAt: null,
+      },
+      include: {
+        author: {
+          select: { id: true, name: true, email: true, picture: true, role: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      skip: offset,
+    });
+  }
+
+  async adminRemove(id: string, adminId: string) {
+    const article = await this.prisma.article.findUnique({
+      where: { id },
+      include: { author: true },
+    });
+
+    if (!article) {
+      throw new Error('Article not found');
+    }
+
+    // Notify author before deletion without linking the articleId (avoids cascade deletion)
+    await this.createNotification({
+      userId: article.authorId,
+      type: 'review',
+      title: 'Article Removed by Admin',
+      message: `Your article "${article.title}" has been permanently removed from the platform by the administration for violating platform guidelines or standards.`,
+      actorId: adminId,
+      actorName: 'System Administrator',
+      actorPicture: null,
+    });
+
+    return this.prisma.article.delete({
+      where: { id },
+    });
   }
 }

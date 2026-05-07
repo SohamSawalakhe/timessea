@@ -30,9 +30,11 @@ export default function ActivityPage() {
   // Let's refetch stats for the counts.
   
   const [activityStats, setActivityStats] = useState({
-        likesCount: 0,
-        commentsCount: 0,
-      });
+    likesCount: 0,
+    commentsCount: 0,
+    viewsCount: 0,
+    historyCount: 0,
+  });
   
   useEffect(() => {
     setMounted(true);
@@ -42,13 +44,22 @@ export default function ActivityPage() {
       if (user && token) {
         const fetchStats = () => {
           const API_URL =
-            process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+            process.env.NEXT_PUBLIC_API_URL;
             
           fetch(`${API_URL}/analytics/profile/activity`, {
             headers: { Authorization: `Bearer ${token}` },
           })
             .then((res) => res.json())
-            .then((data) => setActivityStats(data))
+            .then((data) => {
+              if (data) {
+                setActivityStats({
+                  likesCount: data.likesCount || 0,
+                  commentsCount: data.commentsCount || 0,
+                  viewsCount: data.viewsCount || 0,
+                  historyCount: data.historyCount || 0,
+                });
+              }
+            })
             .catch((err) => console.error("Failed to fetch activity stats:", err));
         };
   
@@ -76,6 +87,20 @@ export default function ActivityPage() {
   }
 
   const menuItems = [
+    {
+      icon: Eye,
+      label: "Viewing History",
+      count: activityStats.viewsCount,
+      href: "/profile/views",
+      color: "text-blue-400",
+    },
+    {
+      icon: History,
+      label: "Reading History",
+      count: activityStats.historyCount,
+      href: "/profile/history",
+      color: "text-emerald-500",
+    },
     {
       icon: Heart,
       label: "Liked Articles",
@@ -120,11 +145,9 @@ export default function ActivityPage() {
                                 <span className="font-medium">{item.label}</span>
                             </div>
                             <div className="flex items-center space-x-2 text-muted-foreground">
-                                {item.count > 0 && (
-                                    <span className="text-sm bg-muted-foreground/10 px-2 py-0.5 rounded-full">
-                                        {item.count}
-                                    </span>
-                                )}
+                                <span className="text-sm bg-muted-foreground/10 px-2.5 py-0.5 rounded-full font-bold">
+                                    {typeof item.count === 'number' ? item.count : 0}
+                                </span>
                                 <ChevronRight className="w-5 h-5" />
                             </div>
                         </div>

@@ -11,7 +11,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
       callbackURL:
         process.env.GOOGLE_CALLBACK_URL ||
-        'http://localhost:5000/auth/google/callback',
+        process.env.GOOGLE_CALLBACK_URL || 'http://localhost:5000/auth/google/callback',
       scope: ['email', 'profile'],
     });
   }
@@ -31,7 +31,13 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
       accessToken,
       googleId: profile.id,
     };
-    const payload = await this.authService.validateUser(user);
-    done(null, payload);
+    try {
+      const payload = await this.authService.validateUser(user);
+      done(null, payload);
+    } catch (err: any) {
+      // Pass a banned-marker object so AuthGuard lets the request through.
+      // The controller will detect this and redirect gracefully.
+      done(null, { __banned: true, message: err.message || 'Authentication failed.' });
+    }
   }
 }

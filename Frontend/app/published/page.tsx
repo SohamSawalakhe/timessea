@@ -26,7 +26,7 @@ import { motion } from "framer-motion";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 interface Article {
   id: string;
@@ -62,7 +62,11 @@ export default function PublishedArticlesPage() {
         },
       });
       const data = await res.json();
-      setArticles(data);
+      if (res.ok) {
+        setArticles(data);
+      } else {
+        setArticles([]);
+      }
     } catch (err) {
       console.error("Error fetching published articles:", err);
     } finally {

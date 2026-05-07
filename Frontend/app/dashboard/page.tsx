@@ -90,7 +90,7 @@ export default function DashboardPage() {
 
     const fetchData = async () => {
       try {
-        const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+        const API_URL = process.env.NEXT_PUBLIC_API_URL;
         const res = await fetch(`${API_URL}/analytics/dashboard?days=${trendDays}`, {
           headers: {
             Authorization: `Bearer ${token}`

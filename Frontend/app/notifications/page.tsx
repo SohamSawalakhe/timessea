@@ -16,11 +16,12 @@ import {
   ChevronRight,
   ArrowLeft,
   Settings,
+  Shield,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 interface Notification {
   id: string
@@ -62,6 +63,12 @@ const typeConfig: Record<
     color: "text-amber-500",
     bg: "bg-amber-500/10",
     gradient: "from-amber-500/20 to-yellow-500/20",
+  },
+  review: {
+    icon: Shield,
+    color: "text-emerald-500",
+    bg: "bg-emerald-500/10",
+    gradient: "from-emerald-500/20 to-green-500/20",
   },
   system: {
     icon: Bell,
@@ -134,17 +141,17 @@ export default function NotificationsPage() {
         const data = await res.json()
         
         setNotifications((prev) => {
-          if (isInitial) return data
+          if (isInitial || prev.length === 0) return data
 
-          // If polling, keep existing local 'unread' status so items don't suddenly disappear
-          // from the "Unread" tab just because we auto-marked them on the backend during isInitial.
-          return data.map((newNotif: Notification) => {
-            const existing = prev.find((p) => p.id === newNotif.id)
-            if (existing && !existing.read) {
-              return { ...newNotif, read: false }
-            }
-            return newNotif
-          })
+          // Merge: Add any notifications from 'data' that aren't in 'prev'
+          const existingIds = new Set(prev.map(n => n.id))
+          const newItems = data.filter((n: Notification) => !existingIds.has(n.id))
+          
+          if (newItems.length === 0) return prev // No changes
+          
+          return [...newItems, ...prev].sort((a, b) => 
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          )
         })
 
         // Auto-mark read on backend without changing UI for the current session
@@ -172,7 +179,7 @@ export default function NotificationsPage() {
       return
     }
     fetchNotifications(true)
-    const interval = setInterval(() => fetchNotifications(false), 30000)
+    const interval = setInterval(() => fetchNotifications(false), 5000) // Poll every 5 seconds for real-time feel
     return () => clearInterval(interval)
   }, [token, isAuthenticated, authLoading, router, fetchNotifications])
 
@@ -220,7 +227,18 @@ export default function NotificationsPage() {
     if (!notification.read) {
       markAsRead(notification.id)
     }
-    if (notification.articleId) {
+    if (notification.type === "review") {
+      if (notification.title?.includes("Published") && notification.articleId) {
+        // Published → go to the article
+        router.push(`/article/${notification.articleId}`)
+      } else if (notification.title?.includes("for Review")) {
+        // Admin got "New Article for Review" → go to admin review page
+        router.push("/admin/review")
+      } else {
+        // Corrections / rejection → user goes to their drafts
+        router.push("/drafts")
+      }
+    } else if (notification.articleId) {
       router.push(`/article/${notification.articleId}`)
     }
   }
@@ -360,6 +378,9 @@ export default function NotificationsPage() {
                     const config =
                       typeConfig[notification.type] || typeConfig.system
                     const IconComponent = config.icon
+                    const isReviewFeedback = notification.type === "review" && !notification.title?.includes("New Article")
+                    const showActorPicture = notification.actorPicture && !isReviewFeedback
+                    const showActorName = notification.actorName && !isReviewFeedback
 
                     return (
                       <motion.div
@@ -387,7 +408,7 @@ export default function NotificationsPage() {
 
                         {/* Avatar / Icon */}
                         <div className="relative shrink-0 ml-1">
-                          {notification.actorPicture ? (
+                          {showActorPicture ? (
                             <div className="h-11 w-11 rounded-full overflow-hidden ring-2 ring-background shadow-sm">
                               <img
                                 src={notification.actorPicture}
@@ -409,7 +430,7 @@ export default function NotificationsPage() {
                             </div>
                           )}
                           {/* Type badge on avatar */}
-                          {notification.actorPicture && (
+                          {showActorPicture && (
                             <div
                               className={cn(
                                 "absolute -bottom-0.5 -right-0.5 h-5 w-5 rounded-full flex items-center justify-center ring-2 ring-background shadow-sm",
@@ -433,14 +454,16 @@ export default function NotificationsPage() {
                                 : "text-foreground"
                             )}
                           >
-                            {notification.actorName && (
+                            {showActorName && (
                               <span className="font-bold">
                                 {notification.actorName}
                               </span>
                             )}{" "}
-                            {notification.actorName
+                            {showActorName
                               ? getActionText(notification)
-                              : notification.message}
+                              : isReviewFeedback 
+                                ? notification.message.replace(/by [a-zA-Z\s]+\./g, "by Admin.")
+                                : notification.message}
                           </p>
 
                           {/* Article preview */}
@@ -544,6 +567,8 @@ function getActionText(notification: Notification): string {
       return `commented on ${title}`
     case "bookmark":
       return `saved ${title}`
+    case "review":
+      return notification.message
     default:
       return notification.message
   }

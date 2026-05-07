@@ -1,7 +1,7 @@
 "use client";
 import { useAuth } from "@/contexts/AuthContext";
 
-import { use, useState, useEffect, useCallback } from "react";
+import { use, useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -33,10 +33,14 @@ import {
   ArticleCardVertical,
   ArticleCardHorizontal,
 } from "@/components/article-card";
+import { TopicFollowButton } from "@/components/topic-follow-button";
 import { analytics, AnalyticsEventType } from "@/lib/analytics";
 import { globalSocket } from "@/lib/socket";
+import { ArticleTakeaways } from "@/components/article-takeaways";
+import { ArticleTTSPlayer } from "@/components/article-tts-player";
+import { ReadingModeSwitcher, getReadingModeClasses, applySpeedReadHighlights, type ReadingMode } from "@/components/reading-mode-switcher";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:5000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 // ─── Comment Types ─────────────────────────────────────────────
 interface CommentType {
@@ -286,33 +290,73 @@ export default function ArticlePage({
   const [isDeletingComment, setIsDeletingComment] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
   const [isFollowLoading, setIsFollowLoading] = useState(false);
-
-  // Delayed read counting (1 minute threshold for "read")
+  const [readingMode, setReadingMode] = useState<ReadingMode>("standard");
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
+  const readSentinelRef = useRef<HTMLDivElement>(null);
+  const hasTrackedRead = useRef(false);
+  // Close menu on click outside & track scroll
   useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(event.target as Node)) {
+        setShowMoreMenu(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.body.classList.remove("focus-mode-active");
+    };
+  }, []);
+
+  // Track read event based on scroll or time
+  useEffect(() => {
+    // 1. Time-based fallback (1 minute)
     const timer = setTimeout(() => {
-      // Track READ event
-      analytics.track({
-        event: AnalyticsEventType.POST_READ,
-        post_id: id,
-        user_id: user?.id,
-      });
+      if (!hasTrackedRead.current) {
+        hasTrackedRead.current = true;
+        analytics.track({
+          event: AnalyticsEventType.POST_READ,
+          post_id: id,
+          user_id: user?.id,
+        });
 
-      // Legacy support (optional, if you still use postgres counters separately)
-      fetch(`${API_URL}/api/articles/${id}/read`, {
-        method: "POST",
-      })
-        .then(
-          (res) =>
-            res.ok &&
-            setArticle((prev) =>
-              prev ? { ...prev, reads: (prev.reads || 0) + 1 } : null,
-            ),
-        )
-        .catch((err) => console.error("Failed to increment read", err));
-    }, 15000); // Changed to 15 seconds for easier testing, can be 60s later
+        // Legacy support
+        fetch(`${API_URL}/api/articles/${id}/read`, { method: "POST" }).catch(() => {});
+      }
+    }, 60000);
 
-    return () => clearTimeout(timer);
-  }, [id]);
+    // 2. Scroll-based tracking
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !hasTrackedRead.current) {
+          hasTrackedRead.current = true;
+          analytics.track({
+            event: AnalyticsEventType.POST_READ,
+            post_id: id,
+            user_id: user?.id,
+          });
+
+          // Legacy support
+          fetch(`${API_URL}/api/articles/${id}/read`, { method: "POST" }).catch(() => {});
+          
+          // Cleanup observer once tracked
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (readSentinelRef.current) {
+      observer.observe(readSentinelRef.current);
+    }
+
+    return () => {
+      clearTimeout(timer);
+      observer.disconnect();
+    };
+  }, [id, user?.id]);
 
   useEffect(() => {
     if (deletingCommentId) {
@@ -370,22 +414,26 @@ export default function ArticlePage({
     };
   }, [id]);
 
+  // Track VIEW event
+  useEffect(() => {
+    if (id) {
+      analytics.track({
+        event: AnalyticsEventType.POST_VIEW,
+        post_id: id,
+        user_id: user?.id,
+      });
+
+      // Legacy support
+      fetch(`${API_URL}/api/articles/${id}/view`, { method: "POST" }).catch(
+        () => {},
+      );
+    }
+  }, [id, user?.id]);
+
   // Fetch article
   useEffect(() => {
     async function fetchArticle() {
       try {
-        // Track VIEW event
-        analytics.track({
-          event: AnalyticsEventType.POST_VIEW,
-          post_id: id,
-          user_id: user?.id,
-        });
-
-        // Legacy support
-        fetch(`${API_URL}/api/articles/${id}/view`, { method: "POST" }).catch(
-          () => {},
-        );
-
         const headers: HeadersInit = {};
         if (token) {
           headers["Authorization"] = `Bearer ${token}`;
@@ -437,22 +485,28 @@ export default function ArticlePage({
         );
         if (resRelated.ok) {
           const data = await resRelated.json();
-          setRelatedArticles(data);
-          if (data.length < 4) setHasMoreRelated(false);
-          setRelatedOffset(4);
+          // Filter out duplicates if any
+          const uniqueData = data.filter((item: Article, index: number, self: Article[]) => 
+            index === self.findIndex((t) => t.id === item.id)
+          );
+          setRelatedArticles(uniqueData);
+          if (uniqueData.length < 4) setHasMoreRelated(false);
+          setRelatedOffset(uniqueData.length);
         }
 
         // Fetch initial Trending (Limit 4)
-        // Note: pass excludeId={id} to filter current viewing article from trending list
-        // Fetch 10 initially to have a buffer after filtering related ones
         const resTrending = await fetch(
           `${API_URL}/api/articles/trending/all?limit=10&offset=0&excludeId=${id}`,
         );
         if (resTrending.ok) {
           const data = await resTrending.json();
-          setTrendingArticles(data);
-          if (data.length < 10) setHasMoreTrending(false);
-          setTrendingOffset(10);
+          // Filter out duplicates
+          const uniqueData = data.filter((item: Article, index: number, self: Article[]) => 
+            index === self.findIndex((t) => t.id === item.id)
+          );
+          setTrendingArticles(uniqueData);
+          if (uniqueData.length < 10) setHasMoreTrending(false);
+          setTrendingOffset(uniqueData.length);
         }
       } catch (err) {
         console.error(err);
@@ -473,8 +527,11 @@ export default function ArticlePage({
       if (res.ok) {
         const data = await res.json();
         if (data.length > 0) {
-          setRelatedArticles((prev) => [...prev, ...data]);
-          setRelatedOffset((prev) => prev + 4);
+          setRelatedArticles((prev) => {
+            const newArticles = data.filter((item: Article) => !prev.some((p) => p.id === item.id));
+            return [...prev, ...newArticles];
+          });
+          setRelatedOffset((prev) => prev + data.length);
           if (data.length < 4) setHasMoreRelated(false);
         } else {
           setHasMoreRelated(false);
@@ -490,7 +547,6 @@ export default function ArticlePage({
       (t) => !relatedArticles.some((r) => r.id === t.id),
     );
 
-    // If we have more articles already fetched but not shown, show them first
     if (trendingVisibleCount < filteredTrending.length) {
       setTrendingVisibleCount((prev) => prev + 4);
       return;
@@ -505,8 +561,11 @@ export default function ArticlePage({
       if (res.ok) {
         const data = await res.json();
         if (data.length > 0) {
-          setTrendingArticles((prev) => [...prev, ...data]);
-          setTrendingOffset((prev) => prev + 4);
+          setTrendingArticles((prev) => {
+            const newArticles = data.filter((item: Article) => !prev.some((p) => p.id === item.id));
+            return [...prev, ...newArticles];
+          });
+          setTrendingOffset((prev) => prev + data.length);
           setTrendingVisibleCount((prev) => prev + 4);
           if (data.length < 4) setHasMoreTrending(false);
         } else {
@@ -622,6 +681,13 @@ export default function ArticlePage({
       likes: willLike ? originalLikes + 1 : Math.max(0, originalLikes - 1),
     });
 
+    // Track analytics
+    analytics.track({
+      event: willLike ? AnalyticsEventType.LIKE : ("unlike" as any),
+      post_id: id,
+      user_id: user?.id,
+    });
+
     try {
       const headers: HeadersInit = {};
       if (token) {
@@ -659,16 +725,32 @@ export default function ArticlePage({
       bookmarked: willBookmark,
     });
 
+    // Track analytics
+    analytics.track({
+      event: willBookmark ? AnalyticsEventType.SAVE : AnalyticsEventType.UNSAVE,
+      post_id: id,
+      user_id: user?.id,
+    });
+
     try {
       const headers: HeadersInit = {};
       if (token) {
         headers["Authorization"] = `Bearer ${token}`;
       }
 
-      await fetch(`${API_URL}/api/articles/${id}/bookmark`, {
+      const res = await fetch(`${API_URL}/api/articles/${id}/bookmark`, {
         method: "POST",
         headers,
       });
+
+      if (res.ok) {
+        toast.success(willBookmark ? "Story saved to bookmarks" : "Story removed from bookmarks", {
+          position: "bottom-center",
+          autoClose: 2000,
+          hideProgressBar: true,
+          theme: "dark"
+        });
+      }
     } catch (e) {
       console.error("Failed to bookmark", e);
       // Revert logic
@@ -727,6 +809,14 @@ export default function ArticlePage({
       });
       if (res.ok) {
         setCommentText("");
+        
+        // Track analytics
+        analytics.track({
+          event: AnalyticsEventType.COMMENT,
+          post_id: id,
+          user_id: user?.id,
+        });
+
         await fetchComments(true);
       }
     } catch (e) {
@@ -996,6 +1086,7 @@ export default function ArticlePage({
 
   return (
     <AppShell>
+      {/* ── Section 1: Navigation + Mode Toggle ── */}
       {/* Share Toast */}
       {showShareToast && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] bg-foreground text-background px-4 py-2 rounded-full text-xs font-semibold shadow-xl animate-in fade-in slide-in-from-top-2 duration-300">
@@ -1017,12 +1108,12 @@ export default function ArticlePage({
           />
         </button>
 
-        <div className="flex items-center gap-0.5">
+        <div className="flex items-center gap-0.5 relative">
           <button
             type="button"
             onClick={handleShare}
             aria-label="Share"
-            className="p-2 rounded-full text-muted-foreground hover:text-foreground transition-colors"
+            className="p-2 rounded-full text-muted-foreground hover:text-foreground transition-colors hover:bg-secondary/50"
           >
             <Share2 className="h-5 w-5" strokeWidth={1.8} />
           </button>
@@ -1030,27 +1121,70 @@ export default function ArticlePage({
             type="button"
             onClick={handleBookmark}
             aria-label="Bookmark"
-            className="p-2 rounded-full text-muted-foreground hover:text-foreground transition-colors"
+            className={cn(
+              "p-2 rounded-full transition-all duration-300",
+              article?.bookmarked 
+                ? "text-primary bg-primary/5 shadow-[0_0_15px_rgba(var(--primary),0.1)]" 
+                : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+            )}
           >
-            <Bookmark className={cn("h-5 w-5", article?.bookmarked && "fill-current text-primary")} strokeWidth={1.8} />
+            <Bookmark className={cn("h-5 w-5", article?.bookmarked && "fill-current")} strokeWidth={1.8} />
           </button>
-          <button
-            type="button"
-            aria-label="More options"
-            className="p-2 rounded-full text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <MoreHorizontal className="h-5 w-5" strokeWidth={1.8} />
-          </button>
+          
+          <div ref={moreMenuRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setShowMoreMenu(!showMoreMenu)}
+              aria-label="More options"
+              className={cn(
+                "p-2 rounded-full text-muted-foreground hover:text-foreground transition-colors",
+                showMoreMenu ? "bg-secondary text-foreground" : "hover:bg-secondary/50"
+              )}
+            >
+              <MoreHorizontal className="h-5 w-5" strokeWidth={1.8} />
+            </button>
+
+            {showMoreMenu && (
+              <div className="absolute right-0 top-full mt-2 w-48 bg-card border border-border shadow-2xl rounded-2xl overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-200">
+                <div className="py-1.5">
+                  <button 
+                    onClick={() => {
+                      navigator.clipboard.writeText(window.location.href);
+                      toast.info("Link copied to clipboard");
+                      setShowMoreMenu(false);
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm font-semibold hover:bg-secondary transition-colors flex items-center gap-2"
+                  >
+                    <Share2 className="w-4 h-4" />
+                    Copy Link
+                  </button>
+                  <button 
+                    onClick={() => {
+                      toast.info("Thank you for your feedback");
+                      setShowMoreMenu(false);
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm font-semibold text-red-500 hover:bg-red-500/5 transition-colors flex items-center gap-2"
+                  >
+                    <AlertTriangle className="w-4 h-4" />
+                    Report Story
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
       {/* Article Content — The Hindu Layout */}
       <div className="pb-8 pt-5">
         {/* ── Section 1: Category Badge ── */}
-        <div className="mb-3 px-1">
+        <div className="mb-3 px-1 flex items-center justify-between">
           <span className="inline-block text-[11px] font-black tracking-[0.2em] text-red-600 dark:text-red-400 uppercase border-b-2 border-red-600 dark:border-red-400 pb-0.5">
             {article.category || "NEWS"}
           </span>
+          {article.category && (
+            <TopicFollowButton category={article.category} variant="pill" className="h-7" />
+          )}
         </div>
 
         {/* ── Section 2: HEADING (Title) ── */}
@@ -1138,15 +1272,28 @@ export default function ArticlePage({
           </div>
 
           {/* ── Metadata Bar (Read Time, Views, Date) ── */}
-          <div className="flex items-center gap-3 py-2.5 border-y border-border/40 text-[12px] text-muted-foreground">
-            <span className="flex items-center gap-1">
-              <Clock className="w-3.5 h-3.5" />
-              {article.readTime} min read
-            </span>
-            <span className="text-border">|</span>
-            <span>
-              Updated {formatDate(article.createdAt || article.publishedAt)}
-            </span>
+          <div className="flex items-center justify-between py-2.5 border-y border-border/40 text-[12px] text-muted-foreground">
+            <div className="flex items-center gap-3">
+              <span className="flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5" />
+                {article.readTime} min read
+              </span>
+              <span className="text-border">|</span>
+              <span>
+                Updated {formatDate(article.createdAt || article.publishedAt)}
+              </span>
+            </div>
+            <ReadingModeSwitcher
+              currentMode={readingMode}
+              onModeChange={(mode) => {
+                setReadingMode(mode);
+                if (mode === "focus") {
+                  document.body.classList.add("focus-mode-active");
+                } else {
+                  document.body.classList.remove("focus-mode-active");
+                }
+              }}
+            />
           </div>
         </div>
 
@@ -1188,12 +1335,27 @@ export default function ArticlePage({
           </figure>
         )}
 
+        {/* ── Section 6.5: AI Quick Takeaways ── */}
+        <ArticleTakeaways
+          content={article.content}
+          title={article.title}
+          excerpt={article.excerpt}
+        />
+
+        {/* ── Section 6.6: Listen to Article ── */}
+        <ArticleTTSPlayer
+          content={article.content}
+          title={article.title}
+          authorName={article.author?.name}
+        />
+
         {/* ── Section 7: ARTICLE BODY ── */}
-        <article className="space-y-6 px-1">
+        <article className={cn("space-y-6 px-1", getReadingModeClasses(readingMode))}>
           <div
             className="prose prose-lg dark:prose-invert max-w-none font-serif leading-relaxed prose-img:rounded-xl prose-img:w-full prose-headings:font-black prose-a:text-primary prose-blockquote:border-l-4 prose-blockquote:border-red-600 dark:prose-blockquote:border-red-400 prose-blockquote:bg-secondary/10 prose-blockquote:py-1 prose-blockquote:px-4 prose-blockquote:not-italic"
             dangerouslySetInnerHTML={{
-              __html: article.content
+              __html: (() => {
+                let processedContent = article.content
                 // 1. Markdown Images
                 .replace(
                   /!\[(.*?)\]\((.*?)(\s+"(.*?)")?\)/g,
@@ -1306,9 +1468,17 @@ export default function ArticlePage({
                       </figure>
                     `;
                   },
-                ),
+                );
+                // Apply speed-read highlights if in speed mode
+                if (readingMode === "speed") {
+                  processedContent = applySpeedReadHighlights(processedContent);
+                }
+                return processedContent;
+              })()
             }}
           />
+          {/* Sentinel for scroll tracking */}
+          <div ref={readSentinelRef} className="h-4 w-full" />
         </article>
 
         {/* ── Section 8: Tags ── */}

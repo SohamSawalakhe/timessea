@@ -7,12 +7,16 @@ interface ConfirmDeleteProps {
   onConfirm: () => void;
   onCancel: () => void;
   message: string;
+  confirmText?: string;
+  ConfirmIcon?: any;
 }
 
 const ConfirmDelete = ({
   onConfirm,
   onCancel,
   message,
+  confirmText = "Delete",
+  ConfirmIcon = Trash2,
 }: ConfirmDeleteProps) => (
   <div className="flex flex-col gap-3 p-1">
     <div className="flex items-center gap-2 text-amber-500 font-bold">
@@ -26,7 +30,7 @@ const ConfirmDelete = ({
           onCancel();
           toast.dismiss();
         }}
-        className="px-3 py-1.5 text-xs font-bold rounded-full bg-secondary hover:bg-secondary/80 transition-colors"
+        className="px-3 py-1.5 text-xs font-bold rounded-full bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
       >
         Cancel
       </button>
@@ -37,8 +41,8 @@ const ConfirmDelete = ({
         }}
         className="px-3 py-1.5 text-xs font-bold text-white rounded-full bg-red-500 hover:bg-red-600 transition-colors flex items-center gap-1"
       >
-        <Trash2 className="h-3.5 w-3.5" />
-        Delete
+        <ConfirmIcon className="h-3.5 w-3.5" />
+        {confirmText}
       </button>
     </div>
   </div>
@@ -47,6 +51,15 @@ const ConfirmDelete = ({
 export const showConfirmDelete = (
   onConfirm: () => void,
   message: string = "Are you sure you want to delete this item?",
+) => {
+  showConfirmAction(onConfirm, message, "Delete", Trash2);
+};
+
+export const showConfirmAction = (
+  onConfirm: () => void,
+  message: string,
+  confirmText: string = "Confirm",
+  ConfirmIcon: any = AlertTriangle
 ) => {
   // Add class to body to show overlay and block clicks
   document.body.classList.add("toast-overlay-active");
@@ -64,6 +77,8 @@ export const showConfirmDelete = (
           cleanup();
         }}
         message={message}
+        confirmText={confirmText}
+        ConfirmIcon={ConfirmIcon}
       />
     ),
     {

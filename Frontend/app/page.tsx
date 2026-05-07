@@ -15,8 +15,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { analytics } from "@/lib/analytics";
 import { globalSocket } from "@/lib/socket";
+import { useNotifications } from "@/contexts/NotificationContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 type FeedTab = "General" | "For You" | "Local" | "Following";
 
@@ -31,11 +33,16 @@ export default function HomePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [articles, setArticles] = useState<Article[]>([]);
+  const [otherArticles, setOtherArticles] = useState<Article[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<FeedTab>("General");
   const [isMounted, setIsMounted] = useState(false);
+  const [globalSearchUsers, setGlobalSearchUsers] = useState<any[]>([]);
+  const [globalSearchArticles, setGlobalSearchArticles] = useState<Article[]>([]);
+  const [isGlobalSearching, setIsGlobalSearching] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isNavigatingTo, setIsNavigatingTo] = useState<string | null>(null);
+  const [newArticlesCount, setNewArticlesCount] = useState(0);
   const router = useRouter();
 
   // Sync state from sessionStorage *after* initial mount to prevent hydration mismatch
@@ -54,9 +61,41 @@ export default function HomePage() {
     } catch { /* ignore */ }
   }, []);
 
+  // Global search effect for the overlay
+  useEffect(() => {
+    if (!searchQuery.trim() || !isSearchOpen) {
+      setGlobalSearchUsers([]);
+      setGlobalSearchArticles([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setIsGlobalSearching(true);
+      try {
+        const [usersRes, articlesRes] = await Promise.all([
+          fetch(`${API_URL}/users/search?q=${encodeURIComponent(searchQuery.trim())}`),
+          fetch(`${API_URL}/api/articles?query=${encodeURIComponent(searchQuery.trim())}`)
+        ]);
+        
+        if (usersRes.ok) {
+          setGlobalSearchUsers(await usersRes.json());
+        }
+        if (articlesRes.ok) {
+          setGlobalSearchArticles(await articlesRes.json());
+        }
+      } catch (e) {
+        console.error("Overlay search failed", e);
+      } finally {
+        setIsGlobalSearching(false);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery, isSearchOpen]);
+
   useEffect(() => {
     try {
-      sessionStorage.setItem("ts_feed_tab", activeTab);
+      if (!locationTiersKey) {
+        sessionStorage.setItem("ts_feed_tab", activeTab);
+      }
     } catch { /* ignore */ }
   }, [activeTab]);
 
@@ -74,7 +113,7 @@ export default function HomePage() {
   const geoDetectedThisSession = useRef(false);
 
   const [visibleCount, setVisibleCount] = useState(4);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const { unreadCount } = useNotifications();
 
   // Helper: update tiers and key together
   const updateTiers = useCallback((tiers: LocationTier[]) => {
@@ -91,28 +130,7 @@ export default function HomePage() {
     setLocationTiersKey(unique.map((t) => t.term).join("|"));
   }, []);
 
-  // ---- Notification unread count ----
-  const fetchUnreadCount = useCallback(async () => {
-    if (!token) return;
-    try {
-      const res = await fetch(`${API_URL}/api/notifications/unread-count`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setUnreadCount(data.count || 0);
-      }
-    } catch {
-      /* silent */
-    }
-  }, [token]);
-
-  useEffect(() => {
-    if (!isAuthenticated || !token) return;
-    fetchUnreadCount();
-    const interval = setInterval(fetchUnreadCount, 30000);
-    return () => clearInterval(interval);
-  }, [isAuthenticated, token, fetchUnreadCount]);
+  // Notification fetching is now handled globally by NotificationProvider
 
   // ---- Restore saved location from user profile ----
   useEffect(() => {
@@ -353,6 +371,7 @@ export default function HomePage() {
 
     async function fetchStandard() {
       setIsLoading(true);
+      setOtherArticles([]);
       try {
         const params = new URLSearchParams({ limit: "50", offset: "0" });
         const headers: HeadersInit = {};
@@ -417,17 +436,21 @@ export default function HomePage() {
 
         if (cancelled) return;
 
-        // Merge local + international, deduplicating
+        // Deduplicate local
         const seenIds = new Set<string>();
-        const merged: Article[] = [];
+        const localMerged: Article[] = [];
         for (const a of localArticles) {
-          if (!seenIds.has(a.id)) { seenIds.add(a.id); merged.push(a); }
+          if (!seenIds.has(a.id)) { seenIds.add(a.id); localMerged.push(a); }
         }
+        
+        // Deduplicate intl
+        const intlMerged: Article[] = [];
         for (const a of intlData) {
-          if (!seenIds.has(a.id)) { seenIds.add(a.id); merged.push(a); }
+          if (!seenIds.has(a.id)) { seenIds.add(a.id); intlMerged.push(a); }
         }
 
-        setArticles(merged);
+        setArticles(localMerged);
+        setOtherArticles(intlMerged);
       } catch (error) {
         console.error("Failed to fetch local:", error);
       } finally {
@@ -467,14 +490,34 @@ export default function HomePage() {
       );
     };
 
+    const handleArticlePublished = () => {
+      if (activeTab === "General") {
+        setNewArticlesCount((prev) => prev + 1);
+      }
+    };
+
+    const handleArticleViewed = (data: { articleId: string; views: number }) => {
+      setArticles((prev) =>
+        prev.map((article) =>
+          article.id === data.articleId
+            ? { ...article, views: data.views }
+            : article
+        )
+      );
+    };
+
     globalSocket.on("articleLiked", handleArticleLiked);
     globalSocket.on("commentCountUpdate", handleCommentCountUpdate);
+    globalSocket.on("articlePublished", handleArticlePublished);
+    globalSocket.on("articleViewed", handleArticleViewed);
 
     return () => {
       globalSocket.off("articleLiked", handleArticleLiked);
       globalSocket.off("commentCountUpdate", handleCommentCountUpdate);
+      globalSocket.off("articlePublished", handleArticlePublished);
+      globalSocket.off("articleViewed", handleArticleViewed);
     };
-  }, []);
+  }, [activeTab]);
 
   // Reset visible count on tab/filter change
   useEffect(() => {
@@ -544,7 +587,7 @@ export default function HomePage() {
           >
             <Bell className="h-6 w-6 text-foreground" strokeWidth={2} />
             {unreadCount > 0 && (
-              <span className="absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white ring-2 ring-background">
+              <span className="absolute top-1.5 right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white ring-2 ring-background animate-in fade-in zoom-in duration-300">
                 {unreadCount > 9 ? "9+" : unreadCount}
               </span>
             )}
@@ -568,6 +611,29 @@ export default function HomePage() {
           </Link>
         </div>
       </header>
+
+      {/* ---- New Articles Pill ---- */}
+      <AnimatePresence>
+        {newArticlesCount > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, x: "-50%" }}
+            animate={{ opacity: 1, y: 0, x: "-50%" }}
+            exit={{ opacity: 0, y: -20, x: "-50%" }}
+            className="fixed top-24 left-1/2 z-50"
+          >
+            <button
+              onClick={() => {
+                setNewArticlesCount(0);
+                window.location.reload();
+              }}
+              className="flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-xs font-bold text-white shadow-xl ring-4 ring-background transition-transform active:scale-95"
+            >
+              <TrendingUp className="h-3 w-3" />
+              {newArticlesCount === 1 ? "New Article Available" : `${newArticlesCount} New Articles`}
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ---- Feed Tabs ---- */}
       <div className="border-b border-border/50 mb-5">
@@ -699,26 +765,26 @@ export default function HomePage() {
               {searchQuery.trim().length > 0 ? (
                 (() => {
                   const query = searchQuery.toLowerCase();
-                  const matchingAuthors = Array.from(
-                    new Map(
-                      articles
-                        .filter((a) => a.author?.name?.toLowerCase().includes(query))
-                        .map((a) => [a.author?.id, a.author])
-                    ).values()
-                  );
-                  const matchingArticles = articles.filter(
-                    (a) =>
-                      a.title?.toLowerCase().includes(query) ||
-                      a.subheadline?.toLowerCase().includes(query)
-                  );
+                  
+                  // Use the globally fetched users for the Authors list
+                  const matchingAuthors = globalSearchUsers;
+                  
+                  // Use the globally fetched articles for the Articles list
+                  const matchingArticles = globalSearchArticles;
 
                   if (matchingAuthors.length === 0 && matchingArticles.length === 0) {
                     return (
                       <div className="py-12 text-center flex flex-col items-center gap-3">
-                        <div className="h-12 w-12 rounded-full bg-secondary flex items-center justify-center">
-                          <Search className="h-5 w-5 text-muted-foreground" />
-                        </div>
-                        <span className="text-sm font-medium text-muted-foreground">No local matches found.</span>
+                        {isGlobalSearching ? (
+                          <Loader2 className="h-6 w-6 text-muted-foreground animate-spin" />
+                        ) : (
+                          <>
+                            <div className="h-12 w-12 rounded-full bg-secondary flex items-center justify-center">
+                              <Search className="h-5 w-5 text-muted-foreground" />
+                            </div>
+                            <span className="text-sm font-medium text-muted-foreground">No matches found.</span>
+                          </>
+                        )}
                         <Link 
                           href={`/search?q=${encodeURIComponent(searchQuery)}`}
                           className="mt-2 text-sm font-bold text-primary hover:underline transition-colors"
@@ -977,6 +1043,29 @@ export default function HomePage() {
                 )}
               </div>
             )}
+            
+            {/* Other News Section for Local Tab */}
+            {activeTab === "Local" && otherArticles.length > 0 && (
+              <div className="mt-12 space-y-4">
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="h-px bg-border flex-1"></div>
+                  <h2 className="text-sm font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap">
+                    More from everywhere
+                  </h2>
+                  <div className="h-px bg-border flex-1"></div>
+                </div>
+                {otherArticles.map((article, index) => (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.1 * index, duration: 0.3 }}
+                    key={article.id}
+                  >
+                    <ArticleCardHorizontal article={article} />
+                  </motion.div>
+                ))}
+              </div>
+            )}
           </div>
         </>
       )}
@@ -1048,7 +1137,7 @@ export default function HomePage() {
                       </div>
                       {locationSuggestions.map((suggestion) => {
                         const parts = suggestion.display_name.split(",").map((p: string) => p.trim());
-                        const shortName = parts.length > 2 ? `${parts[0]}, ${parts[parts.length - 1]}` : suggestion.display_name;
+                        const shortName = parts.length > 2 ? `${parts[0]}, ${parts[parts.length - 2]}, ${parts[parts.length - 1]}` : suggestion.display_name;
                         
                         return (
                           <button

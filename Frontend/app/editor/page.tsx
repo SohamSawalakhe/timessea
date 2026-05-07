@@ -176,17 +176,17 @@ function EditorContent() {
       setGeoError("Geolocation is not supported by your browser");
       return;
     }
-    
+
     setIsDetectingLocation(true);
     setGeoError(null);
-    
+
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         try {
           const { latitude, longitude } = position.coords;
           let detectedLocation = "";
           let tempVillages: string[] = [];
-          
+
           try {
             const nomRes = await fetch(
               `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`,
@@ -205,7 +205,7 @@ function EditorContent() {
               }
             }
           } catch { /* ignore nominatim fail */ }
-          
+
           const res = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`);
           if (res.ok) {
             const data = await res.json();
@@ -213,11 +213,11 @@ function EditorContent() {
             const city = (data.city || "").trim();
             const state = (data.principalSubdivision || "").trim();
             const country = (data.countryName || "").trim();
-            
+
             let dispTop = tempVillages.length > 0 ? tempVillages[0] : (locality || city || state || country);
             detectedLocation = state && state !== dispTop ? `${dispTop}, ${state}` : dispTop;
           }
-          
+
           if (detectedLocation) {
             setLocation(detectedLocation);
             setShowLocationModal(false);
@@ -305,7 +305,7 @@ function EditorContent() {
     setIsLoadingDraft(true);
     try {
       const API_URL =
-        process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+        process.env.NEXT_PUBLIC_API_URL;
       const response = await fetch(`${API_URL}/api/articles/${id}`);
 
       if (!response.ok) {
@@ -320,6 +320,7 @@ function EditorContent() {
 
       // Populate all fields
       setTitle(article.title || "");
+      setStatus(article.status || "Draft");
       setImageUrl(article.image || "");
       setSubheadline(article.subheadline || "");
       setLocation(article.location || "");
@@ -425,7 +426,7 @@ function EditorContent() {
     const fetchScheduled = async () => {
       try {
         const API_URL =
-          process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+          process.env.NEXT_PUBLIC_API_URL;
         const res = await fetch(`${API_URL}/api/articles/scheduled`);
         if (res.ok) {
           const data = await res.json();
@@ -504,9 +505,11 @@ function EditorContent() {
     }
     setIsPublishing(true);
 
+    const canPublishDirectly = user?.role === "SUPERADMIN" || user?.role === "ADMIN";
+
     try {
       const API_URL =
-        process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+        process.env.NEXT_PUBLIC_API_URL;
 
       // If editing a draft, update it; otherwise create new article
       const url = editingDraftId
@@ -528,11 +531,13 @@ function EditorContent() {
         scheduledAt: scheduledAt
           ? new Date(scheduledAt).toISOString()
           : undefined,
-        published: !scheduledAt, // If scheduled, it's not "published" yet
+        // Admin publishes directly, regular users create unpublished
+        published: canPublishDirectly ? !scheduledAt : false,
         imageDescription,
         imageCredit,
         subheadline,
         type: articleType,
+        status: canPublishDirectly ? (scheduledAt ? 'Scheduled' : 'Published') : 'Draft',
         seoTitle,
         seoDescription,
         factChecked,
@@ -564,17 +569,41 @@ function EditorContent() {
         );
       }
 
-      setPublished(true);
-      toast.success("Article published successfully!");
+      const createdArticle = await response.json();
 
-      // If scheduled, switch to Scheduled tab
-      if (scheduledAt) {
+      // For regular users: submit article for review
+      if (!canPublishDirectly) {
+        const articleId = editingDraftId || createdArticle.id;
+        if (articleId) {
+          const reviewRes = await fetch(
+            `${API_URL}/api/articles/${articleId}/submit-review`,
+            {
+              method: "PATCH",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+            },
+          );
+          if (reviewRes.ok) {
+            toast.success("Article submitted for review! The editorial team will review it shortly.");
+          } else {
+            toast.warning("Article saved but could not submit for review. Please try again.");
+          }
+        }
+      } else {
+        setPublished(true);
+        toast.success(scheduledAt ? "Article scheduled successfully!" : "Article published successfully!");
+      }
+
+      // If scheduled or submitted for review by standard user, navigate to Drafts tab
+      if (scheduledAt || !canPublishDirectly) {
         setTimeout(() => {
           setPublished(false);
           router.push("/drafts");
         }, 1500);
       } else {
-        // If published immediately, stay on the page and reset
+        // Published or submitted — stay on the page and reset
         setTimeout(() => {
           setPublished(false);
           setEditingDraftId(null);
@@ -606,7 +635,7 @@ function EditorContent() {
 
     try {
       const API_URL =
-        process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+        process.env.NEXT_PUBLIC_API_URL;
       const url = editingDraftId
         ? `${API_URL}/api/articles/${editingDraftId}`
         : `${API_URL}/api/articles`;
@@ -629,6 +658,7 @@ function EditorContent() {
         imageCredit,
         subheadline,
         type: articleType,
+        status: 'Draft',
         seoTitle,
         seoDescription,
         factChecked,
@@ -673,7 +703,7 @@ function EditorContent() {
   const handleDelete = (postId: string) => {
     showConfirmDelete(async () => {
       try {
-        const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+        const API_URL = process.env.NEXT_PUBLIC_API_URL;
         const res = await fetch(
           `${API_URL}/api/articles/${postId}`,
           {
@@ -750,9 +780,33 @@ function EditorContent() {
         <EditorAuthOverlay onClose={() => setShowLoginOverlay(false)} />
       )}
 
+      {/* Rejection Banner */}
+      <AnimatePresence>
+        {status === "Rejected" && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            className="mb-4 overflow-hidden"
+          >
+            <div className="rounded-2xl bg-red-500/10 border border-red-500/20 p-4 flex items-start gap-3">
+              <div className="bg-red-500 rounded-full p-1.5 shrink-0 mt-0.5">
+                <X className="w-3.5 h-3.5 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm font-bold text-red-600 mb-1">Article Rejected</h3>
+                <p className="text-xs text-red-500/80 leading-relaxed font-medium">
+                  This article has been rejected by the editorial team and cannot be edited or resubmitted. If you wish to propose a new version, please start a new draft.
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Header */}
       <header className="sticky top-0 z-40 mb-6 flex items-center justify-between gap-2 overflow-x-auto bg-background/95 backdrop-blur-sm pb-4 -mx-4 px-4">
         <div className="flex items-center gap-2 shrink-0">
+          {/* Schedule Feature Temporarily Disabled
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
@@ -788,16 +842,17 @@ function EditorContent() {
               </>
             )}
           </motion.button>
+          */}
         </div>
 
         {activeTab === "editor" && (
           <div className="flex items-center gap-2 shrink-0 ml-auto">
             <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+              whileHover={status === "Rejected" ? {} : { scale: 1.05 }}
+              whileTap={status === "Rejected" ? {} : { scale: 0.95 }}
               type="button"
               onClick={handleSaveDraft}
-              disabled={isSavingDraft || saved}
+              disabled={isSavingDraft || saved || status === "Rejected"}
               className={cn(
                 "flex items-center gap-1.5 rounded-full border border-border px-3 py-2 text-xs font-semibold shadow-sm transition-colors",
                 saved
@@ -816,11 +871,11 @@ function EditorContent() {
             </motion.button>
 
             <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+              whileHover={status === "Rejected" ? {} : { scale: 1.05 }}
+              whileTap={status === "Rejected" ? {} : { scale: 0.95 }}
               type="button"
               disabled={
-                !title.trim() || !subheadline.trim() || !fullContent.trim()
+                !title.trim() || !subheadline.trim() || !fullContent.trim() || status === "Rejected"
               }
               onClick={() => {
                 setIsPreview(true);
@@ -828,14 +883,14 @@ function EditorContent() {
               }}
               className={cn(
                 "flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold text-background shadow-md transition-all",
-                !title.trim() || !subheadline.trim() || !fullContent.trim()
+                (!title.trim() || !subheadline.trim() || !fullContent.trim() || status === "Rejected")
                   ? "bg-muted text-muted-foreground shadow-none cursor-not-allowed"
                   : "bg-primary text-primary-foreground hover:bg-primary/90",
               )}
             >
               <Eye className="h-3.5 w-3.5" />
               <span className={scheduledAt ? "hidden sm:inline" : ""}>
-                Preview & Publish
+                {(user?.role === "ADMIN" || user?.role === "SUPERADMIN") ? "Preview & Publish" : "Preview & Submit"}
               </span>
             </motion.button>
           </div>
@@ -1066,7 +1121,7 @@ function EditorContent() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.2 }}
-              className="space-y-6 rounded-3xl bg-card p-6 shadow-sm border border-border/50"
+              className="space-y-6 rounded-3xl bg-card p-4 sm:p-6 shadow-sm border border-border/50 overflow-hidden"
             >
               {previewMode === "cards" ? (
                 /* ─── CARDS VIEW ─── */
@@ -1096,8 +1151,8 @@ function EditorContent() {
                           (Click to Preview)
                         </span>
                       </h3>
-                      <div className="max-w-2xl border border-dashed border-border/50 p-6 rounded-2xl bg-secondary/10 group-hover:border-primary/30 group-hover:bg-secondary/20 transition-all">
-                        <div className="pointer-events-none">
+                      <div className="mx-auto w-full max-w-md border border-dashed border-border/50 p-4 sm:p-6 rounded-2xl bg-secondary/10 group-hover:border-primary/30 group-hover:bg-secondary/20 transition-all overflow-hidden">
+                        <div className="pointer-events-none w-full">
                           <ArticleCardFeatured article={previewArticle} />
                         </div>
                       </div>
@@ -1118,8 +1173,8 @@ function EditorContent() {
                           (Click to Preview)
                         </span>
                       </h3>
-                      <div className="max-w-2xl border border-dashed border-border/50 p-6 rounded-2xl bg-secondary/10 group-hover:border-primary/30 group-hover:bg-secondary/20 transition-all">
-                        <div className="pointer-events-none">
+                      <div className="mx-auto w-full max-w-md border border-dashed border-border/50 p-4 sm:p-6 rounded-2xl bg-secondary/10 group-hover:border-primary/30 group-hover:bg-secondary/20 transition-all overflow-hidden">
+                        <div className="pointer-events-none w-full">
                           <ArticleCardHorizontal article={previewArticle} />
                         </div>
                       </div>
@@ -1305,17 +1360,17 @@ function EditorContent() {
               )}
 
               {/* Publish Actions */}
-              <div className="flex items-center justify-between border-t border-border pt-6 mt-8">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-border pt-6 mt-8 pb-10">
                 <button
                   onClick={() => setIsPreview(false)}
-                  className="px-6 py-2.5 rounded-full border border-border text-sm font-bold hover:bg-secondary/50 transition-colors"
+                  className="px-6 py-2.5 rounded-full border border-border text-sm font-bold hover:bg-secondary/50 transition-colors w-full sm:w-auto"
                 >
                   Back to Editor
                 </button>
                 <button
                   onClick={handlePublish}
                   disabled={isPublishing || published}
-                  className="flex items-center gap-2 px-8 py-2.5 rounded-full bg-primary text-primary-foreground text-sm font-bold shadow-lg hover:shadow-xl hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full sm:w-auto flex justify-center items-center gap-2 px-8 py-2.5 rounded-full bg-primary text-primary-foreground text-sm font-bold shadow-lg hover:shadow-xl hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isPublishing ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -1326,7 +1381,9 @@ function EditorContent() {
                     ? "Published!"
                     : scheduledAt
                       ? "Schedule Publication"
-                      : "Publish Now"}
+                      : (user?.role === "ADMIN" || user?.role === "SUPERADMIN")
+                        ? "Publish Now"
+                        : "Submit for Review"}
                 </button>
               </div>
             </motion.div>
@@ -1345,7 +1402,8 @@ function EditorContent() {
                   placeholder="Article Headline"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="w-full bg-transparent text-4xl font-black placeholder:text-muted-foreground/20 focus:outline-none font-serif tracking-tight py-2 border-b-2 border-transparent focus:border-primary/20 transition-colors"
+                  disabled={status === "Rejected"}
+                  className="w-full bg-transparent text-4xl font-black placeholder:text-muted-foreground/20 focus:outline-none font-serif tracking-tight py-2 border-b-2 border-transparent focus:border-primary/20 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
                 />
                 <ContentBlock
                   html={subheadline}
@@ -1354,6 +1412,7 @@ function EditorContent() {
                     setActiveBlockId("summary");
                     activeTextAreaRef.current = e.currentTarget;
                   }}
+                  disabled={status === "Rejected"}
                   className="w-full bg-transparent text-xl font-medium placeholder:text-muted-foreground/30 focus:outline-none tracking-tight py-2 border-b border-transparent focus:border-primary/20 transition-colors text-muted-foreground outline-none empty:before:content-['Summary'] empty:before:text-muted-foreground/30 prose-p:m-0"
                 />
 
@@ -1502,18 +1561,19 @@ function EditorContent() {
                 <div className="flex items-center gap-1 overflow-x-auto border-b border-border bg-muted/30 px-4 py-2">
                   {toolbarButtons.map((btn) => (
                     <motion.button
-                      whileHover={{
+                      whileHover={status === "Rejected" ? {} : {
                         scale: 1.1,
                         backgroundColor: "rgba(0,0,0,0.05)",
                       }}
-                      whileTap={{ scale: 0.9 }}
+                      whileTap={status === "Rejected" ? {} : { scale: 0.9 }}
                       key={btn.label}
                       type="button"
+                      disabled={status === "Rejected"}
                       className={cn(
                         "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors",
                         activeActions.includes(btn.label)
                           ? "bg-primary text-primary-foreground"
-                          : "text-muted-foreground hover:bg-secondary",
+                          : "text-muted-foreground hover:bg-secondary disabled:opacity-50",
                       )}
                       title={btn.label}
                       onMouseDown={(e) => e.preventDefault()}
@@ -1558,6 +1618,7 @@ function EditorContent() {
                                 activeTextAreaRef.current = e.currentTarget;
                                 updateActiveActions();
                               }}
+                              disabled={status === "Rejected"}
                               className="w-full min-h-[10px] px-3 py-2 text-sm font-medium focus:outline-none text-foreground resize-none prose prose-sm dark:prose-invert max-w-none prose-p:m-0 prose-ul:m-0 prose-li:m-0 prose-ul:list-disc prose-ol:list-decimal prose-ul:pl-5 prose-ol:pl-5 empty:before:content-['Type_caption...'] empty:before:text-muted-foreground/50"
                             />
                           </div>
@@ -1603,6 +1664,7 @@ function EditorContent() {
                           setActiveBlockId(block.id);
                           activeTextAreaRef.current = e.currentTarget;
                         }}
+                        disabled={status === "Rejected"}
                         className="w-full bg-transparent text-base leading-relaxed placeholder:text-muted-foreground/30 focus:outline-none font-medium text-foreground outline-none empty:before:content-['Start_writing...'] empty:before:text-muted-foreground/20 prose prose-sm dark:prose-invert max-w-none prose-p:m-0 prose-headings:m-0 prose-h2:text-xl prose-h2:font-bold prose-blockquote:border-l-4 prose-blockquote:border-primary prose-blockquote:pl-4 prose-blockquote:italic prose-ul:list-disc prose-ol:list-decimal prose-ul:pl-5 prose-ol:pl-5"
                       />
                     );
@@ -1660,7 +1722,7 @@ function EditorContent() {
 
                 <div className="relative mb-5">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
                   </div>
                   <input
                     type="text"
@@ -1692,8 +1754,8 @@ function EditorContent() {
                       {locationSuggestions.map((suggestion) => {
                         // Keep location strings concise
                         const parts = suggestion.display_name.split(",").map((p: string) => p.trim());
-                        const shortName = parts.length > 2 ? `${parts[0]}, ${parts[parts.length - 1]}` : suggestion.display_name;
-                        
+                        const shortName = parts.length > 2 ? `${parts[0]}, ${parts[parts.length - 2]}, ${parts[parts.length - 1]}` : suggestion.display_name;
+
                         return (
                           <button
                             key={suggestion.place_id}
@@ -1738,7 +1800,7 @@ function EditorContent() {
                               <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
                               {loc}
                             </span>
-                            {(location === loc || location?.includes(loc.split(",")[0])) && <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><path d="M20 6 9 17l-5-5"/></svg>}
+                            {(location === loc || location?.includes(loc.split(",")[0])) && <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><path d="M20 6 9 17l-5-5" /></svg>}
                           </button>
                         ),
                       )}
@@ -1758,7 +1820,7 @@ function EditorContent() {
                       </>
                     ) : (
                       <>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="3" /></svg>
                         Auto-detect
                       </>
                     )}

@@ -34,7 +34,7 @@ export type Article = {
     | "Analysis"
     | "Standard"
     | "Feature";
-  status?: "Draft" | "In Review" | "Approved" | "Published" | "Corrected";
+  status?: "Draft" | "In Review" | "Approved" | "Published" | "Corrected" | "Pending Review" | "Needs Correction" | "Rejected";
   section?: string;
   tags?: string[];
   imageCaption?: string;
@@ -96,7 +96,7 @@ The future of Web 3 likely lies not in replacing existing systems entirely, but 
       name: "Josh Brian",
       email: "josh@blogify.com",
     },
-    category: "Tech",
+    category: "Technology",
     readTime: 5,
     publishedAt: "2 days ago",
     image: "/placeholder-web3.jpg",

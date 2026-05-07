@@ -13,6 +13,7 @@ export interface AuthorStats {
   draftCount: number;
   totalLikes: number;
   totalViews: number;
+  savedCount: number;
 }
 
 export interface PostAnalyticsResult {
@@ -138,10 +139,12 @@ export class AnalyticsQueryService {
       totalComments,
       totalFollowers,
       totalFollowing,
+      savedCount,
     ] = await Promise.all([
       this.prismaService.article.count({
         where: {
           authorId,
+          status: 'Published',
           published: true,
           deletedAt: null,
         },
@@ -149,19 +152,31 @@ export class AnalyticsQueryService {
       this.prismaService.article.count({
         where: {
           authorId,
+          status: 'Scheduled',
           published: false,
-          scheduledAt: {
-            not: null,
-          },
+          scheduledAt: { not: null },
           deletedAt: null,
         },
       }),
       this.prismaService.article.count({
         where: {
           authorId,
-          published: false,
-          scheduledAt: null,
           deletedAt: null,
+          scheduledAt: null,
+          OR: [
+            { published: false },
+            {
+              status: {
+                in: [
+                  'Draft',
+                  'Pending Review',
+                  'In Review',
+                  'Needs Correction',
+                  'Rejected',
+                ],
+              },
+            },
+          ],
         },
       }),
       this.prismaService.article.aggregate({
@@ -192,6 +207,11 @@ export class AnalyticsQueryService {
           followerId: authorId,
         },
       }),
+      (this.prismaService as any).bookmark.count({
+        where: {
+          userId: authorId,
+        },
+      }),
     ]);
 
     return {
@@ -203,6 +223,30 @@ export class AnalyticsQueryService {
       totalComments,
       totalFollowers,
       totalFollowing,
+      savedCount,
+    };
+  }
+
+  /**
+   * Get user activity stats (likes, comments, bookmarks)
+   */
+  async getUserActivityStats(userId: string) {
+    const [likesCount, commentsCount, bookmarksCount, viewsCount, historyCount] = await Promise.all([
+      this.prismaService.articleLike.count({ where: { userId, article: { deletedAt: null } } }),
+      this.prismaService.comment.count({
+        where: { authorId: userId, deletedAt: null, article: { deletedAt: null } },
+      }),
+      (this.prismaService as any).bookmark.count({ where: { userId, article: { deletedAt: null } } }),
+      this.getViewHistoryCount(userId),
+      this.getActualReadHistoryCount(userId),
+    ]);
+
+    return {
+      likesCount,
+      commentsCount,
+      bookmarksCount,
+      viewsCount,
+      historyCount,
     };
   }
 
@@ -1067,51 +1111,66 @@ export class AnalyticsQueryService {
     return Number(results[0]?.count) || 0;
   }
 
-  /**
-   * Get user activity stats (likes, comments)
-   */
-  async getUserActivityStats(userId: string) {
-    const [likesCount, commentsCount] = await Promise.all([
-      this.prismaService.articleLike.count({ where: { userId } }),
-      this.prismaService.comment.count({
-        where: { authorId: userId, deletedAt: null },
-      }),
-    ]);
 
-    return {
-      likesCount,
-      commentsCount,
-    };
-  }
 
-  private async getViewHistoryCount(userId: string): Promise<number> {
-    const query = `
-      SELECT uniq(post_id) as count
-      FROM analytics.events
-      WHERE user_id = {userId:UUID} AND event = 'post_view'
-    `;
+  async getViewHistoryCount(userId: string): Promise<number> {
     try {
-      const result = await this.clickhouseService.query<{
-        count: string | number;
-      }>(query, { userId });
-      return Number(result[0]?.count) || 0;
+      let postIds: string[] = [];
+      const redisHistory = await this.redisService.getUserHistory(userId, 'view', 1000, 0);
+      
+      if (redisHistory && redisHistory.length > 0) {
+        postIds = redisHistory.map((r: any) => r.postId);
+      } else {
+        const query = `
+          SELECT DISTINCT post_id 
+          FROM analytics.events 
+          WHERE user_id = {userId:UUID} AND event = 'post_view'
+          LIMIT 1000
+        `;
+        const result = await this.clickhouseService.query<{ post_id: string }>(query, { userId });
+        postIds = result.map(r => r.post_id);
+      }
+      
+      if (postIds.length === 0) return 0;
+      
+      return await this.prismaService.article.count({
+        where: { 
+          id: { in: postIds },
+          deletedAt: null
+        }
+      });
     } catch (e) {
       console.error('Failed to get view history count', e);
       return 0;
     }
   }
 
-  private async getActualReadHistoryCount(userId: string): Promise<number> {
-    const query = `
-      SELECT uniq(post_id) as count
-      FROM analytics.events
-      WHERE user_id = {userId:UUID} AND event = 'post_read'
-    `;
+  async getActualReadHistoryCount(userId: string): Promise<number> {
     try {
-      const result = await this.clickhouseService.query<{
-        count: string | number;
-      }>(query, { userId });
-      return Number(result[0]?.count) || 0;
+      let postIds: string[] = [];
+      const redisHistory = await this.redisService.getUserHistory(userId, 'read', 1000, 0);
+      
+      if (redisHistory && redisHistory.length > 0) {
+        postIds = redisHistory.map((r: any) => r.postId);
+      } else {
+        const query = `
+          SELECT DISTINCT post_id 
+          FROM analytics.events 
+          WHERE user_id = {userId:UUID} AND event = 'post_read'
+          LIMIT 1000
+        `;
+        const result = await this.clickhouseService.query<{ post_id: string }>(query, { userId });
+        postIds = result.map(r => r.post_id);
+      }
+      
+      if (postIds.length === 0) return 0;
+      
+      return await this.prismaService.article.count({
+        where: { 
+          id: { in: postIds },
+          deletedAt: null
+        }
+      });
     } catch (e) {
       console.error('Failed to get read history count', e);
       return 0;
@@ -1123,7 +1182,7 @@ export class AnalyticsQueryService {
    */
   async getUserLikedArticles(userId: string, limit = 20, offset = 0) {
     const likes = await this.prismaService.articleLike.findMany({
-      where: { userId },
+      where: { userId, article: { deletedAt: null } },
       include: {
         article: {
           include: { author: { select: { name: true, picture: true } } },
@@ -1146,7 +1205,7 @@ export class AnalyticsQueryService {
   async getUserCommentedArticles(userId: string, limit = 20, offset = 0) {
     // Get distinct article IDs first
     const comments = await this.prismaService.comment.findMany({
-      where: { authorId: userId, deletedAt: null },
+      where: { authorId: userId, deletedAt: null, article: { deletedAt: null } },
       select: { articleId: true, createdAt: true },
       orderBy: { createdAt: 'desc' },
       distinct: ['articleId'],
@@ -1173,33 +1232,48 @@ export class AnalyticsQueryService {
   }
 
   /**
-   * Get viewing history from ClickHouse (opened articles)
+   * Get viewing history from Redis/ClickHouse (opened articles)
    */
   async getUserViewHistory(userId: string, limit = 20, offset = 0) {
-    const query = `
-      SELECT DISTINCT post_id, max(created_at) as viewed_at
-      FROM analytics.events
-      WHERE user_id = {userId:UUID} AND event = 'post_view'
-      GROUP BY post_id
-      ORDER BY viewed_at DESC
-      LIMIT {limit:UInt32} OFFSET {offset:UInt32}
-    `;
-
     try {
+      // 1. Try Redis first
+      const redisHistory = await this.redisService.getUserHistory(userId, 'view', limit, offset);
+      if (redisHistory && redisHistory.length > 0) {
+        const postIds = redisHistory.map((r) => r.postId);
+        const articles = await this.prismaService.article.findMany({
+          where: { id: { in: postIds }, deletedAt: null },
+          include: { author: { select: { name: true, picture: true } } },
+        });
+
+        // Re-order based on Redis sorting and map
+        return redisHistory
+          .map((r) => {
+            const article = articles.find((a) => a.id === r.postId);
+            return article ? { ...article, viewedAt: new Date(r.timestamp).toISOString() } : null;
+          })
+          .filter(Boolean);
+      }
+
+      // 2. Fallback to ClickHouse
+      const query = `
+        SELECT DISTINCT post_id, max(created_at) as viewed_at
+        FROM analytics.events
+        WHERE user_id = {userId:UUID} AND event = 'post_view'
+        GROUP BY post_id
+        ORDER BY viewed_at DESC
+        LIMIT {limit:UInt32} OFFSET {offset:UInt32}
+      `;
+
       const results = await this.clickhouseService.query<{
         post_id: string;
         viewed_at: string;
-      }>(query, {
-        userId,
-        limit,
-        offset,
-      });
+      }>(query, { userId, limit, offset });
 
       if (results.length === 0) return [];
 
       const postIds = results.map((r) => r.post_id);
       const articles = await this.prismaService.article.findMany({
-        where: { id: { in: postIds } },
+        where: { id: { in: postIds }, deletedAt: null },
         include: { author: { select: { name: true, picture: true } } },
       });
 
@@ -1216,33 +1290,48 @@ export class AnalyticsQueryService {
   }
 
   /**
-   * Get reading history from ClickHouse (fully read articles)
+   * Get reading history from Redis/ClickHouse (fully read articles)
    */
   async getUserReadHistory(userId: string, limit = 20, offset = 0) {
-    const query = `
-      SELECT DISTINCT post_id, max(created_at) as read_at
-      FROM analytics.events
-      WHERE user_id = {userId:UUID} AND event = 'post_read'
-      GROUP BY post_id
-      ORDER BY read_at DESC
-      LIMIT {limit:UInt32} OFFSET {offset:UInt32}
-    `;
-
     try {
+      // 1. Try Redis first
+      const redisHistory = await this.redisService.getUserHistory(userId, 'read', limit, offset);
+      if (redisHistory && redisHistory.length > 0) {
+        const postIds = redisHistory.map((r) => r.postId);
+        const articles = await this.prismaService.article.findMany({
+          where: { id: { in: postIds }, deletedAt: null },
+          include: { author: { select: { name: true, picture: true } } },
+        });
+
+        // Re-order based on Redis sorting and map
+        return redisHistory
+          .map((r) => {
+            const article = articles.find((a) => a.id === r.postId);
+            return article ? { ...article, readAt: new Date(r.timestamp).toISOString() } : null;
+          })
+          .filter(Boolean);
+      }
+
+      // 2. Fallback to ClickHouse
+      const query = `
+        SELECT DISTINCT post_id, max(created_at) as read_at
+        FROM analytics.events
+        WHERE user_id = {userId:UUID} AND event = 'post_read'
+        GROUP BY post_id
+        ORDER BY read_at DESC
+        LIMIT {limit:UInt32} OFFSET {offset:UInt32}
+      `;
+
       const results = await this.clickhouseService.query<{
         post_id: string;
         read_at: string;
-      }>(query, {
-        userId,
-        limit,
-        offset,
-      });
+      }>(query, { userId, limit, offset });
 
       if (results.length === 0) return [];
 
       const postIds = results.map((r) => r.post_id);
       const articles = await this.prismaService.article.findMany({
-        where: { id: { in: postIds } },
+        where: { id: { in: postIds }, deletedAt: null },
         include: { author: { select: { name: true, picture: true } } },
       });
 

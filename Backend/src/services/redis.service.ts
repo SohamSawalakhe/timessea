@@ -90,4 +90,35 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   async getOnlineAdminsCount(): Promise<number> {
     return await this.client.scard('admin:online');
   }
+
+  /**
+   * Add to user view/read history (Instant tracking)
+   */
+  async addToUserHistory(userId: string, type: 'view' | 'read', postId: string) {
+    const key = `user:${userId}:history:${type}s`;
+    const score = Date.now();
+    await this.client.zadd(key, score, postId);
+    // Keep only the last 100 items to prevent unbounded growth
+    await this.client.zremrangebyrank(key, 0, -101);
+  }
+
+  /**
+   * Get total count of user history from Redis
+   */
+  async getUserHistoryCount(userId: string, type: 'view' | 'read'): Promise<number> {
+    return await this.client.zcard(`user:${userId}:history:${type}s`);
+  }
+
+  /**
+   * Get paginated user history from Redis
+   */
+  async getUserHistory(userId: string, type: 'view' | 'read', limit = 20, offset = 0) {
+    const key = `user:${userId}:history:${type}s`;
+    const results = await this.client.zrevrange(key, offset, offset + limit - 1, 'WITHSCORES');
+    const history: Array<{ postId: string; timestamp: number }> = [];
+    for (let i = 0; i < results.length; i += 2) {
+      history.push({ postId: results[i], timestamp: parseInt(results[i + 1], 10) });
+    }
+    return history;
+  }
 }

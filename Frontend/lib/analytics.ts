@@ -18,6 +18,7 @@ export enum AnalyticsEventType {
   COMMENT = "comment",
   SHARE = "share",
   SAVE = "save",
+  UNSAVE = "unsave",
   SEARCH_QUERY = "search_query",
 }
 
@@ -44,7 +45,7 @@ class AnalyticsService {
   private BATCH_SIZE = 5;
   private FLUSH_INTERVAL = 3000;
   private timer: NodeJS.Timeout | null = null;
-  private endpoint = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/analytics/track`;
+  private endpoint = `${process.env.NEXT_PUBLIC_API_URL}/analytics/track`;
 
   constructor() {
     if (typeof window !== "undefined") {

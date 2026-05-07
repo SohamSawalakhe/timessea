@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/contexts/AuthContext";
-import { ArrowLeft, UserCircle, Settings, Users, UserPlus, MapPin } from "lucide-react";
+import { ArrowLeft, UserCircle, Settings, Users, UserPlus, MapPin, Shield, BadgeCheck } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
@@ -12,11 +12,12 @@ import { ArticleCardHorizontal } from "@/components/article-card";
 import type { Article } from "@/lib/data";
 import { cn } from "@/lib/utils";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 type UserProfile = {
   id: string;
   name: string;
+  role?: string;
   handle?: string;
   bio?: string;
   coverImage?: string;
@@ -175,11 +176,29 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
             <div className="w-full px-5 sm:px-8 pb-6 relative z-10">
               <div className="flex justify-between items-start mb-4 gap-4">
                 <div className="flex flex-col pt-1 z-10 flex-1 text-left min-w-0">
-                  <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-foreground tracking-tight leading-none mb-1.5 drop-shadow-md whitespace-normal">
-                    {profile.name}
-                  </h1>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-foreground tracking-tight leading-none drop-shadow-md whitespace-normal">
+                      {profile.name}
+                    </h1>
+                    {/* Role Badges: Only visible to other admins. Super Admin specifically only to Super Admins. */}
+                    {profile.role === "SUPERADMIN" ? (
+                      user?.role === "SUPERADMIN" && (
+                        <span className="inline-flex items-center gap-0.5 rounded-full bg-blue-500/10 px-2 py-0.5 text-blue-500 ring-1 ring-blue-500/20 shrink-0" title="Super Admin">
+                          <BadgeCheck className="w-3.5 h-3.5" />
+                          <span className="text-[9px] font-bold uppercase tracking-wider">Super Admin</span>
+                        </span>
+                      )
+                    ) : profile.role === "ADMIN" ? (
+                      (user?.role === "ADMIN" || user?.role === "SUPERADMIN") && (
+                        <span className="inline-flex items-center gap-0.5 rounded-full bg-blue-500/10 px-2 py-0.5 text-blue-500 ring-1 ring-blue-500/20 shrink-0" title="Admin">
+                          <BadgeCheck className="w-3.5 h-3.5" />
+                          <span className="text-[9px] font-bold uppercase tracking-wider">Admin</span>
+                        </span>
+                      )
+                    ) : null}
+                  </div>
                   {profile.handle && (
-                    <p className="text-foreground/80 text-sm font-bold drop-shadow-sm whitespace-normal">
+                    <p className="text-foreground/80 text-sm font-bold drop-shadow-sm whitespace-normal mt-1.5">
                       {profile.handle}
                     </p>
                   )}
@@ -201,6 +220,20 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
                         </div>
                       )}
                     </div>
+                    {/* Admin Shield Icon: Visibility logic mirrors the badge above */}
+                    {profile.role === "SUPERADMIN" ? (
+                      user?.role === "SUPERADMIN" && (
+                        <div className="absolute bottom-1 right-1 h-5 w-5 sm:h-6 sm:w-6 rounded-full border-4 border-card bg-blue-500 shadow-sm flex items-center justify-center" title="Super Admin">
+                          <Shield className="w-2.5 h-2.5 text-white" />
+                        </div>
+                      )
+                    ) : profile.role === "ADMIN" ? (
+                      (user?.role === "ADMIN" || user?.role === "SUPERADMIN") && (
+                        <div className="absolute bottom-1 right-1 h-5 w-5 sm:h-6 sm:w-6 rounded-full border-4 border-card bg-blue-500 shadow-sm flex items-center justify-center" title="Admin">
+                          <Shield className="w-2.5 h-2.5 text-white" />
+                        </div>
+                      )
+                    ) : null}
                   </div>
                   
                   <button

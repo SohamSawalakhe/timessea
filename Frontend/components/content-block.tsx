@@ -4,11 +4,13 @@ export const ContentBlock = ({
   html,
   onChange,
   onFocus,
+  disabled = false,
   className,
 }: {
   html: string;
   onChange: (html: string) => void;
   onFocus: (e: React.FocusEvent<HTMLDivElement>) => void;
+  disabled?: boolean;
   className?: string;
 }) => {
   const contentEditableRef = useRef<HTMLDivElement>(null);
@@ -26,7 +28,7 @@ export const ContentBlock = ({
     <div
       ref={contentEditableRef}
       className={className}
-      contentEditable
+      contentEditable={!disabled}
       suppressContentEditableWarning
       onInput={(e) => {
         onChange(e.currentTarget.innerHTML);

@@ -18,6 +18,7 @@ export enum AnalyticsEventType {
   COMMENT_DELETED = 'comment_deleted',
   SHARE = 'share',
   SAVE = 'save',
+  UNSAVE = 'unsave',
   REPORT = 'report',
 
   // User Events

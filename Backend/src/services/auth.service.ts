@@ -17,13 +17,21 @@ export class AuthService {
     const userByGoogleId = await this.usersService.findOne({
       googleId: details.googleId,
     });
-    if (userByGoogleId) return userByGoogleId;
+    if (userByGoogleId) {
+      if ((userByGoogleId as any).banned) {
+        throw new Error('Your account has been suspended.');
+      }
+      return userByGoogleId;
+    }
 
     // Check if user exists by email
     const userByEmail = await this.usersService.findOne({
       email: details.email,
     });
     if (userByEmail) {
+      if ((userByEmail as any).banned) {
+        throw new Error('Your account has been suspended.');
+      }
       // Connect googleId to existing user if not present
       // For now just return the user, assuming implied linking
       // Ideally we would update the user to add googleId here
@@ -43,7 +51,7 @@ export class AuthService {
   }
 
   async login(user: any) {
-    const payload = { email: user.email, sub: user.id };
+    const payload = { email: user.email, sub: user.id, role: user.role || 'USER' };
 
     // Generate access token (short-lived: 15 minutes)
     const accessToken = this.jwtService.sign(payload, {
@@ -90,6 +98,13 @@ export class AuthService {
       throw new Error('Invalid refresh token');
     }
 
+    if ((storedToken.user as any).banned) {
+      await this.prisma.refreshToken.delete({
+        where: { id: storedToken.id },
+      });
+      throw new Error('Your account has been suspended.');
+    }
+
     // Check if token is expired
     if (new Date() > storedToken.expiresAt) {
       // Delete expired token
@@ -100,7 +115,11 @@ export class AuthService {
     }
 
     // Generate new access token
-    const payload = { email: storedToken.user.email, sub: storedToken.user.id };
+    const payload = {
+      email: storedToken.user.email,
+      sub: storedToken.user.id,
+      role: (storedToken.user as any).role || 'USER',
+    };
     const accessToken = this.jwtService.sign(payload, {
       expiresIn: '15m',
     });

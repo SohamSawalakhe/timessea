@@ -208,3 +208,63 @@
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--muted-foreground) / 0.5) !important;
 }
+
+/* ═══════════════════════════════════════════════════════
+   Reading Mode: Speed Read
+   Highlights the first sentence of each paragraph
+   ═══════════════════════════════════════════════════════ */
+.reading-mode-speed mark.speed-read-highlight {
+  background: linear-gradient(120deg, rgba(250, 204, 21, 0.25) 0%, rgba(251, 191, 36, 0.15) 100%);
+  padding: 2px 0;
+  border-radius: 2px;
+  color: inherit;
+  font-weight: 600;
+}
+
+.dark .reading-mode-speed mark.speed-read-highlight {
+  background: linear-gradient(120deg, rgba(250, 204, 21, 0.15) 0%, rgba(251, 191, 36, 0.08) 100%);
+}
+
+.reading-mode-speed p {
+  position: relative;
+}
+
+/* De-emphasize non-highlighted text slightly */
+.reading-mode-speed p::after {
+  content: none;
+}
+
+/* ═══════════════════════════════════════════════════════
+   Reading Mode: Focus
+   Larger text, stripped-down UI, centered reading
+   ═══════════════════════════════════════════════════════ */
+.reading-mode-focus {
+  font-size: 1.2em !important;
+  line-height: 1.9 !important;
+  letter-spacing: 0.01em;
+  max-width: 600px !important;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.reading-mode-focus p {
+  margin-bottom: 1.8em !important;
+}
+
+.reading-mode-focus img,
+.reading-mode-focus figure {
+  margin-top: 2.5em !important;
+  margin-bottom: 2.5em !important;
+}
+
+/* Fade out distractions when in focus mode */
+.focus-mode-active .bottom-nav,
+.focus-mode-active header.sticky {
+  opacity: 0.3;
+  transition: opacity 0.4s ease;
+}
+
+.focus-mode-active .bottom-nav:hover,
+.focus-mode-active header.sticky:hover {
+  opacity: 1;
+}

@@ -16,13 +16,17 @@ export default function LikedArticlesPage() {
 
   useEffect(() => {
     if (token) {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+      const API_URL = process.env.NEXT_PUBLIC_API_URL;
       fetch(`${API_URL}/analytics/profile/likes?limit=50`, {
         headers: { Authorization: `Bearer ${token}` },
       })
         .then((res) => res.json())
         .then((data) => {
-            setArticles(data);
+            if (Array.isArray(data)) {
+              setArticles(data);
+            } else {
+              setArticles([]);
+            }
             setLoading(false);
         })
         .catch((err) => {

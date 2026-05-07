@@ -48,4 +48,12 @@ export class ArticlesGateway
   notifyCommentCountUpdate(articleId: string, commentCount: number) {
     this.server.emit('commentCountUpdate', { articleId, commentCount });
   }
+
+  notifyArticlePublished(article: any) {
+    this.server.emit('articlePublished', article);
+  }
+
+  notifyNewSubmission(article: any) {
+    this.server.emit('newSubmission', article);
+  }
 }

@@ -85,4 +85,8 @@ export class CreateArticleDto {
   @IsOptional()
   @IsBoolean()
   factChecked?: boolean;
+
+  @IsOptional()
+  @IsString()
+  status?: string;
 }

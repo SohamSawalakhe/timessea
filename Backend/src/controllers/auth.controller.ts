@@ -13,11 +13,11 @@ import type { Response, Request } from 'express';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService) { }
 
   @Get('google')
   @UseGuards(AuthGuard('google'))
-  async googleAuth() {}
+  async googleAuth() { }
 
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))
@@ -25,12 +25,18 @@ export class AuthController {
     @Req() req: Request & { user: any },
     @Res() res: Response,
   ) {
+    // If user has the banned marker, redirect to login with error
+    if (!req.user || req.user.__banned) {
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      return res.redirect(`${frontendUrl}/login?error=banned`);
+    }
+
     const data = await this.authService.login(req.user);
 
     // Set refresh token as httpOnly cookie (secure, not accessible via JavaScript)
     res.cookie('refreshToken', data.refresh_token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+      secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       path: '/',
@@ -58,6 +64,15 @@ export class AuthController {
 
     try {
       const data = await this.authService.refreshAccessToken(refreshToken);
+
+      // Refresh the cookie to extend its lifespan
+      res.cookie('refreshToken', refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 7 * 24 * 60 * 60 * 1000, // Extend by 7 days
+        path: '/',
+      });
 
       // Return new access token
       res.json({

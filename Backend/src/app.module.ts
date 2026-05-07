@@ -10,6 +10,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { ArticlesModule } from './modules/articles/articles.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { CommentsModule } from './modules/comments/comments.module';
+import { ThrottlerModule } from '@nestjs/throttler';
 
 @Module({
   imports: [
@@ -25,11 +26,18 @@ import { CommentsModule } from './modules/comments/comments.module';
         port: parseInt(process.env.REDIS_PORT || '6379', 10),
       },
     }),
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000,
+        limit: 100, // 100 requests per minute
+      },
+    ]),
     PrismaModule,
     UsersModule,
     AuthModule,
     ArticlesModule,
     AnalyticsModule,
+    CommentsModule,
     ScheduleModule.forRoot(),
   ],
   controllers: [AppController],

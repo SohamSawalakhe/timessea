@@ -1,17 +1,18 @@
 "use client";
 
-import { useEffect, Suspense } from "react";
+import { useEffect, Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Loader2, Newspaper } from "lucide-react";
+import { Loader2, Newspaper, ShieldOff } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login, isAuthenticated, isLoading: authLoading } = useAuth();
+  const [bannedError, setBannedError] = useState<string | null>(null);
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -23,20 +24,48 @@ function LoginForm() {
   // Handle Google OAuth callback token
   useEffect(() => {
     const token = searchParams.get("token");
+    const error = searchParams.get("error");
+
+    // Handle ban redirect from backend (?error=banned)
+    if (error === "banned") {
+      setBannedError("Your account has been banned by the owner.");
+      router.replace("/login");
+      return;
+    }
+
     if (token) {
-      fetch(`${API_URL}/auth/profile`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-        .then((res) => res.json())
-        .then((user) => {
+      const fetchProfile = async () => {
+        try {
+          const res = await fetch(`${API_URL}/auth/profile`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            const msg =
+              (errData as any).message ||
+              "Your account has been suspended by the owner.";
+            setBannedError(msg);
+            router.replace("/login");
+            return;
+          }
+          
+          const user = await res.json();
           login(token, user);
           router.push("/profile");
-        })
-        .catch((err) => console.error(err));
+        } catch (err) {
+          console.error("Login profile fetch failed:", err);
+          setBannedError("Unable to connect to the server. Please check your internet connection and try again.");
+          // Clear token from URL to stop retry loop
+          router.replace("/login");
+        }
+      };
+      
+      fetchProfile();
     }
   }, [searchParams, router, login]);
 
-  const isProcessingToken = !!searchParams.get("token");
+  const isProcessingToken = !!searchParams.get("token") && !bannedError;
 
   if (isProcessingToken) {
     return (
@@ -55,6 +84,20 @@ function LoginForm() {
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_at_top,rgba(120,119,198,0.1),transparent_50%)]" />
 
       <div className="relative w-full max-w-md space-y-8 rounded-2xl bg-[#111] p-8 shadow-2xl border border-white/10">
+
+        {/* Banned Error Banner */}
+        {bannedError && (
+          <div className="flex items-start gap-3 rounded-xl bg-red-500/10 border border-red-500/30 p-4">
+            <ShieldOff className="h-5 w-5 text-red-400 mt-0.5 shrink-0" />
+            <div>
+              <p className="text-sm font-bold text-red-400">Account Suspended</p>
+              <p className="text-xs text-red-400/80 mt-0.5">
+                Your account has been banned by the owner. Please contact support if you believe this is a mistake.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Logo / Brand */}
         <div className="text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-linear-to-br from-white/15 to-white/5 backdrop-blur-sm border border-white/10">

@@ -16,7 +16,7 @@ export default function ReadingHistoryPage() {
 
   useEffect(() => {
     if (token) {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+      const API_URL = process.env.NEXT_PUBLIC_API_URL;
       fetch(`${API_URL}/analytics/profile/history?limit=50`, {
         headers: { Authorization: `Bearer ${token}` },
       })

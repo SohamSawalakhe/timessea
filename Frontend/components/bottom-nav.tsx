@@ -4,24 +4,42 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
-import { Home, Compass, PenSquare, Bookmark, User } from "lucide-react";
-
-const navItems = [
-  { href: "/", label: "Home", icon: Home },
-  { href: "/explore", label: "Explore", icon: Compass },
-  { href: "/editor", label: "Create", icon: PenSquare, isCenter: true },
-  { href: "/bookmarks", label: "Saved", icon: Bookmark },
-  { href: "/profile", label: "Profile", icon: User },
-];
+import { Home, Compass, PenSquare, Bookmark, User, Shield, Bell } from "lucide-react";
+import { useNotifications } from "@/contexts/NotificationContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export function BottomNav() {
   const pathname = usePathname();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  const { unreadCount } = useNotifications();
+  const { t } = useLanguage();
   const router = useRouter();
+
+  const isAdmin = user?.role === "ADMIN" || user?.role === "SUPERADMIN";
+  const isSuperAdmin = user?.role === "SUPERADMIN";
+
+  interface NavItem {
+    href: string;
+    label: string;
+    icon: any;
+    isCenter?: boolean;
+    badge?: number;
+  }
+
+  // Build nav items dynamically
+  const navItems: NavItem[] = [
+    { href: "/", label: t("home"), icon: Home },
+    { href: "/explore", label: t("explore"), icon: Compass },
+    { href: "/editor", label: t("create"), icon: PenSquare, isCenter: true },
+    isAdmin
+      ? { href: "/admin/review", label: isSuperAdmin ? "super admin" : "admin", icon: Shield }
+      : { href: "/bookmarks", label: t("saved"), icon: Bookmark },
+    { href: "/profile", label: t("profile"), icon: User },
+  ];
 
   const handleNavigation = (href: string, e: React.MouseEvent) => {
     // Protected routes
-    if (["/bookmarks", "/profile"].includes(href) && !isAuthenticated) {
+    if (["/bookmarks", "/profile", "/admin/review"].includes(href) && !isAuthenticated) {
       e.preventDefault();
       router.push(`/login?redirect=${href}`);
     }
@@ -72,19 +90,28 @@ export function BottomNav() {
               className="flex flex-col items-center gap-0.5 py-1.5"
               aria-label={item.label}
             >
-              <item.icon
-                className={cn(
-                  "h-6 w-6 transition-colors",
-                  isActive ? "text-foreground" : "text-muted-foreground",
+              <div className="relative">
+                <item.icon
+                  className={cn(
+                    "h-6 w-6 transition-colors",
+                    isActive ? "text-foreground" : "text-muted-foreground",
+                    (item.label === "admin" || item.label === "super admin") && isActive && "text-primary",
+                  )}
+                  strokeWidth={isActive ? 2.5 : 1.5}
+                />
+                {item.badge && (
+                  <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[8px] font-bold text-white ring-2 ring-card animate-in zoom-in">
+                    {item.badge}
+                  </span>
                 )}
-                strokeWidth={isActive ? 2.5 : 1.5}
-              />
+              </div>
               <span
                 className={cn(
                   "text-[10px] transition-colors",
                   isActive
                     ? "font-semibold text-foreground"
                     : "font-medium text-muted-foreground",
+                  (item.label === "admin" || item.label === "super admin") && isActive && "text-primary",
                 )}
               >
                 {item.label}
@@ -96,3 +123,4 @@ export function BottomNav() {
     </nav>
   );
 }
+

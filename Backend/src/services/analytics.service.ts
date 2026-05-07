@@ -52,6 +52,15 @@ export class AnalyticsService {
       if (event.user_id) {
         await this.redisService.trackActiveUser(event.user_id);
       }
+
+      // Track instant user history in Redis
+      if (event.user_id && event.post_id) {
+        if (event.event === 'post_view') {
+          await this.redisService.addToUserHistory(event.user_id, 'view', event.post_id);
+        } else if (event.event === 'post_read') {
+          await this.redisService.addToUserHistory(event.user_id, 'read', event.post_id);
+        }
+      }
     } catch (error) {
       console.error('Failed to track analytics event:', error);
       // Don't throw - analytics should never break the main flow
@@ -77,6 +86,17 @@ export class AnalyticsService {
       }));
 
       await this.analyticsQueue.addBulk(jobs);
+
+      // Track instant user history in Redis for batch events too
+      for (const event of events) {
+        if (event.user_id && event.post_id) {
+          if (event.event === 'post_view') {
+            await this.redisService.addToUserHistory(event.user_id, 'view', event.post_id).catch(console.error);
+          } else if (event.event === 'post_read') {
+            await this.redisService.addToUserHistory(event.user_id, 'read', event.post_id).catch(console.error);
+          }
+        }
+      }
     } catch (error) {
       console.error('Failed to track batch analytics events:', error);
     }
